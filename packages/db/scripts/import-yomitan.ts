@@ -1,7 +1,6 @@
 import AdmZip from "adm-zip";
 import { db } from "../src/client.js";
 import { dictionaries, dictionaryEntries } from "../src/schema/index.js";
-import { eq } from "drizzle-orm";
 import { parseArgs } from "node:util";
 import path from "node:path";
 

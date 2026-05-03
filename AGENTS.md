@@ -37,6 +37,7 @@ LLMは、DBから取得した定義の説明係に限定する。
 | Package Manager | pnpm workspaces |
 | LLM | Gemini primary / OpenRouter fallback |
 | Web UI | Astro + React islands |
+| Agent Control Plane | MCP Server (Node.js + TypeScript) |
 | Local infra | Docker Compose |
 
 新しい技術を足す前に、既存スタックで解けない理由を書くこと。
@@ -53,6 +54,7 @@ packages/
   bot/   Discord Bot本体
   db/    Drizzle schema、DB client、import scripts
   web/   Admin Web UI
+  mcp/   外側AIエージェント向け Control Plane
 ```
 
 責務を混ぜない。
@@ -60,9 +62,13 @@ packages/
 - `packages/db`: DB schema、DB client、migration、seed、importer
 - `packages/bot`: Discord events、commands、Bot services
 - `packages/web`: 管理画面のみ
+- `packages/mcp`: 外側AIエージェント向けの監視・診断・限定操作窓口
 
 Bot側で直接SQL文字列を散らさない。
 DBアクセスは `@grkd/db` 経由に寄せる。
+
+MCP側にも Discord Bot Token を持たせない。
+Discord API を実際に呼ぶのは `packages/bot` だけにする。
 
 ---
 
@@ -72,10 +78,10 @@ DBアクセスは `@grkd/db` 経由に寄せる。
 
 ```txt
 Phase 0: monorepo / Docker / DB schema / Yomitan importer / env schema
-Phase 1: Bot MVP / dictionary lookup / cache / LLM / rate limit / wipe scheduler
-Phase 2: Slash command 管理機能
-Phase 3: Web Admin UI
-Phase 4: 品質改善・最適化
+Phase 1: Bot MVP / dictionary lookup / cache / LLM / rate limit / wipe scheduler / observability
+Phase 2: Slash command 管理機能 / read-only MCP
+Phase 3: Web Admin UI / Agent Ops 承認画面 / dry-run MCP
+Phase 4: 品質改善・最適化 / limited write MCP / agent runbook
 ```
 
 Phaseを飛ばさない。
@@ -109,6 +115,8 @@ llm.service.ts              Gemini / OpenRouter 呼び出し
 lookup-log.service.ts       検索ログ保存
 rate-limit.service.ts       ユーザー別リミット
 channel-wipe.service.ts     チャンネル消去
+observability.service.ts    trace_id / bot_events / heartbeat
+ops-job.service.ts          MCP経由の運営ジョブ処理
 ```
 
 1ファイルに全部詰め込まない。
@@ -128,14 +136,18 @@ channel-wipe.service.ts     チャンネル消去
 主要テーブルは以下。
 
 ```txt
-dictionaries
-dictionary_entries
-response_cache
-response_edits
-lookup_logs
-role_rate_limits
-user_usage
-channel_settings
+dictionaries        (Phase 0)
+dictionary_entries  (Phase 0)
+response_cache      (Phase 0)
+response_edits      (Phase 0)
+lookup_logs         (Phase 0)
+role_rate_limits    (Phase 0)
+user_usage          (Phase 0)
+channel_settings    (Phase 0)
+bot_events          (Phase 1: observability)
+bot_heartbeats      (Phase 1: observability)
+ops_jobs            (Phase 1: safe ops queue)
+mcp_audit_logs      (Phase 2: MCP audit)
 ```
 
 ### 6-1. キャッシュキー
@@ -288,7 +300,102 @@ Botには最低限以下が必要。
 
 ---
 
-## 11. やってはいけないこと
+## 11. AI Agent / MCP Control Plane 方針
+
+外側のAIエージェントが、MCP経由で GRKD-Jisho Bot を自律監視・診断・限定運営できるようにする。
+
+ただし、MCPは Discord Bot の代わりではない。
+MCPは Control Plane として、DBに記録された状態を読み、必要なら安全な `ops_jobs` を作る。
+Discord API を実際に呼ぶのは `packages/bot` だけにする。
+
+### 11-1. 役割分担
+
+```txt
+External AI Agent = 監視・診断・提案・安全な操作要求
+packages/mcp      = AI向け操作窓口。tool schema、入力検証、audit
+PostgreSQL        = trace、heartbeat、ops job、audit log の保存場所
+packages/bot      = Discord API を実際に呼ぶ唯一の実行者
+Admin UI          = 人間の確認・編集・承認画面
+```
+
+### 11-2. 必須の観測性
+
+Botの主要処理には必ず `trace_id` を流す。
+
+対象は以下。
+
+```txt
+messageCreate
+dictionary lookup
+response cache
+LLM generate / fallback
+rate limit
+channel wipe
+ops job execution
+```
+
+重要イベントは `bot_events` に保存する。
+Bot / MCP / Web は `bot_heartbeats` に稼働状態を記録する。
+
+### 11-3. MCP tool の段階
+
+最初は read-only のみ許可する。
+
+```txt
+Level 1: read-only
+  grkd.health
+  grkd.recent_errors
+  grkd.get_trace
+  grkd.lookup_stats
+  grkd.cache_stats
+  grkd.rate_limit_status
+  grkd.wipe_status
+
+Level 2: dry-run
+  grkd.dry_run_wipe
+  grkd.dry_run_rate_limit_change
+  grkd.dry_run_cache_refresh
+
+Level 3: limited write
+  grkd.request_cache_refresh
+  grkd.request_user_usage_reset
+  grkd.request_rate_limit_change
+  grkd.request_toggle_wipe
+
+Level 4: dangerous
+  grkd.request_wipe_now
+  grkd.request_bulk_cache_delete
+  grkd.request_prompt_version_rotate
+```
+
+Level 3 以上は必ず `mcp_audit_logs` に記録する。
+Level 4 は必ず人間承認を必要とする。
+
+### 11-4. ops_jobs 原則
+
+MCPから直接危険操作を実行しない。
+書き込み系操作は `ops_jobs` に登録し、Botが安全条件を確認して実行する。
+
+特に以下は人間承認必須。
+
+- チャンネル即時wipe
+- bulk cache delete
+- prompt_version rotate
+- 本番DBの大量変更
+- 外部API課金が増える操作
+
+### 11-5. MCPで禁止すること
+
+- Discord Bot Token を MCP に持たせる
+- MCP tool から Discord API のチャンネル削除・メッセージ削除を直接呼ぶ
+- MCP tool に任意SQL実行機能を持たせる
+- `.env`、token、API key、secret を tool 出力に含める
+- AIエージェントの判断だけで destructive 操作を実行する
+- audit log なしで write tool を実行する
+
+---
+
+## 12. やってはいけないこと
 
 このプロジェクトでは以下を禁止する。
 
@@ -302,6 +409,10 @@ Botには最低限以下が必要。
 - wipe対象チャンネルをハードコードする
 - `wipe_enabled = false` のチャンネルを消す
 - 固定メッセージを消す
+- MCPにDiscord Bot Tokenを持たせる
+- MCPからDiscord APIの危険操作を直接実行する
+- MCPに任意SQL実行ツールを公開する
+- `ops_jobs` / `mcp_audit_logs` を通さずにAIエージェントの書き込み操作を許可する
 - `.env`、トークン、APIキー、Discord Bot Tokenをコミットする
 - 本番DBや本番Discordサーバーで未検証のwipe処理を試す
 - ユーザーに無断で大量削除・DB削除・チャンネル削除・git履歴改変を行う
@@ -309,7 +420,7 @@ Botには最低限以下が必要。
 
 ---
 
-## 12. テスト方針
+## 13. テスト方針
 
 最低限、以下を確認してから完了扱いにする。
 
@@ -331,6 +442,8 @@ Botには最低限以下が必要。
 - role_key別の返答
 - rate limit超過
 - wipe_enabled channel のみ wipe
+- trace_id で1回の処理を追跡できる
+- bot_heartbeats が更新される
 
 ### Phase 2以降
 
@@ -338,10 +451,13 @@ Botには最低限以下が必要。
 - 編集履歴
 - refresh後の再生成
 - Web UIの認証ガード
+- MCP read-only tools の入力検証
+- MCP tool call が `mcp_audit_logs` に残る
+- dangerous ops job が人間承認なしに実行されない
 
 ---
 
-## 13. ドキュメントの扱い
+## 14. ドキュメントの扱い
 
 作業前に必ず読む。
 
@@ -365,7 +481,7 @@ DOCS/Roadmap_Implement/phase-0-foundation.md
 
 ---
 
-## 14. 変更時の原則
+## 15. 変更時の原則
 
 大きく変えない。
 必要な場所だけ変える。
@@ -385,7 +501,7 @@ DOCS/Roadmap_Implement/phase-0-foundation.md
 
 ---
 
-## 15. 判断に迷ったら
+## 16. 判断に迷ったら
 
 以下の順に判断する。
 

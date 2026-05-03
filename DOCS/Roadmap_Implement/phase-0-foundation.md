@@ -85,7 +85,11 @@ grkd-jisho/
     "dev:web": "pnpm --filter web dev",
     "db:generate": "pnpm --filter db generate",
     "db:migrate": "pnpm --filter db migrate",
-    "db:import": "pnpm --filter db import-yomitan"
+    "db:import": "pnpm --filter db import-yomitan",
+    "db:seed": "pnpm --filter db seed-defaults"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^11.0.0"
   }
 }
 ```
@@ -103,8 +107,8 @@ packages:
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "Node16",
-    "moduleResolution": "Node16",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -120,7 +124,7 @@ packages:
 node_modules/
 dist/
 .env
-drizzle/
+/drizzle/
 *.log
 ```
 
@@ -132,20 +136,24 @@ drizzle/
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",
+  "type": "module",
   "scripts": {
-    "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate",
-    "import-yomitan": "tsx scripts/import-yomitan.ts"
+    "generate": "dotenv -e ../../.env -- drizzle-kit generate",
+    "migrate": "dotenv -e ../../.env -- drizzle-kit migrate",
+    "import-yomitan": "dotenv -e ../../.env -- tsx scripts/import-yomitan.ts",
+    "seed-defaults": "dotenv -e ../../.env -- tsx scripts/seed-defaults.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.41.0",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "adm-zip": "^0.5.10"
   },
   "devDependencies": {
     "drizzle-kit": "^0.30.0",
     "tsx": "^4.19.3",
     "typescript": "^5.8.3",
-    "@types/node": "^22.15.3"
+    "@types/node": "^22.15.3",
+    "@types/adm-zip": "^0.5.5"
   }
 }
 ```
@@ -158,8 +166,9 @@ drizzle/
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",
+  "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
@@ -171,7 +180,8 @@ drizzle/
   "devDependencies": {
     "tsx": "^4.19.3",
     "typescript": "^5.8.3",
-    "@types/node": "^22.15.3"
+    "@types/node": "^22.15.3",
+    "dotenv-cli": "^11.0.0"
   }
 }
 ```
@@ -206,7 +216,7 @@ drizzle/
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src", "scripts"]
+  "include": ["src"]
 }
 ```
 
@@ -319,7 +329,7 @@ docker compose ps
 ```typescript
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as schema from "./schema/index.js";
+import * as schema from "./schema/index";
 
 const connectionString = process.env["DATABASE_URL"];
 if (!connectionString) {
@@ -353,7 +363,7 @@ export type NewDictionary = typeof dictionaries.$inferInsert;
 
 ```typescript
 import { pgTable, bigserial, integer, text, jsonb, timestamp, index } from "drizzle-orm/pg-core";
-import { dictionaries } from "./dictionaries.js";
+import { dictionaries } from "./dictionaries";
 
 export const dictionaryEntries = pgTable(
   "dictionary_entries",
@@ -387,8 +397,8 @@ import {
   pgTable, bigserial, text, integer, bigint,
   boolean, timestamp, unique
 } from "drizzle-orm/pg-core";
-import { dictionaries } from "./dictionaries.js";
-import { dictionaryEntries } from "./dictionary-entries.js";
+import { dictionaries } from "./dictionaries";
+import { dictionaryEntries } from "./dictionary-entries";
 
 export const responseCache = pgTable(
   "response_cache",
@@ -428,7 +438,7 @@ export type NewResponseCache = typeof responseCache.$inferInsert;
 
 ```typescript
 import { pgTable, bigserial, bigint, text, timestamp } from "drizzle-orm/pg-core";
-import { responseCache } from "./response-cache.js";
+import { responseCache } from "./response-cache";
 
 export const responseEdits = pgTable("response_edits", {
   id: bigserial("id", { mode: "bigint" }).primaryKey(),
@@ -453,8 +463,8 @@ import {
   pgTable, bigserial, text, integer, bigint,
   boolean, jsonb, timestamp
 } from "drizzle-orm/pg-core";
-import { dictionaries } from "./dictionaries.js";
-import { responseCache } from "./response-cache.js";
+import { dictionaries } from "./dictionaries";
+import { responseCache } from "./response-cache";
 
 export const lookupLogs = pgTable("lookup_logs", {
   id: bigserial("id", { mode: "bigint" }).primaryKey(),
@@ -480,21 +490,21 @@ export type NewLookupLog = typeof lookupLogs.$inferInsert;
 ### 4-7. `packages/db/src/schema/index.ts`
 
 ```typescript
-export * from "./dictionaries.js";
-export * from "./dictionary-entries.js";
-export * from "./response-cache.js";
-export * from "./response-edits.js";
-export * from "./lookup-logs.js";
-export * from "./role-rate-limits.js";
-export * from "./user-usage.js";
-export * from "./channel-settings.js";
+export * from "./dictionaries";
+export * from "./dictionary-entries";
+export * from "./response-cache";
+export * from "./response-edits";
+export * from "./lookup-logs";
+export * from "./role-rate-limits";
+export * from "./user-usage";
+export * from "./channel-settings";
 ```
 
 ### 4-8. `packages/db/src/index.ts`
 
 ```typescript
-export { db } from "./client.js";
-export * from "./schema/index.js";
+export { db } from "./client";
+export * from "./schema/index";
 ```
 
 ### 4-9. `packages/db/drizzle.config.ts`
@@ -562,7 +572,6 @@ jmdict.zip
 import AdmZip from "adm-zip";
 import { db } from "../src/client.js";
 import { dictionaries, dictionaryEntries } from "../src/schema/index.js";
-import { eq } from "drizzle-orm";
 import { parseArgs } from "node:util";
 import path from "node:path";
 
@@ -848,10 +857,10 @@ seedDefaults().catch((err) => {
 });
 ```
 
-`packages/db/package.json` にスクリプト追加：
+`packages/db/package.json` にスクリプト追加（`dotenv` 経由）：
 
 ```json
-"seed-defaults": "tsx scripts/seed-defaults.ts"
+"seed-defaults": "dotenv -e ../../.env -- tsx scripts/seed-defaults.ts"
 ```
 
 ルート `package.json` にも追加：
@@ -859,6 +868,8 @@ seedDefaults().catch((err) => {
 ```json
 "db:seed": "pnpm --filter db seed-defaults"
 ```
+
+依存関係としてルート `devDependencies` に `dotenv-cli: "^11.0.0"` が必要。
 
 ---
 
@@ -890,3 +901,49 @@ Phase 0 の完了を宣言する前に、以下を全て確認すること。
 | PostgreSQL への bulk INSERT が遅い | 低 | 500件チャンク分割 + `onConflictDoNothing` で対処 |
 | `DATABASE_URL` の接続失敗 | 低 | `client.ts` の `drizzle()` が例外を投げるので即座に気づく |
 | adm-zip が大きな zip でメモリ不足 | 低 | JMdict は ~100MB 程度なので問題なし。将来的に streaming に変更可 |
+
+---
+
+## 10. 実装後の修正記録
+
+Phase 0 実装完了後にコードレビュー + 型チェック + DB実動作確認で発見したバグと修正。
+
+### 2026-05-03 修正一覧
+
+| # | 深刻度 | 問題 | ファイル | 発見方法 |
+|---|--------|------|---------|----------|
+| 1 | 🔴 Critical | `.gitignore` の `drizzle/` が glob パターンで全階層マッチ。`packages/db/drizzle/` のマイグレーションファイルが git 追跡されず、クローン時に `db:migrate` が実行不可能 | `.gitignore` | `git ls-files` で確認 |
+| 2 | 🔴 Critical | Bot dev スクリプト (`tsx watch src/index.ts`) が `.env` を自動ロードしない。`env.ts` は safeParse 失敗時に即 `process.exit(1)` するため、Bot が全く起動しない | `bot/package.json` | コード検証 |
+| 3 | 🟠 High | db の `tsconfig.json` で `rootDir: "./src"` だが `include: ["src", "scripts"]` で scripts/ が範囲外 → `tsc --noEmit` がエラー | `db/tsconfig.json` | `tsc --noEmit` 実行 |
+| 4 | 🟠 High | `tsconfig.base.json` の `moduleResolution: "Node16"` が `.js` 拡張子を強制 → drizzle-kit が ESM 解決失敗 | `tsconfig.base.json` | `pnpm db:generate` 実行 |
+| 5 | 🟡 Low | `import-yomitan.ts` に未使用 import `{ eq } from "drizzle-orm"` | `scripts/import-yomitan.ts` | コード精査 |
+
+### 修正内容
+
+| # | 修正前 | 修正後 |
+|---|--------|--------|
+| 1 | `drizzle/` | `/drizzle/`（先頭スラッシュでルートのみ除外） |
+| 2 | `"dev": "tsx watch src/index.ts"` | `"dev": "dotenv -e ../../.env -- tsx watch src/index.ts"` |
+| 3 | `"include": ["src", "scripts"]` | `"include": ["src"]` |
+| 4 | `"moduleResolution": "Node16"` | `"moduleResolution": "bundler"` |
+| 5 | `import { eq } from "drizzle-orm"`（削除） | — |
+
+### 確信度の評価
+
+**各レイヤーでの検証結果：**
+
+| 検証レイヤー | 手段 | 結果 |
+|-------------|------|------|
+| 型チェック | `tsc --noEmit`（bot + db 両パッケージ） | ✅ エラー0 |
+| DB 実動作 | `docker exec` で全テーブル確認（\d コマンド） | ✅ 8テーブル + 全FK + 全Index |
+| seed 確認 | `SELECT * FROM role_rate_limits` | ✅ `__default__` 10/day 存在 |
+| マイグレーション | `pnpm db:migrate` 2回実行 | ✅ 冪等性確認済み |
+| Git 追跡 | `git ls-files packages/db/drizzle/` | ✅ 3ファイル追跡済み |
+| Bot スクリプト | `dotenv` 付き dev コマンド | ✅ env.ts が env を読める状態 |
+| 未使用import | tsc 型チェック通過 | ✅ 残骸なし |
+
+**確信度：95%**
+
+残り5%は、実機でYomitan辞書をインポートしていない点（サンプルファイルが必要）、および実際のDiscord Botログインによる検証が未実施である点。
+
+検証できない理由：辞書ファイルはユーザーがYomitan .zipを `dicts/` ディレクトリに配置して初めて `pnpm db:import` の確認が可能になる。これが完了すれば **99%** になる。

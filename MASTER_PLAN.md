@@ -35,6 +35,7 @@ WebUI = 管理・品質改善の拠点
 | Database | PostgreSQL 16 | JSONB 対応、全文検索、信頼性 |
 | ORM | Drizzle ORM | TypeSafe、軽量、migration が明確 |
 | Web UI | Astro 4 + React islands | 静的優先、管理画面に適したSSR |
+| Agent Control Plane | MCP Server (Node.js + TypeScript) | 外側AIエージェントが安全に監視・診断・限定操作するため |
 | Monorepo | pnpm workspaces | bot / web / db 共通パッケージの共有 |
 | Containerize | Docker + docker-compose | ローカル → クラウドのmigration が容易 |
 | Cloud Deploy | Railway (推奨) or Fly.io | Dockerfile ベースでそのまま移行可 |
@@ -75,9 +76,27 @@ Discord Guild
 │  ├ lookup_logs           (検索ログ)              │
 │  ├ role_rate_limits      (ロール別上限)          │
 │  ├ user_usage            (ユーザー別使用量)      │
-│  └ channel_settings      (wipe対象チャンネル)    │
-└────────────────┬────────────────────────────────┘
-                 │
+│  ├ channel_settings      (wipe対象チャンネル)    │
+│  ├ bot_events            (trace / debug events) │
+│  ├ bot_heartbeats        (service liveness)     │
+│  ├ ops_jobs              (safe operation queue) │
+│  └ mcp_audit_logs        (agent operation audit)│
+└───────┬───────────────────────────────┬─────────┘
+        │                               │
+        │                               ▼
+        │                 ┌─────────────────────────────────┐
+        │                 │ MCP Server (packages/mcp)       │
+        │                 │ read-only tools first            │
+        │                 │ dry-run before write             │
+        │                 │ no direct Discord token access   │
+        │                 └───────────────┬─────────────────┘
+        │                                 │ MCP
+        │                                 ▼
+        │                 ┌─────────────────────────────────┐
+        │                 │ External AI Agent               │
+        │                 │ monitoring / diagnosis / ops    │
+        │                 └─────────────────────────────────┘
+        │
                  ▼
 ┌─────────────────────────────────────────────────┐
 │  Web UI  (packages/web)  — Astro + React        │
@@ -87,6 +106,8 @@ Discord Guild
 │  └ /admin/cache          (キャッシュ削除)        │
 └─────────────────────────────────────────────────┘
 ```
+
+> **DB table phase note:** Phase 0 で実装済み・完了基準に含めるのは `dictionaries`, `dictionary_entries`, `response_cache`, `response_edits`, `lookup_logs`, `role_rate_limits`, `user_usage`, `channel_settings` の8テーブル。`bot_events`, `bot_heartbeats`, `ops_jobs`, `mcp_audit_logs` は Phase 1〜2 の Observability / MCP Control Plane で追加する。
 
 ---
 
@@ -136,6 +157,13 @@ grkd-jisho/
 │       │   │   └── channel-settings.ts
 │       │   └── index.ts
 │       ├── drizzle.config.ts
+│       └── package.json
+│
+│   └── mcp/              # AI Agent Control Plane (Phase 2以降)
+│       ├── src/
+│       │   ├── tools/          # grkd.health, grkd.get_trace 等
+│       │   ├── services/       # MCP用の読み取り・ops job発行
+│       │   └── index.ts
 │       └── package.json
 │
 ├── docker-compose.yml
@@ -539,6 +567,9 @@ pnpm --filter db import-yomitan --file ./dicts/jmdict.zip --name "JMdict" --prio
 - Bot Token は環境変数のみ、コードに直書き禁止
 - WebUI 管理者アクセスは Discord OAuth2 + Guild ロール確認必須
 - Slash Command 管理操作は Discord 権限チェック必須
+- MCP Server は原則 read-only から開始し、書き込み系 tool は audit log と dry-run を必須にする
+- MCP Server に Discord Bot Token を渡さない。Discord 実操作は Bot Service だけが実行する
+- MCP tool から生SQLを実行できる汎用DB操作口を公開しない
 - DB は外部公開しない（Docker network 内部のみ）
 - LLM へ送信する辞書定義は `definitions_json` のみ（個人情報を送らない）
 - `lookup_logs` の `user_id` は Discord ID のみ（DM や個人情報は保存しない）
@@ -865,7 +896,212 @@ cron.schedule("0 0 * * *", async () => {
 
 ---
 
-## 18. Open Questions (Flag for Later)
+## 18. AI Agent Operations / MCP Control Plane
+
+GRKD-Jisho は、人間の管理画面だけでなく、外側のAIエージェントが MCP 経由で稼働監視・診断・限定的な運営操作を行える構造にする。
+
+ただし、AIエージェントにDiscord Botを直接操作させない。
+MCP Server は **Control Plane** として動き、Bot の状態を読み、必要ならDBに安全な運営ジョブを登録する。
+Discord API の危険操作は Bot Service が権限・設定・承認状態を確認してから実行する。
+
+### 18-1. 基本構造
+
+```txt
+External AI Agent
+  ↓ MCP tools/list, tools/call
+packages/mcp
+  ↓ read status / write ops_jobs
+PostgreSQL
+  ↓ poll safe jobs / write events
+packages/bot
+  ↓ Discord API
+Discord Guild
+```
+
+役割分担は固定する。
+
+| コンポーネント | 役割 |
+|---|---|
+| External AI Agent | 監視・診断・提案・安全な運営操作の呼び出し |
+| MCP Server | AI向けの操作窓口。tool schema、入力検証、権限、auditを担当 |
+| PostgreSQL | 状態、trace、heartbeat、ops job、audit log の保存場所 |
+| Bot Service | Discord API を実際に呼ぶ唯一の実行者 |
+| Admin UI | 人間向けの確認・編集・承認画面 |
+
+### 18-2. Observability: trace_id と bot_events
+
+検索1回、wipe1回、LLM生成1回ごとに `trace_id` を作る。
+同じ `trace_id` を全 service に渡し、処理の流れを `bot_events` に残す。
+
+```txt
+message.received
+query.extracted
+channel.allowed
+rate_limit.checked
+dictionary.lookup.started
+dictionary.hit
+cache.miss
+llm.generate.started
+llm.generated
+cache.saved
+reply.sent
+```
+
+```sql
+CREATE TABLE bot_events (
+  id           BIGSERIAL PRIMARY KEY,
+  trace_id     TEXT NOT NULL,
+  level        TEXT NOT NULL, -- info / warn / error
+  event_type   TEXT NOT NULL,
+  guild_id     TEXT,
+  channel_id   TEXT,
+  user_id      TEXT,
+  payload_json JSONB DEFAULT '{}',
+  duration_ms  INTEGER,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_bot_events_trace_id ON bot_events (trace_id);
+CREATE INDEX idx_bot_events_created_at ON bot_events (created_at);
+CREATE INDEX idx_bot_events_level ON bot_events (level);
+```
+
+### 18-3. Liveness: bot_heartbeats
+
+Bot と MCP Server は定期的に heartbeat をDBへ書く。
+外側AIエージェントは `grkd.health` でこの情報を読み、停止・遅延・エラーを検知する。
+
+```sql
+CREATE TABLE bot_heartbeats (
+  id            BIGSERIAL PRIMARY KEY,
+  service_name  TEXT NOT NULL, -- bot / mcp / web
+  instance_id   TEXT NOT NULL,
+  status        TEXT NOT NULL, -- ok / degraded / down
+  last_seen_at  TIMESTAMPTZ NOT NULL,
+  metadata_json JSONB DEFAULT '{}',
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now(),
+
+  UNIQUE (service_name, instance_id)
+);
+```
+
+### 18-4. Safe Operations: ops_jobs
+
+AIエージェントが危険操作を直接実行しないように、書き込み系操作は `ops_jobs` に登録する。
+Bot Service はジョブを読み、安全条件を満たすものだけ実行する。
+
+```sql
+CREATE TABLE ops_jobs (
+  id                BIGSERIAL PRIMARY KEY,
+  job_type          TEXT NOT NULL,
+  requested_by      TEXT NOT NULL, -- agent_id / admin_discord_id
+  args_json         JSONB NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'pending', -- pending / approved / running / succeeded / failed / rejected
+  approval_required BOOLEAN NOT NULL DEFAULT true,
+  approved_by       TEXT,
+  result_json       JSONB DEFAULT '{}',
+  error_message     TEXT,
+  created_at        TIMESTAMPTZ DEFAULT now(),
+  approved_at       TIMESTAMPTZ,
+  completed_at      TIMESTAMPTZ
+);
+
+CREATE INDEX idx_ops_jobs_status ON ops_jobs (status);
+CREATE INDEX idx_ops_jobs_type ON ops_jobs (job_type);
+```
+
+### 18-5. MCP Audit Log
+
+MCP tool 呼び出しは全て `mcp_audit_logs` に残す。
+引数は token / secret / API key を必ずredactする。
+
+```sql
+CREATE TABLE mcp_audit_logs (
+  id                 BIGSERIAL PRIMARY KEY,
+  agent_id           TEXT NOT NULL,
+  tool_name          TEXT NOT NULL,
+  args_json_redacted JSONB DEFAULT '{}',
+  result_status      TEXT NOT NULL, -- success / error / rejected
+  dry_run            BOOLEAN NOT NULL DEFAULT false,
+  error_message      TEXT,
+  created_at         TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_mcp_audit_logs_agent ON mcp_audit_logs (agent_id);
+CREATE INDEX idx_mcp_audit_logs_tool ON mcp_audit_logs (tool_name);
+CREATE INDEX idx_mcp_audit_logs_created_at ON mcp_audit_logs (created_at);
+```
+
+### 18-6. MCP Tools
+
+最初は read-only で始める。
+書き込み系は dry-run と audit log が揃ってから解禁する。
+
+#### Level 1: Read-only tools
+
+| Tool | 説明 |
+|---|---|
+| `grkd.health` | Bot / MCP / DB の稼働状態を見る |
+| `grkd.recent_errors` | 直近の error / warn event を見る |
+| `grkd.get_trace` | `trace_id` 単位で処理全体を見る |
+| `grkd.lookup_stats` | 検索数、辞書ヒット率、上位クエリを見る |
+| `grkd.cache_stats` | cache hit / miss を見る |
+| `grkd.rate_limit_status` | user_usage と role_rate_limits を見る |
+| `grkd.wipe_status` | wipe_enabled、last_wipe_at、失敗履歴を見る |
+
+#### Level 2: Dry-run tools
+
+| Tool | 説明 |
+|---|---|
+| `grkd.dry_run_wipe` | 対象チャンネル、pin数、必要権限を確認。削除はしない |
+| `grkd.dry_run_rate_limit_change` | rate limit変更後の影響ユーザー数を確認 |
+| `grkd.dry_run_cache_refresh` | cache refresh対象件数を確認 |
+
+#### Level 3: Limited write tools
+
+| Tool | 説明 | 承認 |
+|---|---|---|
+| `grkd.request_cache_refresh` | cache refresh job を作成 | 内容により不要 |
+| `grkd.request_user_usage_reset` | user_usage reset job を作成 | 原則不要 |
+| `grkd.request_rate_limit_change` | role_rate_limits変更 job を作成 | 必要 |
+| `grkd.request_toggle_wipe` | wipe_enabled変更 job を作成 | 必要 |
+
+#### Level 4: Dangerous tools
+
+以下は自律実行禁止。必ず人間承認を挟む。
+
+| Tool | 理由 |
+|---|---|
+| `grkd.request_wipe_now` | Discordチャンネル削除を伴う |
+| `grkd.request_bulk_cache_delete` | 大量データ削除を伴う |
+| `grkd.request_prompt_version_rotate` | 全回答品質に影響する |
+
+### 18-7. Agent Runbook
+
+外側AIエージェントは、定期監視で以下の順に確認する。
+
+```txt
+1. grkd.health
+2. heartbeat が古い場合は grkd.recent_errors
+3. trace failure がある場合は grkd.get_trace
+4. LLMエラー増加なら fallback 状態を確認
+5. wipe失敗なら grkd.wipe_status と dry_run_wipe
+6. 危険操作が必要なら ops_jobs を作り、人間承認待ちにする
+```
+
+### 18-8. 禁止事項
+
+- MCP Server に Discord Bot Token を持たせない
+- MCP tool からDiscordチャンネルを直接削除しない
+- MCP tool から任意SQLを実行できる口を作らない
+- `.env`、API key、token、secret を MCP tool の出力に含めない
+- Level 4 tool を人間承認なしに実行しない
+- AIエージェントの判断だけで本番DBの削除・大量変更を行わない
+
+---
+
+## 19. Open Questions (Flag for Later)
 
 - [ ] 辞書インポート時に `reading` が空の場合、どう全文検索するか（`pg_trgm` or `tsvector` 検討）
 - [ ] WebUI の認証に Bearer Token か Cookie セッションどちらを使うか

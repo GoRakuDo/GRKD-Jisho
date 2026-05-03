@@ -11,8 +11,8 @@
 ```
 Phase 0: 環境構築とDB基盤             ~1週間
 Phase 1: MVP — Bot コア機能           ~2週間
-Phase 2: 管理コマンド + Cache 制御    ~1週間
-Phase 3: Web Admin UI                ~2週間
+Phase 2: 管理コマンド + Read-only MCP ~1週間
+Phase 3: Web Admin UI + Agent Ops     ~2週間
 Phase 4: 品質改善・最適化             ongoing
 ```
 
@@ -134,14 +134,27 @@ Phase 4: 品質改善・最適化             ongoing
   - 削除後に `channel_settings.channel_id` と `last_wipe_at` を更新
   - Bot 起動時（`ready`）にスケジューラを起動
 
+- [ ] **1-12** Observability 基盤
+  - 全リクエストに `trace_id` を付与
+  - `bot_events` テーブルに処理イベントを記録
+  - `bot_heartbeats` テーブルに Bot 稼働状態を定期記録
+  - `messageCreate` の各段階（query抽出、rate limit、辞書hit、cache hit/miss、LLM生成、reply）を trace 可能にする
+  - ログに token / API key / secret / DM本文 を出さない
+
+- [ ] **1-13** Safe Ops Job 基盤
+  - `ops_jobs` テーブルを追加
+  - Bot が `pending / approved` job を読み、安全条件を満たすものだけ実行する worker を作る
+  - dangerous job（wipe-now、bulk delete、prompt rotate）は human approval 必須
+  - 実行結果を `result_json` と `bot_events` に残す
+
 **完了基準:**  
-`@grkd-jisho 単語` に対してロール別で回答が返り、2回目以降はキャッシュが使われること。毎日 00:00 GMT+7 に `wipe_enabled = true` の設定チャンネルだけがクローン方式で自動消去され、固定メッセージのみ保持されること。
+`@grkd-jisho 単語` に対してロール別で回答が返り、2回目以降はキャッシュが使われること。毎日 00:00 GMT+7 に `wipe_enabled = true` の設定チャンネルだけがクローン方式で自動消去され、固定メッセージのみ保持されること。さらに、検索1回ごとの `trace_id` から処理全体を追えること。
 
 ---
 
 ## Phase 2 — Admin Commands (Week 4)
 
-**目的:** 管理者が Discord から回答を検索・編集・更新できるようにする
+**目的:** 管理者が Discord から回答を検索・編集・更新でき、外側AIエージェントが read-only MCP で監視できるようにする
 
 ### Tasks
 
@@ -191,8 +204,29 @@ Phase 4: 品質改善・最適化             ongoing
   - `/wipe-status`: 全チャンネルの wipe 設定・最終消去日時を表示
   - `/wipe-now <channel>`: スケジュールを待たずに即時消去
 
+- [ ] **2-11** MCP Server パッケージ追加 (`packages/mcp`)
+  - Node.js + TypeScript で MCP server を作成
+  - `@grkd/db` 経由でDBを読む
+  - Discord Bot Token は持たせない
+  - MCP tool input は zod で検証
+
+- [ ] **2-12** Read-only MCP tools
+  - `grkd.health`: heartbeat / DB接続 / 最新errorを返す
+  - `grkd.recent_errors`: 直近の warn/error event を返す
+  - `grkd.get_trace`: `trace_id` 単位の処理履歴を返す
+  - `grkd.lookup_stats`: 検索数・辞書hit・上位queryを返す
+  - `grkd.cache_stats`: cache hit / miss を返す
+  - `grkd.rate_limit_status`: role limit と user_usage を返す
+  - `grkd.wipe_status`: wipe_enabled と last_wipe_at を返す
+
+- [ ] **2-13** MCP Audit Log
+  - `mcp_audit_logs` テーブルを追加
+  - 全 MCP tool call を記録
+  - args は secret / token / API key を redacted 保存
+  - tool error も記録
+
 **完了基準:**  
-管理者が Discord 上から回答の確認・編集・キャッシュ更新ができること。チャンネル自動消去の ON/OFF 設定がコマンドで操作できること。
+管理者が Discord 上から回答の確認・編集・キャッシュ更新ができること。チャンネル自動消去の ON/OFF 設定がコマンドで操作できること。外側AIエージェントが MCP 経由で health / errors / trace / stats を read-only で確認できること。
 
 ---
 
@@ -242,8 +276,23 @@ Phase 4: 品質改善・最適化             ongoing
   - ユーザー別検索回数（user_id のみ表示）
   - 辞書別ヒット率
 
+- [ ] **3-8** `/admin/traces` — Trace Viewer
+  - `trace_id` で検索
+  - Bot処理のイベントタイムライン表示
+  - LLM error / DB error / Discord error を区別して表示
+
+- [ ] **3-9** `/admin/ops-jobs` — Agent Ops 承認画面
+  - AIエージェントが作成した `ops_jobs` を一覧表示
+  - dangerous job は人間が approve / reject
+  - job 実行結果と audit log を表示
+
+- [ ] **3-10** Dry-run MCP tools
+  - `grkd.dry_run_wipe`
+  - `grkd.dry_run_rate_limit_change`
+  - `grkd.dry_run_cache_refresh`
+
 **完了基準:**  
-ブラウザで Discord 認証後、回答の編集・辞書管理・ログ確認ができること
+ブラウザで Discord 認証後、回答の編集・辞書管理・ログ確認ができること。Trace Viewer で1回の検索フローを追え、AIエージェントが作成した運営ジョブを人間が承認・拒否できること。
 
 ---
 
@@ -287,6 +336,19 @@ Phase 4: 品質改善・最適化             ongoing
   - `lookup_logs` の `guild_id` を利用した Guild 別統計
   - Guild 別許可チャンネル設定の DB 管理
 
+- [ ] **4-8** Limited write MCP tools
+  - `grkd.request_cache_refresh`
+  - `grkd.request_user_usage_reset`
+  - `grkd.request_rate_limit_change`
+  - `grkd.request_toggle_wipe`
+  - 全て `ops_jobs` + `mcp_audit_logs` 経由に限定
+
+- [ ] **4-9** Agent Runbook / 自律監視
+  - 外側AIエージェント用 runbook を `DOCS/Operations/agent-runbook.md` に作成
+  - `grkd.health` → `grkd.recent_errors` → `grkd.get_trace` の診断順を固定
+  - dangerous operation は human approval 必須
+  - ローカル / クラウド両方で監視できる設定例を用意
+
 ---
 
 ## Milestone Summary
@@ -295,9 +357,9 @@ Phase 4: 品質改善・最適化             ongoing
 |-----------|--------|-------------|
 | M0 | Week 1 | DB + 辞書インポート完了 |
 | M1 | Week 3 | Bot が @メンションに返答 |
-| M2 | Week 4 | 管理 Slash Command 完動 |
-| M3 | Week 6 | Web Admin UI 公開 |
-| M4 | Ongoing | 本番デプロイ + 継続改善 |
+| M2 | Week 4 | 管理 Slash Command + Read-only MCP 完動 |
+| M3 | Week 6 | Web Admin UI + Agent Ops 承認画面 公開 |
+| M4 | Ongoing | 本番デプロイ + AI Agent 自律監視 + 継続改善 |
 
 ---
 
@@ -308,3 +370,4 @@ Phase 4: 品質改善・最適化             ongoing
 - [ ] エラーケース（辞書未ヒット・LLM失敗）を必ず処理している
 - [ ] `is_manual_override` の優先ロジックが崩れていない
 - [ ] `lookup_logs` に記録されている
+- [ ] 危険操作は `ops_jobs` / `mcp_audit_logs` / human approval と整合している
