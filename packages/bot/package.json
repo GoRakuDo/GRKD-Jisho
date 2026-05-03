@@ -1,0 +1,22 @@
+{
+  "name": "@grkd/bot",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./src/index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@grkd/db": "workspace:*",
+    "discord.js": "^14.18.0",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "@types/node": "^22.15.3"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "grkd-jisho",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "dev:bot": "pnpm --filter bot dev",
+    "dev:web": "pnpm --filter web dev",
+    "db:generate": "pnpm --filter db generate",
+    "db:migrate": "pnpm --filter db migrate",
+    "db:import": "pnpm --filter db import-yomitan",
+    "db:seed": "pnpm --filter db seed-defaults"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^11.0.0"
+  }
+}
