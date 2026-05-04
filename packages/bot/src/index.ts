@@ -44,9 +44,9 @@ client.once("ready", () => {
         if (!(discordChannel instanceof TextChannel)) continue;
 
         try {
-          const { newChannelId, pinCount } = await wipeChannel(discordChannel);
+          const { deletedCount } = await wipeChannel(discordChannel);
           console.log(
-            `[Wipe] ${setting.channelId} → ${newChannelId}: wiped (${pinCount} pins restored)`,
+            `[Wipe] ${setting.channelId}: ${deletedCount} messages deleted`,
           );
         } catch (err) {
           console.error(`[Wipe] Failed channel ${setting.channelId}:`, err);

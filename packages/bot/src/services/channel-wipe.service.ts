@@ -1,76 +1,96 @@
-import { type APIEmbed, type TextChannel } from "discord.js";
+import { randomUUID } from "node:crypto";
+import { type TextChannel } from "discord.js";
 import { db, schema } from "@grkd-jisho/db";
 import { eq } from "drizzle-orm";
+import { traceEvent } from "./observability.service.js";
 
 interface WipeResult {
-  newChannelId: string;
-  pinCount: number;
+  deletedCount: number;
 }
 
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
 export async function wipeChannel(channel: TextChannel): Promise<WipeResult> {
+  const traceId = `wipe-${randomUUID()}`;
+  console.log(`[Wipe] trace_id=${traceId} start channel=${channel.id}`);
+
+  // Step 1: ピン留めIDを取得（除外対象）
   const pins = await channel.messages.fetchPinned();
+  const pinnedIds = new Set(pins.map((p) => p.id));
 
-  // Step 1: 固定メッセージの内容を退避（content が空文字の場合は送信しない）
-  const pinContents: Array<{ content: string; embedJSONs: APIEmbed[] }> = [];
-  for (const pin of pins.values()) {
-    pinContents.push({
-      content: pin.content,
-      embedJSONs: pin.embeds.map((e) => e.toJSON()),
-    });
-  }
+  // 24時間前を UTC 基準で計算（cron は 00:00 GMT+7 発火 = 17:00 UTC）
+  // Date.now() と createdTimestamp は共に UTC なので比較にタイムゾーンは影響しない。
+  // このフィルターの目的は「長期停止後の初回wipeで全メッセージを消さない安全策」。
+  // 「GMT+7の日付境界ぴったり」にする必要はない。
+  const cutoff = Date.now() - TWENTY_FOUR_HOURS_MS;
 
-  // Step 2: チャンネルをクローン
-  const newChannel = await channel.clone({
-    name: channel.name,
-    nsfw: channel.nsfw,
-    rateLimitPerUser: channel.rateLimitPerUser,
-    parent: channel.parentId ?? null,
-    position: channel.position,
-    permissionOverwrites: channel.permissionOverwrites.cache.map((o) => ({
-      id: o.id,
-      allow: o.allow.bitfield,
-      deny: o.deny.bitfield,
-      type: o.type,
-    })),
-    reason: "Daily channel wipe (GRKD-Jisho)",
-    ...(channel.topic ? { topic: channel.topic } : {}),
+  // 観測性: wipe開始を記録
+  await traceEvent(traceId, "wipe.started", "info", {
+    channelId: channel.id,
+    pinnedCount: pins.size,
   });
 
-  // Step 3: 固定メッセージを新チャンネルへ復元
-  try {
-    for (const pin of pinContents) {
-      const payload: { content?: string; embeds?: APIEmbed[] } = {};
-      if (pin.content) {
-        payload.content = pin.content;
-      }
-      if (pin.embedJSONs.length > 0) payload.embeds = pin.embedJSONs;
+  // Step 2: バルク削除可能なメッセージを100件ずつバッチ処理
+  let lastId: string | undefined;
+  let totalDeleted = 0;
 
-      if (Object.keys(payload).length === 0) {
-        payload.content = "\u200B";
-      }
+  while (true) {
+    const messages = lastId
+      ? await channel.messages.fetch({
+          limit: 100,
+          cache: false,
+          before: lastId,
+        })
+      : await channel.messages.fetch({ limit: 100, cache: false });
+    if (messages.size === 0) break;
 
-      const sent = await newChannel.send(payload);
-      await sent.pin();
+    // 24時間以内 かつ ピン留め以外 を抽出
+    const toDelete = messages.filter(
+      (m) => !pinnedIds.has(m.id) && m.createdTimestamp >= cutoff,
+    );
+
+    if (toDelete.size > 0) {
+      try {
+        // bulkDelete は最低2件必要。1件の場合は個別削除
+        if (toDelete.size === 1) {
+          await toDelete.first()!.delete();
+        } else {
+          // filterOld: true → 14日以上前のメッセージは自動スキップ
+          await channel.bulkDelete(toDelete, true);
+        }
+        totalDeleted += toDelete.size;
+      } catch (err) {
+        console.error(
+          `[Wipe] trace_id=${traceId} delete batch failed after ${totalDeleted} deleted:`,
+          err,
+        );
+        // discord.js が429を自動リトライするため、ここでは記録のみ
+        // どうしても失敗する場合は上位でキャッチされる
+        throw err;
+      }
     }
-  } catch (err) {
-    await newChannel.delete("Failed to restore pinned messages during wipe");
-    throw err;
+
+    // 今回の取得が100件未満 = 残りなし
+    if (messages.size < 100) break;
+    lastId = messages.last()!.id;
   }
 
-  // Step 4: 古いチャンネルを削除
-  await channel.delete("Daily channel wipe (GRKD-Jisho)");
+  // Step 3: DB の lastWipeAt を更新
+  if (totalDeleted > 0) {
+    await db
+      .update(schema.channelSettings)
+      .set({ lastWipeAt: new Date() })
+      .where(eq(schema.channelSettings.channelId, channel.id));
+  }
 
-  // Step 5: DB の channel_settings を新しいチャンネルIDに更新
-  await db
-    .update(schema.channelSettings)
-    .set({
-      channelId: newChannel.id,
-      lastWipeAt: new Date(),
-    })
-    .where(eq(schema.channelSettings.channelId, channel.id));
+  // Step 4: 観測性
+  await traceEvent(traceId, "wipe.completed", "info", {
+    channelId: channel.id,
+    deletedCount: totalDeleted,
+  });
 
-  return {
-    newChannelId: newChannel.id,
-    pinCount: pinContents.length,
-  };
+  console.log(
+    `[Wipe] trace_id=${traceId} completed: ${totalDeleted} messages deleted`,
+  );
+  return { deletedCount: totalDeleted };
 }

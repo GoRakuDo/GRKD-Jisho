@@ -274,29 +274,28 @@ Wipe対象は `channel_settings.wipe_enabled = true` のチャンネルだけ。
 
 ### 10-2. 実装方式
 
-完全性を優先する。
+シンプルさを優先する。
 
-MASTER_PLAN の最新方針はチャンネルクローン方式。
+毎日 00:00 GMT+7 に動くため、対象メッセージは全て24時間以内。14日制限（`bulkDelete`）に引っかからない。
 
 ```txt
-pin取得
--> channel.clone()
--> old channel delete
--> pin再投稿 / 再pin
--> channel_settings.channel_id 更新
+ピンID取得
+-> messages.fetch({ limit: 100 }) をバッチループ
+-> ピン以外を bulkDelete()
+-> channel_settings.lastWipeAt を更新
 ```
 
-この方式なら14日制限に引っかからない。
+ピン留め以外の全メッセージを100件ずつバッチ削除する。
+
+> **戻り値:** `deletedCount` のみ。チャンネルIDは変わらないため `newChannelId` は不要。
 
 ### 10-3. 権限
 
 Botには最低限以下が必要。
 
-- `MANAGE_CHANNELS`
 - `MANAGE_MESSAGES`
 - `SEND_MESSAGES`
-
-権限がない場合は処理を中断し、ログに残す。
+- `READ_MESSAGE_HISTORY`（`messages.fetch()` に必須）
 
 ---
 
@@ -472,7 +471,7 @@ DOCS/Roadmap_Implement/phase-0-foundation.md
 
 現時点の正は以下。
 
-- Wipe-out はチャンネルクローン方式
+- Wipe-out は bulkDelete 方式（14日制限対象外のため）
 - Phase 0 のDB完了基準は `channel_settings` を含む全8テーブル
 - Wipe-out 対象は毎日 00:00 GMT+7 時点の直近24時間以内メッセージ
 - 固定メッセージ（ピン留め）のみ保持する

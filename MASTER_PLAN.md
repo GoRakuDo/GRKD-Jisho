@@ -777,57 +777,54 @@ CREATE INDEX idx_channel_settings_wipe ON channel_settings (wipe_enabled)
   WHERE wipe_enabled = true;
 ```
 
-#### 実装方針: チャンネルクローン方式
+#### 実装方針: bulkDelete 方式
 
-`bulkDelete` は14日制限がある。個別 `delete()` は全てのメッセージを消せるが、1件あたり200〜800msの遅延が必要で数百件あると非現実的。
-
-そこで **チャンネルをクローンして差し替える** 方式を採用する。
+毎日 00:00 GMT+7 に動くため、削除対象は全メッセージが24時間以内。14日制限（`bulkDelete`）に引っかからないため、クローン方式は不要。
 
 ```typescript
 import cron from "node-cron";
 
 export async function wipeChannel(discordChannel: import("discord.js").TextChannel): Promise<{
-  newChannelId: string;
   deletedCount: number;
 }> {
-  // Step 1: 固定メッセージ（ピン留め）を退避
+  const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+  // Step 1: ピン留めIDを取得（除外対象）
   const pins = await discordChannel.messages.fetchPinned();
-  const pinContents = pins.map((msg) => ({
-    content: msg.content,
-    attachments: msg.attachments.map((a) => a.url),
-    createdAt: msg.createdAt,
-  }));
+  const pinnedIds = new Set(pins.map((p) => p.id));
+  const cutoff = Date.now() - TWENTY_FOUR_HOURS_MS;
 
-  // Step 2: チャンネルをクローン（名前・トピック・権限・位置を全てコピー）
-  const newChannel = await discordChannel.clone({
-    reason: `Daily wipe @ ${new Date().toISOString()}`,
-  });
+  // Step 2: バルク削除可能なメッセージを100件ずつバッチ処理
+  let lastId: string | undefined;
+  let totalDeleted = 0;
 
-  // Step 3: 古いチャンネルを削除（これで全てのメッセージが消える）
-  const oldChannelId = discordChannel.id;
-  await discordChannel.delete("Daily wipe: old channel");
+  while (true) {
+    const messages = lastId
+      ? await discordChannel.messages.fetch({ limit: 100, cache: false, before: lastId })
+      : await discordChannel.messages.fetch({ limit: 100, cache: false });
+    if (messages.size === 0) break;
 
-  // Step 4: 固定メッセージを新しいチャンネルに復元
-  for (const pin of pinContents) {
-    try {
-      const reposted = await newChannel.send(
-        pin.attachments.length > 0
-          ? `${pin.content}\n\n*(Archived attachment: ${pin.attachments.join(", ")})*`
-          : pin.content
-      );
-      await reposted.pin();
-    } catch {
-      // 空メッセージや無効な添付はスキップ
+    // 24時間以内 かつ ピン留め以外 を抽出
+    const toDelete = messages.filter(
+      (m) => !pinnedIds.has(m.id) && m.createdTimestamp >= cutoff,
+    );
+    if (toDelete.size > 0) {
+      if (toDelete.size === 1) {
+        await toDelete.first()!.delete();
+      } else {
+        await discordChannel.bulkDelete(toDelete, true);
+      }
+      totalDeleted += toDelete.size;
     }
+
+    if (messages.size < 100) break;
+    lastId = messages.last()!.id;
   }
 
-  // Step 5: 新しいチャンネルが Bot のキャッシュに入るのを待つ
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  // Step 3: DB の lastWipeAt を更新（channel_id は変わらない）
+  // await db.update(schema.channelSettings)...
 
-  return {
-    newChannelId: newChannel.id,
-    deletedCount: pinContents.length, // ピン以外は全て消えた
-  };
+  return { deletedCount: totalDeleted };
 }
 ```
 
@@ -847,18 +844,15 @@ cron.schedule("0 0 * * *", async () => {
     if (!(discordChannel instanceof TextChannel)) continue;
 
     try {
-      const { newChannelId } = await wipeChannel(discordChannel);
+      const { deletedCount } = await wipeChannel(discordChannel);
 
-      // DB の channel_id を新しい ID に更新
+      // lastWipeAt のみ更新（channel_id は変わらない）
       await db
         .update(schema.channelSettings)
-        .set({
-          channelId: newChannelId,
-          lastWipeAt: new Date(),
-        })
+        .set({ lastWipeAt: new Date() })
         .where(eq(schema.channelSettings.id, setting.id));
 
-      console.log(`[Wipe] ${setting.channelId} → ${newChannelId}: wiped`);
+      console.log(`[Wipe] ${setting.channelId}: ${deletedCount} messages deleted`);
     } catch (err) {
       console.error(`[Wipe] Failed channel ${setting.channelId}:`, err);
     }
@@ -869,9 +863,11 @@ cron.schedule("0 0 * * *", async () => {
 ```
 
 > **必要な権限:**
-> - `MANAGE_CHANNELS` — チャンネルの作成・削除（クローンに必須）
-> - `MANAGE_MESSAGES` — ピン留めの復元
-> - `SEND_MESSAGES` — 固定メッセージの再送信
+> - `MANAGE_MESSAGES` — bulkDelete に必須
+> - `SEND_MESSAGES` — 通常動作に必須
+> - `READ_MESSAGE_HISTORY` — messages.fetch() に必須
+>
+> **戻り値:** `deletedCount` のみ。チャンネルIDは変わらないため `newChannelId` は不要。
 
 #### 管理コマンド
 
@@ -879,7 +875,7 @@ cron.schedule("0 0 * * *", async () => {
 |---------|------|
 | `/wipe-channel <channel> <on|off>` | チャンネルの自動消去を ON/OFF |
 | `/wipe-status` | 全チャンネルの wipe 設定・最終消去日時・チャンネルIDを表示 |
-| `/wipe-now <channel>` | スケジュールを待たずに即時消去（クローン方式） |
+| `/wipe-now <channel>` | スケジュールを待たずに即時消去（bulkDelete 方式、固定メッセージは保持） |
 
 #### ユーザーリミットリセットとの同時性
 
@@ -887,9 +883,8 @@ cron.schedule("0 0 * * *", async () => {
 00:00 GMT+7 に cron 発火
   ├─ Rate limits のリセット
   │   → usage_date が変わるだけ。古いレコードは自然に使われなくなる
-  └─ Channel wipe-out（クローン方式）
-      → wipe_enabled = true の全チャンネルを clone + delete
-      → channel_settings.channel_id を自動更新
+  └─ Channel wipe-out（bulkDelete 方式）
+      → wipe_enabled = true の全チャンネルのメッセージを bulkDelete
 ```
 
 両者は独立した処理であり、片方が失敗してももう片方には影響しない。
@@ -1106,6 +1101,5 @@ CREATE INDEX idx_mcp_audit_logs_created_at ON mcp_audit_logs (created_at);
 - [ ] 辞書インポート時に `reading` が空の場合、どう全文検索するか（`pg_trgm` or `tsvector` 検討）
 - [ ] WebUI の認証に Bearer Token か Cookie セッションどちらを使うか
 - [ ] LLM の `prompt_version` を変えたとき、古いキャッシュをどう扱うか（自動無効化 vs 手動 refresh）
-- [ ] クローン後のチャンネルが Discord クライアントのキャッシュに反映されるまでラグがある。Bot 再起動をトリガーするか検討
 - [ ] `lookup_logs` の 90日パージをどのタイミングで実行するか（pg_cron or Bot の定期タスク）
 - [ ] 将来的に複数 Guild に対応するか（現時点はシングル Guild 前提）

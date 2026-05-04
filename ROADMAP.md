@@ -130,8 +130,7 @@ Phase 4: 品質改善・最適化             ongoing
   - `channel_settings` から `wipe_enabled = true` のチャンネルを取得
   - 対象は毎日 00:00 GMT+7 時点の直近24時間以内メッセージ
   - 固定メッセージ（ピン留め）のみ保持
-  - クローン方式で `pin取得 -> channel.clone() -> old channel delete -> pin再投稿/再pin`
-  - 削除後に `channel_settings.channel_id` と `last_wipe_at` を更新
+  - bulkDelete 方式で `messages.fetch({ limit: 100 })` をバッチループ → ピン以外を `bulkDelete()`
   - Bot 起動時（`ready`）にスケジューラを起動
 
 - [ ] **1-12** Observability 基盤
@@ -148,7 +147,7 @@ Phase 4: 品質改善・最適化             ongoing
   - 実行結果を `result_json` と `bot_events` に残す
 
 **完了基準:**  
-`@grkd-jisho 単語` に対してロール別で回答が返り、2回目以降はキャッシュが使われること。毎日 00:00 GMT+7 に `wipe_enabled = true` の設定チャンネルだけがクローン方式で自動消去され、固定メッセージのみ保持されること。さらに、検索1回ごとの `trace_id` から処理全体を追えること。
+`@grkd-jisho 単語` に対してロール別で回答が返り、2回目以降はキャッシュが使われること。毎日 00:00 GMT+7 に `wipe_enabled = true` の設定チャンネルだけが bulkDelete 方式で自動消去され、固定メッセージのみ保持されること。さらに、検索1回ごとの `trace_id` から処理全体を追えること。
 
 ---
 

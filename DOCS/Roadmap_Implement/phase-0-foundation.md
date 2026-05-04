@@ -795,15 +795,17 @@ export type NewUserUsage = typeof userUsage.$inferInsert;
 
 Channel Wipe-out は毎日 00:00 GMT+7 に実行する。通常の削除対象は直近24時間以内のメッセージで、固定メッセージ（ピン留め）のみ保持する。
 
-実装方式は MASTER_PLAN に合わせてチャンネルクローン方式とする。
+実装方式は bulkDelete 方式。毎日 00:00 GMT+7 に動くため全メッセージが24時間以内であり、14日制限に引っかからない。
 
 ```txt
-pin取得
--> channel.clone()
--> old channel delete
--> pin再投稿 / 再pin
--> channel_settings.channel_id 更新
+ピンID取得
+-> messages.fetch({ limit: 100 }) をバッチループ
+-> ピン以外を bulkDelete()
+-> channel_settings.lastWipeAt を更新
 ```
+
+> **必要な権限:** `MANAGE_MESSAGES`（bulkDelete） / `SEND_MESSAGES` / `READ_MESSAGE_HISTORY`（`messages.fetch()`）
+> **戻り値:** `deletedCount` のみ。チャンネルIDは変わらないため `newChannelId` は不要。
 
 ```typescript
 import { sql } from "drizzle-orm";
