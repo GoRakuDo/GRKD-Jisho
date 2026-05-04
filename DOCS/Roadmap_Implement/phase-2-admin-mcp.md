@@ -912,3 +912,107 @@ Step A 以降に入る前に Step 0 を終わらせる。
 
 Phase 2 は「人間の管理者が Discord で管理できる」「AIエージェントが read-only で見える」まで。
 それ以上は Phase 3 以降に回す。
+
+---
+
+## 21. 実装ログ（Step D: MCP read-only 基盤）
+
+### 実装内容
+
+- `packages/mcp` を新規作成（`@grkd-jisho/mcp`）
+- stdio transport の MCP server を追加
+- read-only tool を 3つ実装
+  - `grkd-jisho.health`
+  - `grkd-jisho.recent_errors`
+  - `grkd-jisho.get_trace`
+- `mcp_audit_logs` schema を追加し、全 tool call を audit 保存
+- Phase 2 ガードとして `MCP_READONLY_MODE=true` を起動時に強制
+
+### 追加/更新ファイル
+
+- `packages/db/src/schema/mcp-audit-logs.ts` (new)
+- `packages/db/src/schema/index.ts` (update)
+- `packages/mcp/package.json` (new)
+- `packages/mcp/tsconfig.json` (new)
+- `packages/mcp/src/config/env.ts` (new)
+- `packages/mcp/src/services/audit.service.ts` (new)
+- `packages/mcp/src/tools/read-only-tools.ts` (new)
+- `packages/mcp/src/index.ts` (new)
+- `packages/mcp/src/utils/redact.ts` (new)
+
+### code-reviewer 指摘と修正
+
+- HIGH: `bot_events.payload_json` が tool 出力にそのまま出る可能性
+  - 対応: `redactDeep()` を共通化し、`recent_errors/get_trace` 返却前に payload を再帰マスク
+- MED: `recent_errors` の warn/error フィルタが raw SQL
+  - 対応: `inArray()` に変更
+- LOW: マスク対象キー不足
+  - 対応: `api-key`, `client_secret`, `access_token`, `refresh_token` を追加
+
+### 検証結果
+
+- `pnpm install` ✅
+- `pnpm db:generate` ✅（`mcp_audit_logs` 反映）
+- `pnpm --filter mcp exec tsc --noEmit` ✅
+- `pnpm --filter db exec tsc --noEmit` ✅
+- `pnpm --filter bot exec tsc --noEmit` ✅
+
+### 残タスク
+
+- Step E: stats系 read-only tool を追加
+  - `grkd-jisho.lookup_stats`
+  - `grkd-jisho.cache_stats`
+  - `grkd-jisho.rate_limit_status`
+  - `grkd-jisho.wipe_status`
+
+---
+
+## 22. 実装ログ（Step E: MCP stats tools）
+
+### 実装内容
+
+- Step E の read-only stats tool を追加
+  - `grkd-jisho.lookup_stats`
+  - `grkd-jisho.cache_stats`
+  - `grkd-jisho.rate_limit_status`
+  - `grkd-jisho.wipe_status`
+- すべて既存の `withAudit()` ラッパー経由で `mcp_audit_logs` 記録
+- すべて `grkd-jisho.` prefix を維持
+
+### 主なロジック
+
+- `lookup_stats`
+  - 期間（日数）内の lookup 件数
+  - unique user 件数
+  - top query（上位10件）
+  - dictionary hit 件数
+  - cache hit ratio
+- `cache_stats`
+  - `response_cache` 総件数
+  - manual override 件数
+  - prompt_version 別件数
+  - model_name 別件数
+  - 直近7日作成件数
+- `rate_limit_status`
+  - `role_rate_limits` 一覧（または role_id 絞り込み）
+  - `user_usage` の当日使用量（GMT+7 = `Asia/Jakarta` 基準）
+- `wipe_status`
+  - `channel_settings` 一覧
+  - `wipe.started / wipe.completed / wipe.failed` の直近イベント
+
+### code-reviewer 指摘と修正
+
+- MED: `usageDate` 比較に `eq(column, sqlExpr)` を使っていた
+  - 対応: `where(sql\`${schema.userUsage.usageDate} = (now() at time zone 'Asia/Jakarta')::date\`)` へ修正
+- MED: redact が厳密一致のみで漏れ余地あり
+  - 対応: `token/secret/api[_-]?key/password/authorization/cookie` の部分一致パターンに変更
+
+### 検証結果
+
+- `pnpm --filter mcp exec tsc --noEmit` ✅
+- `pnpm --filter db exec tsc --noEmit` ✅
+- `pnpm --filter bot exec tsc --noEmit` ✅
+
+### 次ステップ
+
+- Step F: Phase 2 検証と最終レビュー
