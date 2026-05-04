@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Events, type Message } from "discord.js";
+import { type Message } from "discord.js";
 import { env } from "../config/env.js";
 import { lookupWord } from "../services/dictionary.service.js";
 import { resolveRoleKey } from "../services/role-mapper.service.js";
@@ -42,6 +42,19 @@ async function finalizeLookup(
 }
 
 export const messageCreateHandler = async (message: Message): Promise<void> => {
+  try {
+    await handleMessage(message);
+  } catch (err) {
+    console.error("[messageCreate] Unhandled error:", err);
+    try {
+      await message.reply("予期しないエラーが発生しました。");
+    } catch {
+      // reply 自体が失敗しても握りつぶす
+    }
+  }
+};
+
+async function handleMessage(message: Message): Promise<void> {
   if (message.author.bot) return;
 
   const botId = message.client.user?.id;
@@ -69,12 +82,18 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
   const member = message.member;
   if (!member) return;
 
+  // GuildMembers intent に依存しない: roles.cache が不完全なら API fetch で補完
+  // @everyone のみ（size=1）の場合に fetch を試み、失敗時は元の member を維持
+  const safeMember = (member.roles.cache.size < 2 && message.guild)
+    ? await message.guild.members.fetch(message.author.id).catch(() => member)
+    : member;
+
   const isOwner = message.guild?.ownerId === message.author.id;
-  const hasAdmin = member.permissions.has("Administrator");
+  const hasAdmin = safeMember.permissions.has("Administrator");
 
   // ロールIDを取得して rate-limit へ渡す。ロール名は resolveRoleKey 専用
-  const roleIds = member.roles.cache.map((r) => r.id);
-  const roleNames = member.roles.cache.map((r) => r.name);
+  const roleIds = safeMember.roles.cache.map((r) => r.id);
+  const roleNames = safeMember.roles.cache.map((r) => r.name);
 
   const { allowed, limit } = await checkRateLimit({
     userId: message.author.id,
