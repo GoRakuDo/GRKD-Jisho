@@ -142,6 +142,31 @@ INSERT ... ON CONFLICT DO NOTHING RETURNING *
 
 **型チェック:** `pnpm --filter bot exec tsc --noEmit` ✅ 通過
 
+### Step B 実装ログ
+
+2026-05-04 に実装・レビュー・修正完了。
+
+| タスク | ファイル | 説明 |
+|--------|---------|------|
+| service | `services/response-admin.service.ts` | search / getById / update(transaction) / deleteCache / lookupSource / dictionaryList |
+| search | `commands/search-jisho.command.ts` | `/search-jisho word:` — response_cache 一覧表示（上位10件） |
+| edit | `commands/edit-jisho.command.ts` | `/edit-jisho response-id:` → Modal 表示（本文 + 理由入力） |
+| refresh | `commands/refresh-jisho.command.ts` | `/refresh-jisho word: [role:]` — isManualOverride=false のみ削除 |
+| source | `commands/source-jisho.command.ts` | `/source-jisho word:` — lookup_logs + dictionaries JOIN |
+| priority | `commands/priority-jisho.command.ts` | `/priority-jisho` — dictionaries 一覧 |
+| override | `commands/override-jisho.command.ts` | `/override-jisho response-id: text:` — 即時上書き（4000文字制限） |
+| modal | `events/interactionCreate.ts` | `isModalSubmit()` 対応追加。`edit_jisho_` prefix の modal 処理 |
+| types | `commands/types.ts` | `CommandBuilder` 型追加（`SlashCommandBuilder \| SlashCommandOptionsOnlyBuilder`） |
+| registry | `commands/index.ts` | 6コマンドを register |
+
+**コードレビュー修正（4件）:**
+- 🔴 BLOCKER: `response-admin.service.ts` の `Number(id)` が 2^53 超えで精度劣化 → `BigInt(id)` に変更
+- 🟠 HIGH: `interactionCreate.ts` で `String(err)` をユーザーに露出 → 汎用メッセージに変更
+- 🟠 HIGH: `updateResponse` の入力検証不足 → `/^\d+$/` テスト + トランザクション内で `update → returning` の構成に変更（get→update の競合除去）
+- 🟡 MED: `/override-jisho` の `reason` 省略 → `"override-jisho command"` を既定値として渡す
+
+**型チェック:** `pnpm --filter bot exec tsc --noEmit` ✅ 通過
+
 ---
 
 ## 3. Phase 2 完了時のディレクトリ構成
