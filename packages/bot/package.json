@@ -8,6 +8,8 @@
     "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "register-commands": "dotenv -e ../../.env -- tsx src/scripts/register-commands.ts"
   },
   "dependencies": {
@@ -22,6 +24,7 @@
     "@types/node": "^22.15.3",
     "dotenv-cli": "^11.0.0",
     "tsx": "^4.19.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^4.1.5"
   }
 }
