@@ -167,6 +167,31 @@ INSERT ... ON CONFLICT DO NOTHING RETURNING *
 
 **型チェック:** `pnpm --filter bot exec tsc --noEmit` ✅ 通過
 
+### Step C 実装ログ
+
+2026-05-04 に実装・レビュー・修正完了。
+
+| タスク | ファイル | 説明 |
+|--------|---------|------|
+| date-utils | `services/date-utils.ts` | `toGMT7Date()` を抽出。`rate-limit.service.ts` から重複排除 |
+| rate-limit admin | `services/rate-limit-admin.service.ts` | setRoleLimit(UPSERT) / getRoleLimits / resetUserUsage |
+| wipe admin | `services/wipe-admin.service.ts` | setWipeEnabled(UPSERT) / getChannelSettings / getChannelSetting |
+| ratelimit set | `commands/ratelimit-set.command.ts` | `/ratelimit-set role-id: limit:` — string option で `__default__` 対応 |
+| ratelimit list | `commands/ratelimit-list.command.ts` | `/ratelimit-list` — 上限一覧 |
+| ratelimit reset | `commands/ratelimit-reset.command.ts` | `/ratelimit-reset user:` — GMT+7 今日分のみ 0 |
+| wipe channel | `commands/wipe-channel.command.ts` | `/wipe-channel channel: enabled:` — ChannelType.GuildText |
+| wipe status | `commands/wipe-status.command.ts` | `/wipe-status` — 全設定表示 |
+| wipe now | `commands/wipe-now.command.ts` | `/wipe-now channel:` — 確認+キャンセルボタン。`wipe_enabled=true` のみ実行可 |
+| button handler | `events/interactionCreate.ts` | `isButton()` 対応追加。`wipe_now_confirm_` / `wipe_now_cancel` を処理 |
+| types | `types.ts` | `TraceEventType` に `wipe.command_executed` 追加 |
+| registry | `commands/index.ts` | 6コマンドを register |
+
+**コードレビュー修正（2件）:**
+- 🟡 MED: `wipe-now.command.ts` に guild context チェックが欠落 → `interaction.guildId` の防御的チェックを追加
+- 🟡 MED: `rate-limit.service.ts` の `export { toGMT7Date }` が未使用（date-utils.ts に移行済み） → 行を削除
+
+**型チェック:** `pnpm --filter bot exec tsc --noEmit` ✅ 通過
+
 ---
 
 ## 3. Phase 2 完了時のディレクトリ構成

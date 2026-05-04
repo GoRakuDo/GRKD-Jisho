@@ -1,6 +1,7 @@
 import { eq, and, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
+import { toGMT7Date } from "./date-utils.js";
 
 interface RateLimitParams {
   userId: string;
@@ -94,19 +95,4 @@ async function getDefaultDailyLimit(): Promise<number> {
     .limit(1);
 
   return defaultRecord?.dailyLimit ?? 10;
-}
-
-function toGMT7Date(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Bangkok",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const y = parts.find((p) => p.type === "year")?.value ?? "2026";
-  const m = parts.find((p) => p.type === "month")?.value ?? "01";
-  const d = parts.find((p) => p.type === "day")?.value ?? "01";
-
-  return `${y}-${m}-${d}`;
 }

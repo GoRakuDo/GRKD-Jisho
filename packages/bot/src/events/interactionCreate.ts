@@ -1,11 +1,24 @@
-import { type Interaction, type ModalSubmitInteraction } from "discord.js";
+import {
+  type Interaction,
+  type ModalSubmitInteraction,
+  type ButtonInteraction,
+  TextChannel,
+} from "discord.js";
 import { getCommand } from "../commands/index.js";
 import { isInteractionAdmin } from "../services/admin-permission.service.js";
 import { updateResponse } from "../services/response-admin.service.js";
+import { wipeChannel } from "../services/channel-wipe.service.js";
+import { traceEvent } from "../services/observability.service.js";
 
 export const interactionCreateHandler = async (
   interaction: Interaction,
 ): Promise<void> => {
+  // ── Button ──
+  if (interaction.isButton()) {
+    await handleButtonInteraction(interaction);
+    return;
+  }
+
   // ── Modal submit ──
   if (interaction.isModalSubmit()) {
     await handleModalSubmit(interaction);
@@ -50,6 +63,63 @@ export const interactionCreateHandler = async (
     }
   }
 };
+
+/** `/wipe-now` の確認ボタンを処理する。 */
+async function handleButtonInteraction(
+  interaction: ButtonInteraction,
+): Promise<void> {
+  const customId = interaction.customId;
+
+  // キャンセル
+  if (customId === "wipe_now_cancel") {
+    await interaction.update({
+      content: "キャンセルしました。",
+      components: [],
+    });
+    return;
+  }
+
+  // wipe-now 確認
+  if (customId.startsWith("wipe_now_confirm_")) {
+    const channelId = customId.replace("wipe_now_confirm_", "");
+    const channel = interaction.client.channels.cache.get(channelId);
+
+    if (!(channel instanceof TextChannel)) {
+      await interaction.update({
+        content: "チャンネルが見つかりません。削除された可能性があります。",
+        components: [],
+      });
+      return;
+    }
+
+    try {
+      const { deletedCount } = await wipeChannel(channel);
+      const traceId = `wipe_cmd_${channel.id}_${Date.now()}`;
+      await traceEvent(traceId, "wipe.command_executed", "info", {
+        channelId: channel.id,
+        deletedCount,
+        triggeredBy: interaction.user.id,
+      });
+      await interaction.update({
+        content: `チャンネル <#${channelId}> のメッセージ ${deletedCount}件を削除しました。`,
+        components: [],
+      });
+    } catch (err) {
+      console.error(`[Button] wipe-now failed for ${channelId}:`, err);
+      await interaction.update({
+        content: `削除に失敗しました。権限を確認してください。`,
+        components: [],
+      });
+    }
+    return;
+  }
+
+  // 未知のボタン
+  await interaction.update({
+    content: "処理できないボタンです。",
+    components: [],
+  });
+}
 
 /** `/edit-jisho` のモーダル送信を処理する。 */
 async function handleModalSubmit(

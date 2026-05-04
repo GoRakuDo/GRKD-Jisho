@@ -6,6 +6,12 @@ import { refreshJishoCommand } from "./refresh-jisho.command.js";
 import { sourceJishoCommand } from "./source-jisho.command.js";
 import { priorityJishoCommand } from "./priority-jisho.command.js";
 import { overrideJishoCommand } from "./override-jisho.command.js";
+import { ratelimitSetCommand } from "./ratelimit-set.command.js";
+import { ratelimitListCommand } from "./ratelimit-list.command.js";
+import { ratelimitResetCommand } from "./ratelimit-reset.command.js";
+import { wipeChannelCommand } from "./wipe-channel.command.js";
+import { wipeStatusCommand } from "./wipe-status.command.js";
+import { wipeNowCommand } from "./wipe-now.command.js";
 
 const commandMap = new Map<string, Command>();
 
@@ -17,18 +23,22 @@ function register(cmd: Command): void {
   commandMap.set(name, cmd);
 }
 
-// Step A: ping
+// Step A
 register(pingCommand);
-
-// Step B: response 管理コマンド
+// Step B
 register(searchJishoCommand);
 register(editJishoCommand);
 register(refreshJishoCommand);
 register(sourceJishoCommand);
 register(priorityJishoCommand);
 register(overrideJishoCommand);
-
-// Steps C で追加
+// Step C
+register(ratelimitSetCommand);
+register(ratelimitListCommand);
+register(ratelimitResetCommand);
+register(wipeChannelCommand);
+register(wipeStatusCommand);
+register(wipeNowCommand);
 
 export { register };
 export function getCommand(name: string): Command | undefined {

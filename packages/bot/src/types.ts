@@ -38,6 +38,7 @@ export type TraceEventType =
   | "wipe.started"
   | "wipe.completed"
   | "wipe.failed"
+  | "wipe.command_executed"
   | "ops_job.started"
   | "ops_job.completed"
   | "ops_job.failed";
