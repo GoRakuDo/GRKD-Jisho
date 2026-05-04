@@ -708,7 +708,7 @@ export async function incrementUsage(params: {
 // GMT+7 の日付文字列を返す (YYYY-MM-DD)
 function toGMT7Date(date: Date): string {
   return new Intl.DateTimeFormat("id-ID", {
-    timeZone: "Asia/Bangkok",
+    timeZone: "Asia/Jakarta",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -858,7 +858,7 @@ cron.schedule("0 0 * * *", async () => {
     }
   }
 }, {
-  timezone: "Asia/Bangkok",
+  timezone: "Asia/Jakarta",
 });
 ```
 

@@ -55,7 +55,7 @@ client.once("ready", () => {
       }
     },
     {
-      timezone: "Asia/Bangkok",
+      timezone: "Asia/Jakarta",
     },
   );
 

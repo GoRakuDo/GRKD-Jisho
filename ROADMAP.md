@@ -126,7 +126,7 @@ Phase 4: 品質改善・最適化             ongoing
   - 上限超過時は Ephemeral メッセージ送信
 
 - [ ] **1-11** Channel Wipe-out スケジューラ実装
-  - `node-cron` で `0 0 * * * Asia/Bangkok` スケジュール
+  - `node-cron` で `0 0 * * * Asia/Jakarta` スケジュール
   - `channel_settings` から `wipe_enabled = true` のチャンネルを取得
   - 対象は毎日 00:00 GMT+7 時点の直近24時間以内メッセージ
   - 固定メッセージ（ピン留め）のみ保持
