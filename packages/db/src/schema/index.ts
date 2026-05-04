@@ -8,3 +8,4 @@ export * from "./user-usage";
 export * from "./channel-settings";
 export * from "./bot-events";
 export * from "./bot-heartbeats";
+export * from "./ops-jobs";

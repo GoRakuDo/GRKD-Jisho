@@ -1,7 +1,12 @@
 import { env } from "./config/env.js";
-import { Client, GatewayIntentBits, Events } from "discord.js";
+import { Client, GatewayIntentBits, Events, TextChannel } from "discord.js";
+import cron from "node-cron";
+import { eq } from "drizzle-orm";
+import { db, schema } from "@grkd-jisho/db";
 import { messageCreateHandler } from "./events/messageCreate.js";
 import { recordHeartbeat } from "./services/observability.service.js";
+import { wipeChannel } from "./services/channel-wipe.service.js";
+import { pollAndExecuteJobs } from "./services/ops-job.service.js";
 
 const client = new Client({
   intents: [
@@ -22,6 +27,41 @@ client.once("ready", () => {
       uptime: process.uptime(),
     });
   }, 120_000);
+
+  // Channel Wipe スケジューラ: 毎日 00:00 GMT+7
+  cron.schedule(
+    "0 0 * * *",
+    async () => {
+      console.log("[Wipe] Starting daily channel wipe...");
+
+      const enabledChannels = await db
+        .select()
+        .from(schema.channelSettings)
+        .where(eq(schema.channelSettings.wipeEnabled, true));
+
+      for (const setting of enabledChannels) {
+        const discordChannel = client.channels.cache.get(setting.channelId);
+        if (!(discordChannel instanceof TextChannel)) continue;
+
+        try {
+          const { newChannelId, pinCount } = await wipeChannel(discordChannel);
+          console.log(
+            `[Wipe] ${setting.channelId} → ${newChannelId}: wiped (${pinCount} pins restored)`,
+          );
+        } catch (err) {
+          console.error(`[Wipe] Failed channel ${setting.channelId}:`, err);
+        }
+      }
+    },
+    {
+      timezone: "Asia/Bangkok",
+    },
+  );
+
+  // OpsJob ポーリング: 30秒ごと
+  setInterval(async () => {
+    await pollAndExecuteJobs();
+  }, 30_000);
 });
 
 client.on(Events.MessageCreate, messageCreateHandler);

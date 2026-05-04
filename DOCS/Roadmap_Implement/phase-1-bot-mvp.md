@@ -1494,3 +1494,31 @@ packages/bot/src/services/observability.service.ts ← 修正1箇所（new Date(
 **追加の所見（LLM エラーパス）:**
 
 LLM エラー時の `finalizeLookup` 有無は設計判断の範囲内。現状は「エラーはカウントしない」の前提で動いている。もし LLM エラーの観測性を高めたい場合のみ、`catch` ブロック内で `finalizeLookup` を呼ぶことを検討する。この対応は必須ではないため、Phase 1 Step B のタイミングで判断する。
+
+---
+
+## 19. Code Review Fixes — Step B（Channel Wipe / OpsJob）
+
+> **Phase 1 Step B 実装後に code-reviewer へレビュー依頼し、以下の指摘を全て修正済み。**
+> いずれも `tsc --noEmit` を再実行して通過済み。
+
+### 修正内容
+
+| # | 深刻度 | 問題 | 修正 |
+|---|--------|------|------|
+| 1 | 🟡 MED | `channel-wipe.service.ts` の `embeds: pin.embedJSONs as []` が unsafe | `APIEmbed[]` に修正し、`content` / `embeds` を条件付き payload に変更 |
+| 2 | 🟡 MED | 固定メッセージ復元が `channel.delete()` の後で、失敗時にピンが失われる | **復元を先に実行**し、失敗時は新チャンネルを削除して例外を投げるロールバックを追加 |
+| 3 | 🟠 HIGH | `ops-job.service.ts` が 30 秒ポーリング時に同一ジョブの race condition を起こしうる | `pollingInProgress` フラグを追加し、`running` への更新を `status` 条件付き `claim` に変更 |
+| 4 | 🟡 MED | `ops-job.service.ts` の `argsJson as Record<string, unknown>` が unsafe | `isRecord()` ガードに変更し、非 object は明示エラーに変更 |
+| 5 | 🟡 LOW | `ops-jobs.ts` のコメントに `rejected` が残っていた | コメントを実装に合わせて削除 |
+| 6 | 🟡 LOW | `index.ts` の `isTextBased()` が `instanceof TextChannel` と重複 | `instanceof TextChannel` のみに簡素化 |
+
+### 再レビュー結果（期待値）
+
+- Pin 復元は旧チャンネル削除前に行われ、空ペイロードは `\u200B` で回避されるため、固定メッセージ損失リスクを下げた
+- `pollingInProgress` により同一インスタンス内の多重ポーリングを防止した
+- なお、マルチプロセス環境での ops job 排他は Phase 2 で DB ロック/claim 切替を検討する余地がある
+
+### 追加の最終修正
+
+`pollAndExecuteJobs()` の初期 DB クエリ失敗時に `pollingInProgress` が残り続ける問題を修正。関数全体を `try/finally` で囲み、どの経路でも `pollingInProgress = false` に戻るようにした。これで `setInterval` ポーリングが永久停止する経路を潰した。
