@@ -92,6 +92,9 @@ async function handleButtonInteraction(
       return;
     }
 
+    // 先に deferUpdate で 3秒 timeout を回避する
+    await interaction.deferUpdate();
+
     try {
       const { deletedCount } = await wipeChannel(channel);
       const traceId = `wipe_cmd_${channel.id}_${Date.now()}`;
@@ -100,13 +103,13 @@ async function handleButtonInteraction(
         deletedCount,
         triggeredBy: interaction.user.id,
       });
-      await interaction.update({
+      await interaction.editReply({
         content: `チャンネル <#${channelId}> のメッセージ ${deletedCount}件を削除しました。`,
         components: [],
       });
     } catch (err) {
       console.error(`[Button] wipe-now failed for ${channelId}:`, err);
-      await interaction.update({
+      await interaction.editReply({
         content: `削除に失敗しました。権限を確認してください。`,
         components: [],
       });

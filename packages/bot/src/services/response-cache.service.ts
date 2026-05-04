@@ -22,6 +22,11 @@ export async function getCachedResponse(key: CacheKey) {
   return row ?? null;
 }
 
+/**
+ * キャッシュに保存する。既に同じキャッシュキーが存在する場合は何もしない（ON CONFLICT DO NOTHING）。
+ * 手動上書き済みのレコードも含めて、既存レコードを絶対に上書きしない。
+ * 戻り値: 保存されたレコード、または何もしなかった場合は null。
+ */
 export async function saveResponse(
   params: CacheKey & { responseText: string },
 ) {
@@ -37,7 +42,8 @@ export async function saveResponse(
       modelName: params.modelName,
       responseText: params.responseText,
     })
+    .onConflictDoNothing()
     .returning();
 
-  return saved;
+  return saved ?? null;
 }

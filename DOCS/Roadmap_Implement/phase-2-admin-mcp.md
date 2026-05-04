@@ -192,6 +192,27 @@ INSERT ... ON CONFLICT DO NOTHING RETURNING *
 
 **型チェック:** `pnpm --filter bot exec tsc --noEmit` ✅ 通過
 
+### Step 0〜C 回帰検証ログ
+
+2026-05-04 に全23ファイルの系统検証完了。
+
+**発見バグ（2件）:**
+- 🔴 HIGH: `updateResponse()` で `RETURNING` を使って旧テキストを取得していた。PostgreSQL の RETURNING は更新後の値を返すため、`beforeText` と `afterText` が常に同じ値になる。 → トランザクション内で `SELECT` を先に実行してから `UPDATE` する方式に修正
+- 🔴 MED: `/wipe-now` 確認ボタンが3秒 timeout の可能性。`wipeChannel()` の bulkDelete が100件以上のメッセージで3秒を超える可能性がある。 → `interaction.deferUpdate()` を先に実行してから処理し、完了後に `interaction.editReply()` で更新
+
+**再レビュー指摘修正（2件）:**
+- 🟡 MED: `getResponseById()` に事前検証が不足（`updateResponse()` と一貫性がない） → `/^\d+$/` テストを追加
+- 🟡 MED: `saveResponse()` のコメントが実装と乖離（"is_manual_override = true は上書きしない" → `ON CONFLICT DO NOTHING` は全レコードを保護） → コメントを修正
+
+**Regression 確認:**
+- `messageCreate` ↔ `interactionCreate`: 競合なし（別イベントで完全分離）
+- `rate-limit.service` の抽出: 変更なし（date-utils.ts への切り出しのみ）
+- `response-cache.service` ↔ `response-admin.service` の競合: なし（別テーブル/別操作）
+- Cron wipe ↔ Button wipe の競合: なし（冪等）
+- 全23ファイルの相互依存チェック: ✅
+
+**型チェック:** `pnpm --filter bot exec tsc --noEmit` ✅ 通過
+
 ---
 
 ## 3. Phase 2 完了時のディレクトリ構成

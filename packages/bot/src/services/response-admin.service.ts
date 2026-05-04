@@ -43,6 +43,7 @@ export async function getResponseById(
   id: string,
 ): Promise<SearchResult | null> {
   // DB の bigserial は bigint → BigInt で扱う。Number は精度限界（2^53）を超える可能性がある
+  if (!/^\d+$/.test(id)) return null;
   let numericId: bigint;
   try {
     numericId = BigInt(id);
@@ -82,23 +83,28 @@ export async function updateResponse(
   const numericId = BigInt(cacheId);
 
   await db.transaction(async (tx) => {
-    // トランザクション内で update を先に実行し、その returning で変更前テキストを取得する
-    const [updated] = await tx
+    // トランザクション内で変更前テキストを取得（update 後に失われるため先に読む）
+    const [before] = await tx
+      .select({ responseText: schema.responseCache.responseText })
+      .from(schema.responseCache)
+      .where(eq(schema.responseCache.id, numericId))
+      .limit(1);
+
+    if (!before) throw new Error("Response not found");
+
+    await tx
       .update(schema.responseCache)
       .set({
         responseText: newText,
         isManualOverride: true,
         updatedAt: sql`now()`,
       })
-      .where(eq(schema.responseCache.id, numericId))
-      .returning({ responseText: schema.responseCache.responseText });
-
-    if (!updated) throw new Error("Response not found");
+      .where(eq(schema.responseCache.id, numericId));
 
     await tx.insert(schema.responseEdits).values({
       responseCacheId: numericId,
       editorDiscordId,
-      beforeText: updated.responseText,
+      beforeText: before.responseText,
       afterText: newText,
       reason: reason ?? null,
     });
