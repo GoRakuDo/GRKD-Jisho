@@ -4,6 +4,7 @@ import cron from "node-cron";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 import { messageCreateHandler } from "./events/messageCreate.js";
+import { interactionCreateHandler } from "./events/interactionCreate.js";
 import { recordHeartbeat } from "./services/observability.service.js";
 import { wipeChannel } from "./services/channel-wipe.service.js";
 import { pollAndExecuteJobs } from "./services/ops-job.service.js";
@@ -65,6 +66,7 @@ client.once("ready", () => {
 });
 
 client.on(Events.MessageCreate, messageCreateHandler);
+client.on(Events.InteractionCreate, interactionCreateHandler);
 
 client.login(env.DISCORD_TOKEN).catch((err) => {
   console.error("Failed to login:", err);

@@ -100,9 +100,47 @@ INSERT ... ON CONFLICT DO NOTHING RETURNING *
 **対応方針:**
 
 - handler 全体を内部関数に分ける
-- 外側で try/catch する
 - catch では `reply.error` と `bot_events` を残す
 - ユーザーへは短いエラー文だけ返す
+
+### 2-0-4. Step 0 実装ログ
+
+以下は 2026-05-04 に実装した内容。
+
+| # | 修正内容 | ファイル | 変更 |
+|---|---------|---------|------|
+| 1 | GuildMember force fetch | `packages/bot/src/events/messageCreate.ts` | `roles.cache.size < 2` の場合のみ `guild.members.fetch()` で補完。privileged intent に依存しない |
+| 2 | `saveResponse()` 競合対応 | `packages/bot/src/services/response-cache.service.ts` | `INSERT ... ON CONFLICT DO NOTHING RETURNING *` に変更。競合時は `null` を返す |
+| 3 | トップレベルエラーハンドラ | `packages/bot/src/events/messageCreate.ts` | `messageCreateHandler` を try/catch の外殻にし、内部ロジックを `handleMessage()` に分離。未使用の `Events` import を削除 |
+| — | 型チェック | `pnpm --filter bot exec tsc --noEmit` | 通過。未使用 import の削除で警告なくなる |
+
+`saveResponse()` が `null` を返した場合、呼び出し元（`handleMessage` 内の LLM 成功パス）は既に `responseText` を持っているので、そのまま返信に使える。次の検索で cache hit する。
+
+**コードレビュー修正:**
+- `response-cache.service.ts` から未使用の `sql` import を削除。型チェック通過。
+
+### Step A 実装ログ
+
+2026-05-04 に実装・レビュー・修正完了。
+
+| タスク | ファイル | 説明 |
+|--------|---------|------|
+| types | `commands/types.ts` | `Command` interface（builder / execute / requiresAdmin） |
+| registry | `commands/index.ts` | `Map<string, Command>` + register() / getCommand() / getAllCommands() |
+| test cmd | `commands/ping.command.ts` | `/ping` — 動作確認用。`requiresAdmin: false` |
+| interaction | `events/interactionCreate.ts` | ChatInputCommand のみ処理。unknown と権限不足は ephemeral error。try/catch で deferred/replied 両対応 |
+| permission | `services/admin-permission.service.ts` | ManageGuild / Administrator / Guild Owner を許可。`typeof` ガードで `APIInteractionGuildMember.permissions`（文字列）に対応 |
+| register | `scripts/register-commands.ts` | REST API v10 + `Routes.applicationGuildCommands` |
+| index.ts | `index.ts` | `client.on(Events.InteractionCreate, interactionCreateHandler)` 追加 |
+| package.json | `package.json` | `register-commands` script 追加 |
+
+**コードレビュー修正（3件）:**
+- 🟠 HIGH: `interactionCreate.ts` のエラー返信が `deferred` 状態を未考慮 → `interaction.replied || interaction.deferred` で分岐
+- 🟡 MED: `interactionCreate.ts` の未使用 import（`Events`, `MessageFlags`）を削除
+- 🟡 MED: `admin-permission.service.ts` の `as GuildMember` キャスト → `typeof` + `PermissionsBitField` で型安全に
+- 🟡 MED: `commands/index.ts` の `register()` が重複を警告しない → `console.warn` 追加
+
+**型チェック:** `pnpm --filter bot exec tsc --noEmit` ✅ 通過
 
 ---
 
