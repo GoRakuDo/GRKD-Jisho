@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { Command } from "./types.js";
 import { getLookupSource } from "../services/response-admin.service.js";
 
@@ -9,7 +9,7 @@ export const sourceJishoCommand: Command = {
     .addStringOption((opt) =>
       opt.setName("word").setDescription("単語").setRequired(true),
     )
-    .setDefaultMemberPermissions(8), // ManageGuild
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
     const word = interaction.options.getString("word", true).trim();

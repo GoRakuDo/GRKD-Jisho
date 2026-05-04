@@ -15,13 +15,47 @@ export const interactionCreateHandler = async (
 ): Promise<void> => {
   // ── Button ──
   if (interaction.isButton()) {
-    await handleButtonInteraction(interaction);
+    try {
+      await handleButtonInteraction(interaction);
+    } catch (err) {
+      console.error(`[Interaction] Button "${interaction.customId}" failed:`, err);
+      const errorReply = {
+        content: "ボタン処理中にエラーが発生しました。",
+        ephemeral: true,
+      };
+      try {
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(errorReply);
+        } else {
+          await interaction.reply(errorReply);
+        }
+      } catch (replyErr) {
+        console.error("[Interaction] Failed to send button error reply:", replyErr);
+      }
+    }
     return;
   }
 
   // ── Modal submit ──
   if (interaction.isModalSubmit()) {
-    await handleModalSubmit(interaction);
+    try {
+      await handleModalSubmit(interaction);
+    } catch (err) {
+      console.error(`[Interaction] Modal "${interaction.customId}" failed:`, err);
+      const errorReply = {
+        content: "モーダル処理中にエラーが発生しました。",
+        ephemeral: true,
+      };
+      try {
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(errorReply);
+        } else {
+          await interaction.reply(errorReply);
+        }
+      } catch (replyErr) {
+        console.error("[Interaction] Failed to send modal error reply:", replyErr);
+      }
+    }
     return;
   }
 

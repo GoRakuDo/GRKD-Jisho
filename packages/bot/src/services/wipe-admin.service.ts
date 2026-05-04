@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, asc } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 
 export async function setWipeEnabled(
@@ -22,8 +22,12 @@ export async function setWipeEnabled(
     });
 }
 
-export async function getChannelSettings() {
-  return db.select().from(schema.channelSettings);
+export async function getChannelSettings(guildId: string) {
+  return db
+    .select()
+    .from(schema.channelSettings)
+    .where(eq(schema.channelSettings.guildId, guildId))
+    .orderBy(asc(schema.channelSettings.channelId));
 }
 
 export async function getChannelSetting(channelId: string) {

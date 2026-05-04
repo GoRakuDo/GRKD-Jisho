@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { Command } from "./types.js";
 import {
   getResponseById,
@@ -15,7 +15,7 @@ export const overrideJishoCommand: Command = {
     .addStringOption((opt) =>
       opt.setName("text").setDescription("新しい回答テキスト").setRequired(true),
     )
-    .setDefaultMemberPermissions(8), // ManageGuild
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
     const rawId = interaction.options.getString("response-id", true).trim();

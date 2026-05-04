@@ -45,6 +45,13 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
   try {
     await handleMessage(message);
   } catch (err) {
+    const traceId = `lookup_unhandled_${message.id}_${Date.now()}`;
+    await traceEvent(traceId, "reply.error", "error", {
+      guildId: message.guildId,
+      channelId: message.channelId,
+      userId: message.author?.id,
+      error: String(err),
+    });
     console.error("[messageCreate] Unhandled error:", err);
     try {
       await message.reply("予期しないエラーが発生しました。");

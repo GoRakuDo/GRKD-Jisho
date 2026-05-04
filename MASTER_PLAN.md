@@ -874,7 +874,7 @@ cron.schedule("0 0 * * *", async () => {
 | コマンド | 説明 |
 |---------|------|
 | `/wipe-channel <channel> <on|off>` | チャンネルの自動消去を ON/OFF |
-| `/wipe-status` | 全チャンネルの wipe 設定・最終消去日時・チャンネルIDを表示 |
+| `/wipe-status` | 実行中ギルドのチャンネル wipe 設定・最終消去日時・チャンネルIDを表示 |
 | `/wipe-now <channel>` | スケジュールを待たずに即時消去（bulkDelete 方式、固定メッセージは保持） |
 
 #### ユーザーリミットリセットとの同時性

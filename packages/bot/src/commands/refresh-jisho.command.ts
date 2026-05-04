@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { Command } from "./types.js";
 import { deleteCacheByQuery } from "../services/response-admin.service.js";
 
@@ -15,7 +15,7 @@ export const refreshJishoCommand: Command = {
         .setDescription("ロールキー（pemula / pemula-atas / menengah / mahir）")
         .setRequired(false),
     )
-    .setDefaultMemberPermissions(8), // ManageGuild
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
     const word = interaction.options.getString("word", true).trim();

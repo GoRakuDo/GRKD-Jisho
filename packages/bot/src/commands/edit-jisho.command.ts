@@ -4,6 +4,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
+  PermissionFlagsBits,
 } from "discord.js";
 import type { Command } from "./types.js";
 import { getResponseById } from "../services/response-admin.service.js";
@@ -15,7 +16,7 @@ export const editJishoCommand: Command = {
     .addStringOption((opt) =>
       opt.setName("response-id").setDescription("回答ID").setRequired(true),
     )
-    .setDefaultMemberPermissions(8), // ManageGuild
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
     const rawId = interaction.options.getString("response-id", true).trim();

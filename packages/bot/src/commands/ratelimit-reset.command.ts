@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { Command } from "./types.js";
 import { resetUserUsage } from "../services/rate-limit-admin.service.js";
 
@@ -9,7 +9,7 @@ export const ratelimitResetCommand: Command = {
     .addUserOption((opt) =>
       opt.setName("user").setDescription("リセットするユーザー").setRequired(true),
     )
-    .setDefaultMemberPermissions(8),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
     const user = interaction.options.getUser("user", true);

@@ -1,4 +1,4 @@
-import { eq, and, asc, sql } from "drizzle-orm";
+import { eq, and, asc, sql, gt } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 import { toGMT7Date } from "./date-utils.js";
 
@@ -36,6 +36,7 @@ export async function resetUserUsage(
   guildId: string,
 ): Promise<number> {
   const today = toGMT7Date(new Date());
+
   const result = await db
     .update(schema.userUsage)
     .set({ count: 0 })
@@ -44,6 +45,7 @@ export async function resetUserUsage(
         eq(schema.userUsage.userId, userId),
         eq(schema.userUsage.guildId, guildId),
         eq(schema.userUsage.usageDate, today),
+        gt(schema.userUsage.count, 0),
       ),
     )
     .returning({ id: schema.userUsage.id });

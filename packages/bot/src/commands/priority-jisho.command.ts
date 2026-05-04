@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { Command } from "./types.js";
 import { getDictionaryList } from "../services/response-admin.service.js";
 
@@ -6,7 +6,7 @@ export const priorityJishoCommand: Command = {
   builder: new SlashCommandBuilder()
     .setName("priority-jisho")
     .setDescription("辞書の優先順位一覧を表示")
-    .setDefaultMemberPermissions(8), // ManageGuild
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
     const dicts = await getDictionaryList();

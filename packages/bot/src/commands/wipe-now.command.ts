@@ -4,6 +4,8 @@ import {
   ButtonBuilder,
   ButtonStyle,
   ActionRowBuilder,
+  PermissionFlagsBits,
+  TextChannel,
 } from "discord.js";
 import type { Command } from "./types.js";
 import { getChannelSetting } from "../services/wipe-admin.service.js";
@@ -19,7 +21,7 @@ export const wipeNowCommand: Command = {
         .addChannelTypes(ChannelType.GuildText)
         .setRequired(true),
     )
-    .setDefaultMemberPermissions(8),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
     if (!interaction.guildId) {
@@ -31,6 +33,42 @@ export const wipeNowCommand: Command = {
     }
 
     const channel = interaction.options.getChannel("channel", true);
+
+    if (!(channel instanceof TextChannel)) {
+      await interaction.reply({
+        content: "テキストチャンネルのみ指定できます。",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const botUser = interaction.client.user;
+    if (!botUser) {
+      await interaction.reply({
+        content: "Botユーザー情報を取得できませんでした。しばらくしてから再試行してください。",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const requiredPermissions = [
+      PermissionFlagsBits.ManageMessages,
+      PermissionFlagsBits.ReadMessageHistory,
+      PermissionFlagsBits.SendMessages,
+    ] as const;
+    const channelPermissions = channel.permissionsFor(botUser.id);
+    const missingPermissions = requiredPermissions.filter(
+      (perm) => !channelPermissions?.has(perm),
+    );
+
+    if (missingPermissions.length > 0) {
+      await interaction.reply({
+        content:
+          "このチャンネルでBotに必要な権限が不足しています。`ManageMessages` / `ReadMessageHistory` / `SendMessages` を確認してください。",
+        ephemeral: true,
+      });
+      return;
+    }
 
     // wipe_enabled が true 以外のチャンネルでは実行しない
     const setting = await getChannelSetting(channel.id);

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { Command } from "./types.js";
 import { setRoleLimit } from "../services/rate-limit-admin.service.js";
 
@@ -19,7 +19,7 @@ export const ratelimitSetCommand: Command = {
         .setRequired(true)
         .setMinValue(-1),
     )
-    .setDefaultMemberPermissions(8),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
     const roleId = interaction.options.getString("role-id", true).trim();

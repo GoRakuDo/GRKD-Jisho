@@ -200,7 +200,7 @@ Phase 4: 品質改善・最適化             ongoing
 
 - [ ] **2-10** Channel Wipe 管理コマンド
   - `/wipe-channel <channel> <on|off>`: チャンネル自動消去の ON/OFF
-  - `/wipe-status`: 全チャンネルの wipe 設定・最終消去日時を表示
+  - `/wipe-status`: 実行中ギルドの wipe 設定・最終消去日時を表示
   - `/wipe-now <channel>`: スケジュールを待たずに即時消去
 
 - [ ] **2-11** MCP Server パッケージ追加 (`packages/mcp`)

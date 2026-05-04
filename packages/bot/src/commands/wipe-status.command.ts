@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { Command } from "./types.js";
 import { getChannelSettings } from "../services/wipe-admin.service.js";
 
@@ -6,10 +6,18 @@ export const wipeStatusCommand: Command = {
   builder: new SlashCommandBuilder()
     .setName("wipe-status")
     .setDescription("全チャンネルの自動消去設定を表示")
-    .setDefaultMemberPermissions(8),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
-    const settings = await getChannelSettings();
+    if (!interaction.guildId) {
+      await interaction.reply({
+        content: "このコマンドはサーバー内でのみ使用できます。",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const settings = await getChannelSettings(interaction.guildId);
 
     if (settings.length === 0) {
       await interaction.reply({

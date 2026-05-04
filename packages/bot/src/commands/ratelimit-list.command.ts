@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { Command } from "./types.js";
 import { getRoleLimits } from "../services/rate-limit-admin.service.js";
 
@@ -6,7 +6,7 @@ export const ratelimitListCommand: Command = {
   builder: new SlashCommandBuilder()
     .setName("ratelimit-list")
     .setDescription("ロール別検索上限の一覧を表示")
-    .setDefaultMemberPermissions(8),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
     const limits = await getRoleLimits();

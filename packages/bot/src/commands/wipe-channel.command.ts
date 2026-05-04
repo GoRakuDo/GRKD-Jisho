@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChannelType } from "discord.js";
+import { SlashCommandBuilder, ChannelType, PermissionFlagsBits } from "discord.js";
 import type { Command } from "./types.js";
 import { setWipeEnabled } from "../services/wipe-admin.service.js";
 
@@ -19,7 +19,7 @@ export const wipeChannelCommand: Command = {
         .setDescription("自動消去を有効にする")
         .setRequired(true),
     )
-    .setDefaultMemberPermissions(8),
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   requiresAdmin: true,
   async execute(interaction) {
     const channel = interaction.options.getChannel("channel", true);
