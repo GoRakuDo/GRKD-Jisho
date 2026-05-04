@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "idx_bot_heartbeats_service_instance" ON "bot_heartbeats" USING btree ("service_name","instance_id");

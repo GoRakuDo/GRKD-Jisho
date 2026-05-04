@@ -6,3 +6,5 @@ export * from "./lookup-logs";
 export * from "./role-rate-limits";
 export * from "./user-usage";
 export * from "./channel-settings";
+export * from "./bot-events";
+export * from "./bot-heartbeats";
