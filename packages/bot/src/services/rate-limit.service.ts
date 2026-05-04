@@ -23,15 +23,19 @@ export async function checkRateLimit(
     return { allowed: true, remaining: Infinity, limit: Infinity };
   }
 
-  const roleLimits = await db
-    .select()
-    .from(schema.roleRateLimits)
-    .where(inArray(schema.roleRateLimits.discordRoleId, params.memberRoles));
+  // 空配列の場合は DB クエリを飛ばさずデフォルト制限を使う
+  let roleLimit: number | null = null;
+  if (params.memberRoles.length > 0) {
+    const roleLimits = await db
+      .select()
+      .from(schema.roleRateLimits)
+      .where(inArray(schema.roleRateLimits.discordRoleId, params.memberRoles));
+    if (roleLimits.length > 0) {
+      roleLimit = Math.max(...roleLimits.map((r) => r.dailyLimit));
+    }
+  }
 
-  const limit =
-    roleLimits.length > 0
-      ? Math.max(...roleLimits.map((r) => r.dailyLimit))
-      : await getDefaultDailyLimit();
+  const limit = roleLimit ?? await getDefaultDailyLimit();
 
   if (limit === -1) {
     return { allowed: true, remaining: Infinity, limit: -1 };
@@ -93,12 +97,16 @@ async function getDefaultDailyLimit(): Promise<number> {
 }
 
 function toGMT7Date(date: Date): string {
-  return new Intl.DateTimeFormat("id-ID", {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Bangkok",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  })
-    .format(date)
-    .replace(/\//g, "-");
+  }).formatToParts(date);
+
+  const y = parts.find((p) => p.type === "year")?.value ?? "2026";
+  const m = parts.find((p) => p.type === "month")?.value ?? "01";
+  const d = parts.find((p) => p.type === "day")?.value ?? "01";
+
+  return `${y}-${m}-${d}`;
 }

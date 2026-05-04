@@ -7,15 +7,16 @@ const ROLE_MAP: Record<string, RoleKey> = {
   "4段": "mahir",
 };
 
+const ROLE_ORDER: RoleKey[] = ["pemula", "pemula-atas", "menengah", "mahir"];
+
 export function resolveRoleKey(roleNames: string[]): RoleKey {
-  const order: RoleKey[] = ["pemula", "pemula-atas", "menengah", "mahir"];
   let best: RoleKey = "pemula";
   let bestIndex = 0;
 
   for (const roleName of roleNames) {
     const key = ROLE_MAP[roleName];
     if (key) {
-      const idx = order.indexOf(key);
+      const idx = ROLE_ORDER.indexOf(key);
       if (idx > bestIndex) {
         best = key;
         bestIndex = idx;

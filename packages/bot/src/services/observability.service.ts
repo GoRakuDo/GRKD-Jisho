@@ -26,13 +26,14 @@ export async function recordHeartbeat(
   metadata?: Record<string, unknown>,
 ): Promise<void> {
   try {
+    const now = new Date();
     await db
       .insert(schema.botHeartbeats)
       .values({
         serviceName,
         instanceId,
         status,
-        lastSeenAt: new Date(),
+        lastSeenAt: now,
         metadataJson: metadata ?? {},
       })
       .onConflictDoUpdate({
@@ -42,7 +43,7 @@ export async function recordHeartbeat(
         ],
         set: {
           status,
-          lastSeenAt: new Date(),
+          lastSeenAt: now,
           metadataJson: metadata ?? {},
         },
       });

@@ -1,9 +1,9 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 import type { CacheKey } from "../types.js";
 
 export async function getCachedResponse(key: CacheKey) {
-  const [manual] = await db
+  const [row] = await db
     .select()
     .from(schema.responseCache)
     .where(
@@ -14,30 +14,12 @@ export async function getCachedResponse(key: CacheKey) {
         eq(schema.responseCache.roleKey, key.roleKey),
         eq(schema.responseCache.promptVersion, key.promptVersion),
         eq(schema.responseCache.modelName, key.modelName),
-        eq(schema.responseCache.isManualOverride, true),
       ),
     )
+    .orderBy(desc(schema.responseCache.isManualOverride))
     .limit(1);
 
-  if (manual) return manual;
-
-  const [cached] = await db
-    .select()
-    .from(schema.responseCache)
-    .where(
-      and(
-        eq(schema.responseCache.normalizedQuery, key.normalizedQuery),
-        eq(schema.responseCache.dictionaryId, key.dictionaryId),
-        eq(schema.responseCache.dictionaryEntryId, key.entryId),
-        eq(schema.responseCache.roleKey, key.roleKey),
-        eq(schema.responseCache.promptVersion, key.promptVersion),
-        eq(schema.responseCache.modelName, key.modelName),
-        eq(schema.responseCache.isManualOverride, false),
-      ),
-    )
-    .limit(1);
-
-  return cached ?? null;
+  return row ?? null;
 }
 
 export async function saveResponse(

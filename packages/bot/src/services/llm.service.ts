@@ -36,6 +36,8 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 ニュアンス:
 `;
 
+const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
+
 export async function generate(params: GenerateParams): Promise<string> {
   const prompt = PROMPT_TEMPLATE
     .replace("{{role_key}}", params.roleKey)
@@ -52,7 +54,6 @@ export async function generate(params: GenerateParams): Promise<string> {
 }
 
 async function callGemini(prompt: string): Promise<string> {
-  const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
   const result = await model.generateContent(prompt);
   const text = result.response.text();
@@ -79,7 +80,9 @@ async function callOpenRouter(prompt: string): Promise<string> {
   }
 
   const data = await response.json();
-  const text: string | undefined = data.choices?.[0]?.message?.content;
-  if (!text) throw new Error("OpenRouter returned empty response");
+  const text = data?.choices?.[0]?.message?.content;
+  if (typeof text !== "string" || !text) {
+    throw new Error("OpenRouter returned empty response");
+  }
   return text;
 }

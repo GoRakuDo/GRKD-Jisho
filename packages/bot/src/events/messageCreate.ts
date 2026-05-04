@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Events, type Message } from "discord.js";
 import { env } from "../config/env.js";
 import { lookupWord } from "../services/dictionary.service.js";
@@ -47,7 +48,7 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
   if (!botId) return;
   if (!message.mentions.has(botId)) return;
 
-  const traceId = `lookup_${Date.now()}_${message.id}`;
+  const traceId = `lookup_${randomUUID()}_${message.id}`;
   await traceEvent(traceId, "message.received", "info", {
     guildId: message.guildId,
     channelId: message.channelId,
@@ -70,7 +71,10 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
 
   const isOwner = message.guild?.ownerId === message.author.id;
   const hasAdmin = member.permissions.has("Administrator");
-  const roleIds = member.roles.cache.map((r) => r.name);
+
+  // ロールIDを取得して rate-limit へ渡す。ロール名は resolveRoleKey 専用
+  const roleIds = member.roles.cache.map((r) => r.id);
+  const roleNames = member.roles.cache.map((r) => r.name);
 
   const { allowed, limit } = await checkRateLimit({
     userId: message.author.id,
@@ -89,7 +93,7 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
   }
   await traceEvent(traceId, "rate_limit.checked", "info", {});
 
-  const roleKey = resolveRoleKey(roleIds);
+  const roleKey = resolveRoleKey(roleNames);
 
   const result = await lookupWord(query);
   if (!result) {
@@ -144,7 +148,18 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
 
     const saved = await saveResponse({ ...cacheKey, responseText });
     if (!saved) {
-      throw new Error("Failed to save response to cache");
+      // save に失敗しても lookup ログと使用量カウントは残す
+      await finalizeLookup(message, traceId, {
+        query,
+        roleIds,
+        dictionaryIdUsed: result.dictionary.id,
+        responseCacheId: null,
+        cacheHit: false,
+        normalizedQueryOverride: cacheKey.normalizedQuery,
+      });
+      await message.reply(formatReply(responseText));
+      await traceEvent(traceId, "reply.sent", "info", {});
+      return;
     }
     await traceEvent(traceId, "cache.saved", "info", { cacheId: saved.id.toString() });
 
