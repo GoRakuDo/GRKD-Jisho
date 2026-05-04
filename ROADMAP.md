@@ -206,18 +206,18 @@ Phase 4: 品質改善・最適化             ongoing
 
 - [ ] **2-11** MCP Server パッケージ追加 (`packages/mcp`)
   - Node.js + TypeScript で MCP server を作成
-  - `@grkd/db` 経由でDBを読む
+  - `@grkd-jisho/db` 経由でDBを読む
   - Discord Bot Token は持たせない
   - MCP tool input は zod で検証
 
 - [ ] **2-12** Read-only MCP tools
-  - `grkd.health`: heartbeat / DB接続 / 最新errorを返す
-  - `grkd.recent_errors`: 直近の warn/error event を返す
-  - `grkd.get_trace`: `trace_id` 単位の処理履歴を返す
-  - `grkd.lookup_stats`: 検索数・辞書hit・上位queryを返す
-  - `grkd.cache_stats`: cache hit / miss を返す
-  - `grkd.rate_limit_status`: role limit と user_usage を返す
-  - `grkd.wipe_status`: wipe_enabled と last_wipe_at を返す
+  - `grkd-jisho.health`: heartbeat / DB接続 / 最新errorを返す
+  - `grkd-jisho.recent_errors`: 直近の warn/error event を返す
+  - `grkd-jisho.get_trace`: `trace_id` 単位の処理履歴を返す
+  - `grkd-jisho.lookup_stats`: 検索数・辞書hit・上位queryを返す
+  - `grkd-jisho.cache_stats`: cache hit / miss を返す
+  - `grkd-jisho.rate_limit_status`: role limit と user_usage を返す
+  - `grkd-jisho.wipe_status`: wipe_enabled と last_wipe_at を返す
 
 - [ ] **2-13** MCP Audit Log
   - `mcp_audit_logs` テーブルを追加
@@ -287,9 +287,9 @@ Phase 4: 品質改善・最適化             ongoing
   - job 実行結果と audit log を表示
 
 - [ ] **3-10** Dry-run MCP tools
-  - `grkd.dry_run_wipe`
-  - `grkd.dry_run_rate_limit_change`
-  - `grkd.dry_run_cache_refresh`
+  - `grkd-jisho.dry_run_wipe`
+  - `grkd-jisho.dry_run_rate_limit_change`
+  - `grkd-jisho.dry_run_cache_refresh`
 
 **完了基準:**  
 ブラウザで Discord 認証後、回答の編集・辞書管理・ログ確認ができること。Trace Viewer で1回の検索フローを追え、AIエージェントが作成した運営ジョブを人間が承認・拒否できること。
@@ -337,15 +337,15 @@ Phase 4: 品質改善・最適化             ongoing
   - Guild 別許可チャンネル設定の DB 管理
 
 - [ ] **4-8** Limited write MCP tools
-  - `grkd.request_cache_refresh`
-  - `grkd.request_user_usage_reset`
-  - `grkd.request_rate_limit_change`
-  - `grkd.request_toggle_wipe`
+  - `grkd-jisho.request_cache_refresh`
+  - `grkd-jisho.request_user_usage_reset`
+  - `grkd-jisho.request_rate_limit_change`
+  - `grkd-jisho.request_toggle_wipe`
   - 全て `ops_jobs` + `mcp_audit_logs` 経由に限定
 
 - [ ] **4-9** Agent Runbook / 自律監視
   - 外側AIエージェント用 runbook を `DOCS/Operations/agent-runbook.md` に作成
-  - `grkd.health` → `grkd.recent_errors` → `grkd.get_trace` の診断順を固定
+  - `grkd-jisho.health` → `grkd-jisho.recent_errors` → `grkd-jisho.get_trace` の診断順を固定
   - dangerous operation は human approval 必須
   - ローカル / クラウド両方で監視できる設定例を用意
 

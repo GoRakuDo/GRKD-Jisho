@@ -132,7 +132,7 @@ dist/
 
 ```json
 {
-  "name": "@grkd/db",
+  "name": "@grkd-jisho/db",
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",
@@ -162,7 +162,7 @@ dist/
 
 ```json
 {
-  "name": "@grkd/bot",
+  "name": "@grkd-jisho/bot",
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",
@@ -173,7 +173,7 @@ dist/
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@grkd/db": "workspace:*",
+    "@grkd-jisho/db": "workspace:*",
     "discord.js": "^14.18.0",
     "zod": "^3.24.3"
   },
@@ -190,7 +190,7 @@ dist/
 
 ```json
 {
-  "name": "@grkd/web",
+  "name": "@grkd-jisho/web",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -199,7 +199,7 @@ dist/
     "preview": "astro preview"
   },
   "dependencies": {
-    "@grkd/db": "workspace:*",
+    "@grkd-jisho/db": "workspace:*",
     "astro": "^5.7.8"
   }
 }

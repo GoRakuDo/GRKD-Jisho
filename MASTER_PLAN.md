@@ -161,7 +161,7 @@ grkd-jisho/
 │
 │   └── mcp/              # AI Agent Control Plane (Phase 2以降)
 │       ├── src/
-│       │   ├── tools/          # grkd.health, grkd.get_trace 等
+│       │   ├── tools/          # grkd-jisho.health, grkd-jisho.get_trace 等
 │       │   ├── services/       # MCP用の読み取り・ops job発行
 │       │   └── index.ts
 │       └── package.json
@@ -969,7 +969,7 @@ CREATE INDEX idx_bot_events_level ON bot_events (level);
 ### 18-3. Liveness: bot_heartbeats
 
 Bot と MCP Server は定期的に heartbeat をDBへ書く。
-外側AIエージェントは `grkd.health` でこの情報を読み、停止・遅延・エラーを検知する。
+外側AIエージェントは `grkd-jisho.health` でこの情報を読み、停止・遅延・エラーを検知する。
 
 ```sql
 CREATE TABLE bot_heartbeats (
@@ -1042,30 +1042,30 @@ CREATE INDEX idx_mcp_audit_logs_created_at ON mcp_audit_logs (created_at);
 
 | Tool | 説明 |
 |---|---|
-| `grkd.health` | Bot / MCP / DB の稼働状態を見る |
-| `grkd.recent_errors` | 直近の error / warn event を見る |
-| `grkd.get_trace` | `trace_id` 単位で処理全体を見る |
-| `grkd.lookup_stats` | 検索数、辞書ヒット率、上位クエリを見る |
-| `grkd.cache_stats` | cache hit / miss を見る |
-| `grkd.rate_limit_status` | user_usage と role_rate_limits を見る |
-| `grkd.wipe_status` | wipe_enabled、last_wipe_at、失敗履歴を見る |
+| `grkd-jisho.health` | Bot / MCP / DB の稼働状態を見る |
+| `grkd-jisho.recent_errors` | 直近の error / warn event を見る |
+| `grkd-jisho.get_trace` | `trace_id` 単位で処理全体を見る |
+| `grkd-jisho.lookup_stats` | 検索数、辞書ヒット率、上位クエリを見る |
+| `grkd-jisho.cache_stats` | cache hit / miss を見る |
+| `grkd-jisho.rate_limit_status` | user_usage と role_rate_limits を見る |
+| `grkd-jisho.wipe_status` | wipe_enabled、last_wipe_at、失敗履歴を見る |
 
 #### Level 2: Dry-run tools
 
 | Tool | 説明 |
 |---|---|
-| `grkd.dry_run_wipe` | 対象チャンネル、pin数、必要権限を確認。削除はしない |
-| `grkd.dry_run_rate_limit_change` | rate limit変更後の影響ユーザー数を確認 |
-| `grkd.dry_run_cache_refresh` | cache refresh対象件数を確認 |
+| `grkd-jisho.dry_run_wipe` | 対象チャンネル、pin数、必要権限を確認。削除はしない |
+| `grkd-jisho.dry_run_rate_limit_change` | rate limit変更後の影響ユーザー数を確認 |
+| `grkd-jisho.dry_run_cache_refresh` | cache refresh対象件数を確認 |
 
 #### Level 3: Limited write tools
 
 | Tool | 説明 | 承認 |
 |---|---|---|
-| `grkd.request_cache_refresh` | cache refresh job を作成 | 内容により不要 |
-| `grkd.request_user_usage_reset` | user_usage reset job を作成 | 原則不要 |
-| `grkd.request_rate_limit_change` | role_rate_limits変更 job を作成 | 必要 |
-| `grkd.request_toggle_wipe` | wipe_enabled変更 job を作成 | 必要 |
+| `grkd-jisho.request_cache_refresh` | cache refresh job を作成 | 内容により不要 |
+| `grkd-jisho.request_user_usage_reset` | user_usage reset job を作成 | 原則不要 |
+| `grkd-jisho.request_rate_limit_change` | role_rate_limits変更 job を作成 | 必要 |
+| `grkd-jisho.request_toggle_wipe` | wipe_enabled変更 job を作成 | 必要 |
 
 #### Level 4: Dangerous tools
 
@@ -1073,20 +1073,20 @@ CREATE INDEX idx_mcp_audit_logs_created_at ON mcp_audit_logs (created_at);
 
 | Tool | 理由 |
 |---|---|
-| `grkd.request_wipe_now` | Discordチャンネル削除を伴う |
-| `grkd.request_bulk_cache_delete` | 大量データ削除を伴う |
-| `grkd.request_prompt_version_rotate` | 全回答品質に影響する |
+| `grkd-jisho.request_wipe_now` | Discordチャンネル削除を伴う |
+| `grkd-jisho.request_bulk_cache_delete` | 大量データ削除を伴う |
+| `grkd-jisho.request_prompt_version_rotate` | 全回答品質に影響する |
 
 ### 18-7. Agent Runbook
 
 外側AIエージェントは、定期監視で以下の順に確認する。
 
 ```txt
-1. grkd.health
-2. heartbeat が古い場合は grkd.recent_errors
-3. trace failure がある場合は grkd.get_trace
+1. grkd-jisho.health
+2. heartbeat が古い場合は grkd-jisho.recent_errors
+3. trace failure がある場合は grkd-jisho.get_trace
 4. LLMエラー増加なら fallback 状態を確認
-5. wipe失敗なら grkd.wipe_status と dry_run_wipe
+5. wipe失敗なら grkd-jisho.wipe_status と dry_run_wipe
 6. 危険操作が必要なら ops_jobs を作り、人間承認待ちにする
 ```
 

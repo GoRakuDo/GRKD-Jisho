@@ -65,7 +65,7 @@ packages/
 - `packages/mcp`: 外側AIエージェント向けの監視・診断・限定操作窓口
 
 Bot側で直接SQL文字列を散らさない。
-DBアクセスは `@grkd/db` 経由に寄せる。
+DBアクセスは `@grkd-jisho/db` 経由に寄せる。
 
 MCP側にも Discord Bot Token を持たせない。
 Discord API を実際に呼ぶのは `packages/bot` だけにする。
@@ -343,29 +343,29 @@ Bot / MCP / Web は `bot_heartbeats` に稼働状態を記録する。
 
 ```txt
 Level 1: read-only
-  grkd.health
-  grkd.recent_errors
-  grkd.get_trace
-  grkd.lookup_stats
-  grkd.cache_stats
-  grkd.rate_limit_status
-  grkd.wipe_status
+  grkd-jisho.health
+  grkd-jisho.recent_errors
+  grkd-jisho.get_trace
+  grkd-jisho.lookup_stats
+  grkd-jisho.cache_stats
+  grkd-jisho.rate_limit_status
+  grkd-jisho.wipe_status
 
 Level 2: dry-run
-  grkd.dry_run_wipe
-  grkd.dry_run_rate_limit_change
-  grkd.dry_run_cache_refresh
+  grkd-jisho.dry_run_wipe
+  grkd-jisho.dry_run_rate_limit_change
+  grkd-jisho.dry_run_cache_refresh
 
 Level 3: limited write
-  grkd.request_cache_refresh
-  grkd.request_user_usage_reset
-  grkd.request_rate_limit_change
-  grkd.request_toggle_wipe
+  grkd-jisho.request_cache_refresh
+  grkd-jisho.request_user_usage_reset
+  grkd-jisho.request_rate_limit_change
+  grkd-jisho.request_toggle_wipe
 
 Level 4: dangerous
-  grkd.request_wipe_now
-  grkd.request_bulk_cache_delete
-  grkd.request_prompt_version_rotate
+  grkd-jisho.request_wipe_now
+  grkd-jisho.request_bulk_cache_delete
+  grkd-jisho.request_prompt_version_rotate
 ```
 
 Level 3 以上は必ず `mcp_audit_logs` に記録する。

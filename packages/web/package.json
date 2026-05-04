@@ -1,5 +1,5 @@
 {
-  "name": "@grkd/web",
+  "name": "@grkd-jisho/web",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "@grkd/db": "workspace:*",
+    "@grkd-jisho/db": "workspace:*",
     "astro": "^5.7.8"
   }
 }

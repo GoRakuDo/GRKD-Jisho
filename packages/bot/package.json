@@ -1,5 +1,5 @@
 {
-  "name": "@grkd/bot",
+  "name": "@grkd-jisho/bot",
   "version": "0.0.1",
   "private": true,
   "main": "./src/index.ts",
@@ -10,7 +10,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@grkd/db": "workspace:*",
+    "@grkd-jisho/db": "workspace:*",
     "discord.js": "^14.18.0",
     "zod": "^3.24.3"
   },

@@ -14,7 +14,7 @@ importers:
 
   packages/bot:
     dependencies:
-      '@grkd/db':
+      '@grkd-jisho/db':
         specifier: workspace:*
         version: link:../db
       discord.js:
@@ -67,7 +67,7 @@ importers:
 
   packages/web:
     dependencies:
-      '@grkd/db':
+      '@grkd-jisho/db':
         specifier: workspace:*
         version: link:../db
       astro:
