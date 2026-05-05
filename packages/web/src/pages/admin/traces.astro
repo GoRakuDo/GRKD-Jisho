@@ -1,11 +1,207 @@
 ---
 import AdminLayout from "../../layouts/AdminLayout.astro";
+import { TraceSearch } from "../../components/admin/TraceSearch";
+import { TraceTimeline } from "../../components/admin/TraceTimeline";
+import { getSession } from "../../lib/session";
+import { eq, desc } from "drizzle-orm";
+import { db, schema } from "@grkd-jisho/db";
+
+const session = getSession(Astro);
+
+interface TraceEvent {
+  id: string;
+  eventType: string;
+  level: string;
+  createdAt: string | null;
+  payloadJson: Record<string, unknown>;
+}
+
+const urlParams = new URL(Astro.url.toString()).searchParams;
+const initialTraceId = urlParams.get("traceId") ?? "";
+
+let traceEvents: TraceEvent[] = [];
+let recentTraces: { traceId: string; eventType: string; level: string; createdAt: string | null }[] = [];
+
+if (session?.isAdmin) {
+  try {
+    if (initialTraceId) {
+      const events = await db
+        .select()
+        .from(schema.botEvents)
+        .where(eq(schema.botEvents.traceId, initialTraceId))
+        .orderBy(desc(schema.botEvents.createdAt))
+        .limit(200);
+
+      traceEvents = events.map((e) => ({
+        id: String(e.id),
+        eventType: e.eventType,
+        level: e.level,
+        createdAt: e.createdAt?.toISOString() ?? null,
+        payloadJson: e.payloadJson as Record<string, unknown>,
+      }));
+    }
+
+    // Recent trace IDs
+    const recent = (await db
+      .select({
+        traceId: schema.botEvents.traceId,
+        eventType: schema.botEvents.eventType,
+        level: schema.botEvents.level,
+        createdAt: schema.botEvents.createdAt,
+      })
+      .from(schema.botEvents)
+      .orderBy(desc(schema.botEvents.createdAt))
+      .limit(100)) as { traceId: string; eventType: string; level: string; createdAt: Date | null }[];
+
+    const seen = new Set<string>();
+    for (const row of recent) {
+      if (!seen.has(row.traceId)) {
+        seen.add(row.traceId);
+        recentTraces.push({
+          traceId: row.traceId,
+          eventType: row.eventType,
+          level: row.level,
+          createdAt: row.createdAt?.toISOString() ?? null,
+        });
+      }
+    }
+    recentTraces = recentTraces.slice(0, 20);
+  } catch (err) {
+    console.error("Traces SSR error:", err);
+  }
+}
 ---
 
 <AdminLayout title="Traces" active="traces">
-  <p class="stub">Trace viewer — to be implemented in Step E.</p>
+  <div class="search-section">
+    <TraceSearch client:load initialValue={initialTraceId} />
+  </div>
+
+  {traceEvents.length > 0 && (
+    <div class="timeline-section">
+      <TraceTimeline client:load events={traceEvents} traceId={initialTraceId} />
+    </div>
+  )}
+
+  {!initialTraceId && (
+    <div class="recent-section">
+      <div class="panel">
+        <h2 class="panel-title">Recent Traces</h2>
+        {recentTraces.length === 0 && <p class="panel-empty">No traces found.</p>}
+        {recentTraces.length > 0 && (
+          <table class="trace-table">
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Level</th>
+                <th>Trace ID</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentTraces.map((t) => (
+                <tr class="clickable-row" data-trace-id={t.traceId}>
+                  <td>{t.eventType}</td>
+                  <td>
+                    <span class={`level-badge level-${t.level}`}>{t.level}</span>
+                  </td>
+                  <td class="mono">{t.traceId}</td>
+                  <td class="mono">{t.createdAt ? new Date(t.createdAt).toLocaleString("en-US", { timeZone: "Asia/Jakarta" }) : "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )}
 </AdminLayout>
 
 <style>
-  .stub { color: var(--color-graphite-500); font-size: 14px; }
+  .search-section {
+    margin-bottom: 20px;
+  }
+
+  .timeline-section {
+    margin-bottom: 24px;
+  }
+
+  .panel {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-panel);
+    padding: 20px;
+    min-height: 200px;
+  }
+
+  .panel-title {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+  }
+
+  .panel-empty {
+    color: var(--color-graphite-500);
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .trace-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .trace-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--color-graphite-500);
+    text-transform: uppercase;
+    font-size: 11px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .trace-table td {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--color-graphite-180);
+    color: var(--color-graphite-650);
+  }
+
+  .trace-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .trace-table tbody tr:hover {
+    background: var(--color-porcelain-150);
+    cursor: pointer;
+  }
+
+  .mono {
+    font-family: var(--font-grkd-mono);
+    font-size: 12px;
+  }
+
+  .level-badge {
+    display: inline-block;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .level-info { background: var(--color-royal-blue-100); color: var(--color-royal-blue-700); }
+  .level-warn { background: var(--color-warning-100); color: var(--color-warning-600); }
+  .level-error { background: var(--color-danger-100); color: var(--color-danger-600); }
 </style>
+
+<script>
+  document.addEventListener('click', (e) => {
+    const row = (e.target as HTMLElement).closest('.clickable-row');
+    if (row) {
+      const traceId = row.getAttribute('data-trace-id');
+      if (traceId) window.location.href = `/admin/traces?traceId=${encodeURIComponent(traceId)}`;
+    }
+  });
+</script>

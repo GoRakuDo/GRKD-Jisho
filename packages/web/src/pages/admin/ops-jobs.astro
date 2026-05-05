@@ -1,11 +1,180 @@
 ---
 import AdminLayout from "../../layouts/AdminLayout.astro";
+import { OpsJobsList } from "../../components/admin/OpsJobsList";
+import { getSession } from "../../lib/session";
+import { getPendingJobs, getAllJobs } from "@grkd-jisho/db";
+
+const session = getSession(Astro);
+
+interface JobRecord {
+  id: string;
+  jobType: string;
+  status: string;
+  approvalRequired: boolean;
+  argsJson: Record<string, unknown>;
+  errorMessage: string | null;
+  createdAt: string | null;
+}
+
+let pendingJobs: JobRecord[] = [];
+let recentJobs: JobRecord[] = [];
+
+if (session?.isAdmin) {
+  try {
+    const pending = await getPendingJobs();
+    pendingJobs = pending.map((j) => ({
+      ...j,
+      createdAt: j.createdAt?.toISOString() ?? null,
+    }));
+
+    const all = await getAllJobs(30);
+    recentJobs = all.map((j) => ({
+      ...j,
+      createdAt: j.createdAt?.toISOString() ?? null,
+    }));
+  } catch (err) {
+    console.error("Ops jobs SSR error:", err);
+  }
+}
 ---
 
 <AdminLayout title="Ops Jobs" active="ops-jobs">
-  <p class="stub">Ops job approval panel — to be implemented in Step F.</p>
+  <div class="section">
+    <h2 class="section-title">Pending Approvals</h2>
+    {pendingJobs.length === 0 && (
+      <div class="empty-card">
+        <p>No pending ops jobs. Agent requests that need approval will appear here.</p>
+      </div>
+    )}
+  {pendingJobs.length > 0 && (
+    <div id="pending-jobs">
+      <OpsJobsList client:load />
+    </div>
+  )}
+  </div>
+
+  <div class="section">
+    <h2 class="section-title">Recent Jobs</h2>
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Status</th>
+            <th>ID</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody>
+          {recentJobs.map((j) => (
+            <tr>
+              <td class="job-type">{j.jobType}</td>
+              <td>
+                <span class={`badge badge-${j.status}`}>{j.status}</span>
+              </td>
+              <td class="mono">{j.id}</td>
+              <td class="mono">{j.createdAt ? new Date(j.createdAt).toLocaleString("en-US", { timeZone: "Asia/Jakarta" }) : "-"}</td>
+            </tr>
+          ))}
+          {recentJobs.length === 0 && (
+            <tr>
+              <td colspan="4" class="empty-cell">No jobs recorded yet.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </AdminLayout>
 
 <style>
-  .stub { color: var(--color-graphite-500); font-size: 14px; }
+  .section {
+    margin-bottom: 32px;
+  }
+
+  .section-title {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+  }
+
+  .empty-card {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    padding: 40px;
+    text-align: center;
+    color: var(--color-graphite-500);
+    font-size: 14px;
+  }
+
+  .table-container {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .data-table th {
+    background: var(--color-porcelain-150);
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-graphite-500);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .data-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--color-graphite-650);
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .data-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .data-table tbody tr:hover {
+    background: var(--color-porcelain-150);
+  }
+
+  .mono {
+    font-family: var(--font-grkd-mono);
+    font-size: 12px;
+  }
+
+  .job-type {
+    font-weight: 600;
+    color: var(--color-graphite-800);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .badge-pending { background: var(--color-warning-100); color: var(--color-warning-600); }
+  .badge-approved { background: var(--color-success-100); color: var(--color-success-600); }
+  .badge-running { background: var(--color-royal-blue-100); color: var(--color-royal-blue-700); }
+  .badge-succeeded { background: var(--color-success-100); color: var(--color-success-600); }
+  .badge-failed { background: var(--color-danger-100); color: var(--color-danger-600); }
+  .badge-rejected { background: var(--color-porcelain-150); color: var(--color-graphite-650); }
+
+  .empty-cell {
+    text-align: center;
+    color: var(--color-graphite-500);
+    padding: 32px;
+  }
 </style>

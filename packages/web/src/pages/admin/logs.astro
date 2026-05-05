@@ -1,11 +1,114 @@
 ---
 import AdminLayout from "../../layouts/AdminLayout.astro";
+import { LogsSummary } from "../../components/admin/LogsSummary";
+import { PopularQueriesTable } from "../../components/admin/PopularQueriesTable";
+import { getSession } from "../../lib/session";
+import { eq, and, gte, sql, count } from "drizzle-orm";
+import { db, schema } from "@grkd-jisho/db";
+
+const session = getSession(Astro);
+
+let totalLookups = 0;
+let cacheHitRatio = "0.0";
+let errors = 0;
+let warns = 0;
+let popularQueries: { query: string; count: number }[] = [];
+
+if (session?.isAdmin) {
+  try {
+    const since = sql`now() - 7::int * interval '1 day'`;
+
+    const [totalRow] = await db
+      .select({ count: count(schema.lookupLogs.id) })
+      .from(schema.lookupLogs)
+      .where(gte(schema.lookupLogs.createdAt, since));
+    totalLookups = totalRow ? Number(totalRow.count) : 0;
+
+    const [hitRow] = await db
+      .select({ count: count(schema.lookupLogs.id) })
+      .from(schema.lookupLogs)
+      .where(
+        and(eq(schema.lookupLogs.cacheHit, true), gte(schema.lookupLogs.createdAt, since)),
+      );
+    const cacheHits = hitRow ? Number(hitRow.count) : 0;
+    cacheHitRatio = totalLookups > 0 ? ((cacheHits / totalLookups) * 100).toFixed(1) : "0.0";
+
+    const [errRow] = await db
+      .select({ count: count(schema.botEvents.id) })
+      .from(schema.botEvents)
+      .where(and(eq(schema.botEvents.level, "error"), gte(schema.botEvents.createdAt, since)));
+    errors = errRow ? Number(errRow.count) : 0;
+
+    const [warnRow] = await db
+      .select({ count: count(schema.botEvents.id) })
+      .from(schema.botEvents)
+      .where(and(eq(schema.botEvents.level, "warn"), gte(schema.botEvents.createdAt, since)));
+    warns = warnRow ? Number(warnRow.count) : 0;
+
+    popularQueries = await db
+      .select({
+        query: schema.lookupLogs.normalizedQuery,
+        count: count(schema.lookupLogs.id),
+      })
+      .from(schema.lookupLogs)
+      .where(gte(schema.lookupLogs.createdAt, since))
+      .groupBy(schema.lookupLogs.normalizedQuery)
+      .orderBy(sql`count desc`)
+      .limit(20);
+  } catch (err) {
+    console.error("Logs SSR error:", err);
+  }
+}
 ---
 
 <AdminLayout title="Logs" active="logs">
-  <p class="stub">Lookup logs and analytics — to be implemented in Step E.</p>
+  <LogsSummary
+    client:load
+    totalLookups={totalLookups}
+    cacheHitRatio={cacheHitRatio}
+    errors={errors}
+    warns={warns}
+    periodDays={7}
+  />
+
+  <div class="two-column">
+    <div class="panel">
+      <h2 class="panel-title">Popular Queries (7 days)</h2>
+      <PopularQueriesTable client:load queries={popularQueries} />
+    </div>
+    <div class="panel">
+      <h2 class="panel-title">Dictionary Hits (7 days)</h2>
+      <p class="panel-empty">Dictionary hit data available via API.</p>
+    </div>
+  </div>
 </AdminLayout>
 
 <style>
-  .stub { color: var(--color-graphite-500); font-size: 14px; }
+  .two-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+  }
+
+  .panel {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-panel);
+    padding: 20px;
+    min-height: 200px;
+  }
+
+  .panel-title {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+  }
+
+  .panel-empty {
+    color: var(--color-graphite-500);
+    font-size: 14px;
+    margin: 0;
+  }
 </style>

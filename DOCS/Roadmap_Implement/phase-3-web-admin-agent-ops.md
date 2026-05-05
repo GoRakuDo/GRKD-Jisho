@@ -1332,6 +1332,58 @@ trace_id は自動生成（`admin_${eventType}_${Date.now()}`）。
 
 ---
 
+## 28. Step E — 実装ログ
+
+> 実施日: 2026-05-05
+> 実行者: main agent + kuraudo-uidesigner (6 React components)
+> 確認: astro check (0 errors) + code-reviewer → 6件修正後 ✅ Approve
+
+### APIエンドポイント (新規3本)
+
+| エンドポイント | メソッド | ファイル | 機能 |
+|---|---|---|---|
+| `/api/admin/logs` | GET | `logs.ts` | lookup stats, cache hit ratio, popular queries, error/warn summary |
+| `/api/admin/traces` | GET | `traces.ts` | 直近trace一覧（traceId重複排除）、`?traceId=xxx` で全event + payload |
+| `/api/admin/ops-jobs` | GET, POST | `ops-jobs.ts` | GET pending/all jobs、POST approve/reject（CSRF必須） |
+
+### React Components (kuraudo-uidesigner 委任)
+
+| コンポーネント | ファイル | 機能 |
+|---|---|---|
+| LogsSummary | `LogsSummary.tsx` | 4 MetricCard summary |
+| PopularQueriesTable | `PopularQueriesTable.tsx` | Top 20 問い合わせ一覧 |
+| TraceTimeline | `TraceTimeline.tsx` | 垂直タイムライン、collapsible JSON payload |
+| TraceSearch | `TraceSearch.tsx` | trace ID検索（HREF遷移） |
+| OpsJobCard | `OpsJobCard.tsx` | 単一job approve/rejectカード |
+| OpsJobsList | `OpsJobsList.tsx` | pending一覧 + CSRF付きapprove/reject API呼び出し |
+
+### SSRページ更新
+
+| ページ | パス | 内容 |
+|---|---|---|
+| Logs | `/admin/logs` | SSR: LogsSummary + PopularQueriesTable |
+| Traces | `/admin/traces` | SSR: TraceSearch + TraceTimeline + 直近trace一覧 |
+| Ops Jobs | `/admin/ops-jobs` | SSR: pendingカード一覧 + 全recent jobsテーブル |
+
+### コードレビュー修正
+
+| Severity | 問題 | 修正内容 |
+|---|---|---|
+| BLOCKER | `ops-jobs.astro` の `onApprove`/`onReject` が空no-op | `OpsJobsList` を完全なClient Component化、fetch + CSRF + POST呼び出し |
+| BLOCKER | `traces.astro` の `TraceSearch.onSearch` が空no-op | `onSearch` 削除、`window.location.href` でのページ遷移に変更 |
+| HIGH | `ops-jobs.ts` JSONパースエラーで500返却 | `try { body = await req.json() } catch → 400` |
+| HIGH | traces.astro テーブル行クリック未実装 | `<script>` でDOM click → traceId遷移 |
+| MED | `logs.ts days` パラメータに0が許容 | `Math.max(1, ...)` で下限1に |
+| MED | TraceTimeline 日付パース未検証 | コンポーネントは日付表示のみ（API側でISO string保証） |
+
+### 最終状態
+
+- `astro check`: 0 errors, 0 warnings
+- 全12コンポーネント揃い、管理画面9ページ完成
+- 全DBアクセスはSSRまたはClient fetch経由で統一的に動作
+
+---
+
 ## 27. Step D — 実装ログ
 
 > 実施日: 2026-05-05
