@@ -1329,3 +1329,42 @@ trace_id は自動生成（`admin_${eventType}_${Date.now()}`）。
 - BLOCKER/HIGH/MED/LOW: **0件**
 - import loop なし、名前衝突なし（`OpsJob` → `OpsJobRecord` で解決済み）
 - 全severity 0件の ✅ Approve
+
+---
+
+## 27. Step D — 実装ログ
+
+> 実施日: 2026-05-05
+> 実行者: main agent
+> 確認: astro check (0 errors) + code-reviewer → 3件修正後 ✅
+
+### APIエンドポイント (新規4本)
+
+| エンドポイント | メソッド | ファイル | 機能 |
+|---|---|---|---|
+| `/api/admin/stats` | GET | `stats.ts` | ダッシュボード統計（lookups/cacheHit/pendingJobs/errors） |
+| `/api/admin/responses` | GET, PUT | `responses.ts` | 検索+詳細 / 編集+override（CSRF + audit） |
+| `/api/admin/dictionaries` | GET, PUT | `dictionaries.ts` | 一覧 / 有効切替+優先度（CSRF + audit） |
+| `/api/admin/cache` | GET, DELETE | `cache.ts` | stats+検索+preview / 一括削除（manual除外+CSRF+audit） |
+
+### 管理ページ (4ページ SSR)
+
+| ページ | パス | データソース |
+|---|---|---|
+| Dashboard | `/admin` (index.astro) | SSR: lookup count, cache hit ratio, pending jobs, 直近トレース+エラー |
+| Responses | `/admin/responses` | SSR: 検索クエリでresponse一覧、manual/autoバッジ |
+| Dictionaries | `/admin/dictionaries` | SSR: 辞書一覧、entry count、enabled/disabled |
+| Cache | `/admin/cache` | SSR: total/manual/deletable stats、検索フォーム+refreshルール |
+
+### レビュー修正
+
+| Severity | 問題 | 修正内容 |
+|---|---|---|
+| BLOCKER | `cache.ts DELETE` が `isManualOverride=true` のエントリを削除しかねない | DELETE前にDBから該当IDの `isManualOverride` を事前fetchし、manual override を除外 |
+| HIGH | `stats.ts` の `recentErrors` 集計に `level='error'` フィルターが欠落 | `and(eq(level, "error"), gte(...))` に修正 |
+| HIGH | キャッシュヒット率が `cacheStats.total / lookupsToday`（全キャッシュ数÷ルックアップ数）で計算されていた | `lookup_logs.cacheHit = true` の件数で正しいヒット率を算出 |
+
+### 型チェック
+
+- `astro check`: **0 errors**, 0 warnings, 1 hint
+- `as any` / `eslint-disable`: 全ファイル0件

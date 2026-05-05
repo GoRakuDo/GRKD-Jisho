@@ -1,35 +1,145 @@
 ---
 import AdminLayout from "../../layouts/AdminLayout.astro";
+import { MetricCard } from "../../components/admin/MetricCard";
+import { getSession } from "../../lib/session";
+import { eq, and, gte, sql, count } from "drizzle-orm";
+import { db, schema, getCacheStats, toGMT7Date } from "@grkd-jisho/db";
+
+const session = getSession(Astro);
+
+// SSR データフェッチ
+let lookupsToday = 0;
+let cacheHitRatio = "0.0";
+let pendingJobs = 0;
+let recentErrorsCount = 0;
+let recentTracesData: { id: string; traceId: string; eventType: string; level: string; createdAt: Date | null }[] = [];
+let recentErrorList: { id: string; traceId: string; eventType: string; createdAt: Date | null }[] = [];
+
+if (session?.isAdmin) {
+  try {
+    const today = toGMT7Date(new Date());
+
+    const [lookupRow] = await db
+      .select({ count: count(schema.lookupLogs.id) })
+      .from(schema.lookupLogs)
+      .where(gte(schema.lookupLogs.createdAt, sql`${today}::date`));
+    lookupsToday = lookupRow ? Number(lookupRow.count) : 0;
+
+    const cacheStats = await getCacheStats();
+    cacheHitRatio = lookupsToday > 0
+      ? ((cacheStats.total / lookupsToday) * 100).toFixed(1)
+      : "0.0";
+
+    const [pendingRow] = await db
+      .select({ count: count(schema.opsJobs.id) })
+      .from(schema.opsJobs)
+      .where(eq(schema.opsJobs.status, "pending"));
+    pendingJobs = pendingRow ? Number(pendingRow.count) : 0;
+
+    const [errRow] = await db
+      .select({ count: count(schema.botEvents.id) })
+      .from(schema.botEvents)
+      .where(
+        and(
+          eq(schema.botEvents.level, "error"),
+          gte(schema.botEvents.createdAt, sql`now() - interval '24 hours'`),
+        ),
+      );
+    recentErrorsCount = errRow ? Number(errRow.count) : 0;
+
+    recentTracesData = (await db
+      .select({
+        id: schema.botEvents.id,
+        traceId: schema.botEvents.traceId,
+        eventType: schema.botEvents.eventType,
+        level: schema.botEvents.level,
+        createdAt: schema.botEvents.createdAt,
+      })
+      .from(schema.botEvents)
+      .orderBy(sql`${schema.botEvents.createdAt} desc`)
+      .limit(10)).map((r) => ({ ...r, id: String(r.id) }));
+
+    recentErrorList = (await db
+      .select({
+        id: schema.botEvents.id,
+        traceId: schema.botEvents.traceId,
+        eventType: schema.botEvents.eventType,
+        createdAt: schema.botEvents.createdAt,
+      })
+      .from(schema.botEvents)
+      .where(eq(schema.botEvents.level, "error"))
+      .orderBy(sql`${schema.botEvents.createdAt} desc`)
+      .limit(10)).map((r) => ({ ...r, id: String(r.id) }));
+  } catch (err) {
+    console.error("Dashboard SSR data fetch error:", err);
+  }
+}
 ---
 
 <AdminLayout title="Dashboard" active="dashboard">
   <section class="metrics">
-    <div class="metric-card">
-      <span class="metric-label">Lookups Today</span>
-      <span class="metric-value">—</span>
-    </div>
-    <div class="metric-card">
-      <span class="metric-label">Cache Hit Ratio</span>
-      <span class="metric-value">—</span>
-    </div>
-    <div class="metric-card">
-      <span class="metric-label">Pending Ops Jobs</span>
-      <span class="metric-value">—</span>
-    </div>
-    <div class="metric-card">
-      <span class="metric-label">Recent Errors</span>
-      <span class="metric-value">—</span>
-    </div>
+    <MetricCard client:load label="Lookups Today" value={lookupsToday} />
+    <MetricCard client:load label="Cache Hit Ratio" value={`${cacheHitRatio}%`} />
+    <MetricCard client:load label="Pending Ops Jobs" value={pendingJobs} />
+    <MetricCard client:load label="Recent Errors (24h)" value={recentErrorsCount} />
   </section>
 
   <section class="dashboard-panels">
-    <div class="panel trace-panel">
+    <div class="panel">
       <h2 class="panel-title">Recent Traces</h2>
-      <p class="panel-empty">No traces loaded yet.</p>
+      {
+        recentTracesData.length > 0 ? (
+          <table class="trace-table">
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Level</th>
+                <th>Trace ID</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentTracesData.slice(0, 6).map((t) => (
+                <tr>
+                  <td>{t.eventType}</td>
+                  <td><span class={`level-badge level-${t.level}`}>{t.level}</span></td>
+                  <td class="mono">{t.traceId}</td>
+                  <td class="mono">{t.createdAt?.toLocaleTimeString("en-US", { timeZone: "Asia/Jakarta" }) ?? "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p class="panel-empty">No traces yet.</p>
+        )
+      }
     </div>
-    <div class="panel health-panel">
-      <h2 class="panel-title">System Health</h2>
-      <p class="panel-empty">Waiting for heartbeat data.</p>
+    <div class="panel">
+      <h2 class="panel-title">Recent Errors</h2>
+      {
+        recentErrorList.length > 0 ? (
+          <table class="trace-table">
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Trace ID</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentErrorList.slice(0, 6).map((e) => (
+                <tr>
+                  <td class="error-text">{e.eventType}</td>
+                  <td class="mono">{e.traceId}</td>
+                  <td class="mono">{e.createdAt?.toLocaleTimeString("en-US", { timeZone: "Asia/Jakarta" }) ?? "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p class="panel-empty">No recent errors. System looks healthy.</p>
+        )
+      }
     </div>
   </section>
 </AdminLayout>
@@ -40,31 +150,6 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
     margin-bottom: 24px;
-  }
-
-  .metric-card {
-    background: var(--color-porcelain-100);
-    border: 1px solid var(--color-graphite-180);
-    border-radius: var(--radius-card);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .metric-label {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--color-graphite-500);
-    text-transform: uppercase;
-    letter-spacing: 0.01em;
-  }
-
-  .metric-value {
-    font-size: 28px;
-    font-weight: 600;
-    color: var(--color-graphite-900);
-    letter-spacing: -0.015em;
   }
 
   .dashboard-panels {
@@ -92,5 +177,64 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     color: var(--color-graphite-500);
     font-size: 14px;
     margin: 0;
+  }
+
+  .trace-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .trace-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--color-graphite-500);
+    text-transform: uppercase;
+    font-size: 11px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .trace-table td {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--color-graphite-180);
+    color: var(--color-graphite-650);
+  }
+
+  .trace-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .mono {
+    font-family: var(--font-grkd-mono);
+    font-size: 12px;
+  }
+
+  .level-badge {
+    display: inline-block;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .level-info {
+    background: var(--color-royal-blue-100);
+    color: var(--color-royal-blue-700);
+  }
+
+  .level-warn {
+    background: var(--color-warning-100);
+    color: var(--color-warning-600);
+  }
+
+  .level-error {
+    background: var(--color-danger-100);
+    color: var(--color-danger-600);
+  }
+
+  .error-text {
+    color: var(--color-danger-600);
+    font-weight: 500;
   }
 </style>
