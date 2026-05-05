@@ -10,8 +10,13 @@ export type OpsJobCardProps = {
     status: string;
     approvalRequired: boolean;
     argsJson: Record<string, unknown>;
+    resultJson?: Record<string, unknown>;
     errorMessage: string | null;
+    requestedBy: string;
+    approvedBy: string | null;
+    rejectedBy?: string | null;
     createdAt: string | null;
+    completedAt: string | null;
   };
   onApprove: (jobId: string) => void;
   onReject: (jobId: string) => void;

@@ -8,8 +8,13 @@ export type OpsJobRecord = {
   status: string;
   approvalRequired: boolean;
   argsJson: Record<string, unknown>;
+  resultJson?: Record<string, unknown>;
   errorMessage: string | null;
+  requestedBy: string;
+  approvedBy: string | null;
+  rejectedBy?: string | null;
   createdAt: string | null;
+  completedAt: string | null;
 };
 
 let _csrfToken: string | null = null;

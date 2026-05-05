@@ -8,9 +8,10 @@ export const opsJobs = pgTable(
     requestedBy: text("requested_by").notNull(),
     argsJson: jsonb("args_json").notNull(),
     status: text("status").notNull().default("pending"),
-    // pending / approved / running / succeeded / failed
+    // pending / approved / running / succeeded / failed / rejected
     approvalRequired: boolean("approval_required").notNull().default(true),
     approvedBy: text("approved_by"),
+    rejectedBy: text("rejected_by"),
     resultJson: jsonb("result_json").default({}),
     errorMessage: text("error_message"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),

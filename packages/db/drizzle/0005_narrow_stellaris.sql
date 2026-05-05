@@ -1,0 +1,1 @@
+ALTER TABLE "ops_jobs" ADD COLUMN "rejected_by" text;

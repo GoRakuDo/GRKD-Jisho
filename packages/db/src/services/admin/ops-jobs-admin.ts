@@ -9,8 +9,13 @@ export interface OpsJobRecord {
   status: string;
   approvalRequired: boolean;
   argsJson: Record<string, unknown>;
+  resultJson: Record<string, unknown>;
   errorMessage: string | null;
+  requestedBy: string;
+  approvedBy: string | null;
+  rejectedBy: string | null;
   createdAt: Date | null;
+  approvedAt: Date | null;
   completedAt: Date | null;
 }
 
@@ -21,8 +26,13 @@ function mapJob(row: typeof schema.opsJobs.$inferSelect): OpsJobRecord {
     status: row.status,
     approvalRequired: row.approvalRequired,
     argsJson: row.argsJson as Record<string, unknown>,
+    resultJson: row.resultJson as Record<string, unknown>,
     errorMessage: row.errorMessage,
+    requestedBy: row.requestedBy,
+    approvedBy: row.approvedBy,
+    rejectedBy: row.rejectedBy,
     createdAt: row.createdAt,
+    approvedAt: row.approvedAt,
     completedAt: row.completedAt,
   };
 }
@@ -88,7 +98,7 @@ export async function rejectJob(
     .update(schema.opsJobs)
     .set({
       status: "rejected",
-      approvedBy: approverDiscordId,
+      rejectedBy: approverDiscordId,
     })
     .where(
       and(

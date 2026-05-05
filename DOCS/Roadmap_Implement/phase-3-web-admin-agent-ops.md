@@ -1420,3 +1420,57 @@ trace_id は自動生成（`admin_${eventType}_${Date.now()}`）。
 
 - `astro check`: **0 errors**, 0 warnings, 1 hint
 - `as any` / `eslint-disable`: 全ファイル0件
+
+---
+
+## 29. Step F — 実装ログ
+
+> 実施日: 2026-05-05  
+> 実行者: main agent + kuraudo-uidesigner (`JobDetailPanel`)  
+> 確認: `astro check` (0 errors) + `@grkd-jisho/db` `tsc --noEmit` (0 errors) + code-reviewer ✅ Approve
+
+### 目的
+
+Agent Ops UI の `ops_jobs` 表示を強化し、人間が以下を確認できる状態にした。
+
+- pending jobs の承認 / 拒否
+- job status 別フィルター
+- `args_json` / `result_json` / `error_message`
+- `requested_by` / `approved_by` / timestamps
+
+### DB共有サービス更新
+
+| ファイル | 変更 |
+|---|---|
+| `packages/db/src/services/admin/ops-jobs-admin.ts` | `OpsJobRecord` に `resultJson`, `requestedBy`, `approvedBy`, `approvedAt` を追加 |
+| `packages/db/src/schema/ops-jobs.ts` | status comment に `rejected` を追加 |
+
+### UIコンポーネント
+
+| コンポーネント | ファイル | 内容 |
+|---|---|---|
+| `JobDetailPanel` | `packages/web/src/components/admin/JobDetailPanel.tsx` | job detail、StatusBadge、args/result JSON、error box、Asia/Jakarta timestamp |
+| `OpsJobsList` | `packages/web/src/components/admin/OpsJobsList.tsx` | pending jobs の CSRF 付き approve/reject を継続利用 |
+
+### ページ更新
+
+| ページ | 変更 |
+|---|---|
+| `/admin/ops-jobs` | status filter tabs (`all/pending/approved/running/succeeded/failed/rejected`) 追加 |
+| `/admin/ops-jobs` | row click で `jobId` URL param を付与し、選択jobの detail panel を表示 |
+| `/admin/ops-jobs` | pending approvals には `OpsJobsList client:load` を残し、approve/reject を維持 |
+
+### コードレビュー修正
+
+| Severity | 問題 | 修正内容 |
+|---|---|---|
+| HIGH | pending approvals が placeholder div になり approve/reject 不可 | `OpsJobsList client:load` を復元 |
+| HIGH | rejected job でも `approvedBy` が “Approved By” と表示される | `status === rejected` の場合は “Rejected By” と表示 |
+| MED | `rejectJob()` が既存DB列 `approvedBy` に rejector を保存している | **対応済み**: `ops_jobs.rejected_by` を追加し、`rejectJob()` は `rejectedBy` を保存。UIも `Rejected By` は `rejectedBy` 優先（legacy fallbackあり） |
+| LOW | `JobDetailClient.tsx` が未使用 | **対応済み**: ユーザー承認後に削除 |
+
+### 最終状態
+
+- `pnpm --filter @grkd-jisho/web typecheck`: 0 errors
+- `pnpm --filter @grkd-jisho/db exec tsc --noEmit`: 0 errors
+- code-reviewer: ✅ Approve
