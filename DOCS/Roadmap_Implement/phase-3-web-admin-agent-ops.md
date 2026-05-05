@@ -825,6 +825,47 @@ Step G: MCP dry-run
   21. audit dry_run=true
   22. docs整合
 
+---
+
+## 30. Step G — 実装ログ（MCP Level 2 dry-run tools）
+
+> 実施日: 2026-05-05  
+> 実行者: main agent  
+> 確認: `pnpm --filter @grkd-jisho/mcp exec tsc --noEmit` (0 errors) + code-reviewer ✅ Approve
+
+### 目的
+
+外側AIエージェントが「実行前の影響見積もり」を安全に取れるように、MCP Level 2 dry-run tools を追加する。
+
+### 追加Env
+
+`MCP_ENABLE_DRY_RUN=false`（デフォルト）
+
+- `false`: Level 1 read-only tools のみ
+- `true`: Level 1 + Level 2 dry-run tools
+
+### 追加tool
+
+| tool | 目的 | DB write | Discord API | audit | 備考 |
+|---|---|---:|---:|---:|---|
+| `grkd-jisho.dry_run_wipe` | wipe設定/最近のwipeイベント確認 | no | no | `dry_run=true` | 最終実行はBot側で権限/ピン等を再確認 |
+| `grkd-jisho.dry_run_rate_limit_change` | new limit適用時の超過ユーザー見積もり | no | no | `dry_run=true` | `user_usage` はロール所属を持たない制約あり |
+| `grkd-jisho.dry_run_cache_refresh` | cache refreshの削除対象見積もり | no | no | `dry_run=true` | manual overrideは除外（deletable=total-manual） |
+
+### audit方針
+
+- `withAudit()` を `dryRun` option対応に拡張
+- Level 1 は `dryRun=false`
+- Level 2 は `dryRun=true`
+- args/result は `redactDeep()` により secret をマスクした上で `mcp_audit_logs` に保存
+
+### 変更ファイル
+
+- `packages/mcp/src/config/env.ts`（`MCP_ENABLE_DRY_RUN` 追加。enumでtrue/false検証）
+- `packages/mcp/src/index.ts`（tool登録条件分岐 + withAudit拡張）
+- `packages/mcp/src/tools/dry-run-tools.ts`（新規: dry-run tool実装）
+
+
 Step H: Verification
   23. typecheck/build/test
   24. code review

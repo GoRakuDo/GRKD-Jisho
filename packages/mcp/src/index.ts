@@ -12,6 +12,11 @@ import {
   getTrace,
   getWipeStatus,
 } from "./tools/read-only-tools.js";
+import {
+  dryRunCacheRefresh,
+  dryRunRateLimitChange,
+  dryRunWipe,
+} from "./tools/dry-run-tools.js";
 
 type RecentErrorsArgs = { limit: number; level?: "warn" | "error" | undefined };
 type LookupStatsArgs = { days: number };
@@ -22,7 +27,12 @@ const server = new McpServer({
   version: "0.0.1",
 });
 
-async function withAudit<T>(toolName: string, args: unknown, fn: () => Promise<T>): Promise<T> {
+async function withAudit<T>(
+  toolName: string,
+  args: unknown,
+  params: { dryRun: boolean },
+  fn: () => Promise<T>,
+): Promise<T> {
   try {
     const result = await fn();
     await writeMcpAuditLog({
@@ -30,7 +40,7 @@ async function withAudit<T>(toolName: string, args: unknown, fn: () => Promise<T
       toolName,
       args,
       status: "success",
-      dryRun: false,
+      dryRun: params.dryRun,
     });
     return result;
   } catch (error) {
@@ -39,7 +49,7 @@ async function withAudit<T>(toolName: string, args: unknown, fn: () => Promise<T
       toolName,
       args,
       status: "error",
-      dryRun: false,
+      dryRun: params.dryRun,
       errorMessage: error instanceof Error ? error.message : "Unknown MCP tool error",
     });
     throw error;
@@ -53,7 +63,7 @@ server.registerTool(
     inputSchema: z.object({}),
   },
   async () => {
-    const result = await withAudit("grkd-jisho.health", {}, async () => getHealth());
+    const result = await withAudit("grkd-jisho.health", {}, { dryRun: false }, async () => getHealth());
     return {
       content: [{ type: "text", text: JSON.stringify(result) }],
     };
@@ -70,7 +80,12 @@ server.registerTool(
     }),
   },
   async (args: RecentErrorsArgs) => {
-    const result = await withAudit("grkd-jisho.recent_errors", args, async () => getRecentErrors(args));
+    const result = await withAudit(
+      "grkd-jisho.recent_errors",
+      args,
+      { dryRun: false },
+      async () => getRecentErrors(args),
+    );
     return {
       content: [{ type: "text", text: JSON.stringify(result) }],
     };
@@ -86,7 +101,12 @@ server.registerTool(
     }),
   },
   async (args: { trace_id: string }) => {
-    const result = await withAudit("grkd-jisho.get_trace", args, async () => getTrace(args.trace_id));
+    const result = await withAudit(
+      "grkd-jisho.get_trace",
+      args,
+      { dryRun: false },
+      async () => getTrace(args.trace_id),
+    );
     return {
       content: [{ type: "text", text: JSON.stringify(result) }],
     };
@@ -102,7 +122,12 @@ server.registerTool(
     }),
   },
   async (args: LookupStatsArgs) => {
-    const result = await withAudit("grkd-jisho.lookup_stats", args, async () => getLookupStats(args.days));
+    const result = await withAudit(
+      "grkd-jisho.lookup_stats",
+      args,
+      { dryRun: false },
+      async () => getLookupStats(args.days),
+    );
     return {
       content: [{ type: "text", text: JSON.stringify(result) }],
     };
@@ -116,7 +141,7 @@ server.registerTool(
     inputSchema: z.object({}),
   },
   async () => {
-    const result = await withAudit("grkd-jisho.cache_stats", {}, async () => getCacheStats());
+    const result = await withAudit("grkd-jisho.cache_stats", {}, { dryRun: false }, async () => getCacheStats());
     return {
       content: [{ type: "text", text: JSON.stringify(result) }],
     };
@@ -136,6 +161,7 @@ server.registerTool(
     const result = await withAudit(
       "grkd-jisho.rate_limit_status",
       args,
+      { dryRun: false },
       async () => getRateLimitStatus({ userId: args.user_id, roleId: args.role_id }),
     );
     return {
@@ -151,16 +177,90 @@ server.registerTool(
     inputSchema: z.object({}),
   },
   async () => {
-    const result = await withAudit("grkd-jisho.wipe_status", {}, async () => getWipeStatus());
+    const result = await withAudit("grkd-jisho.wipe_status", {}, { dryRun: false }, async () => getWipeStatus());
     return {
       content: [{ type: "text", text: JSON.stringify(result) }],
     };
   },
 );
 
+if (env.enableDryRun) {
+  server.registerTool(
+    "grkd-jisho.dry_run_wipe",
+    {
+      description: "Dry-run: check wipe settings and recent wipe events (no DB write, no Discord API)",
+      inputSchema: z.object({
+        guild_id: z.string().min(1),
+        channel_id: z.string().min(1),
+      }),
+    },
+    async (args: { guild_id: string; channel_id: string }) => {
+      const result = await withAudit(
+        "grkd-jisho.dry_run_wipe",
+        args,
+        { dryRun: true },
+        async () => dryRunWipe({ guildId: args.guild_id, channelId: args.channel_id }),
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
+
+  server.registerTool(
+    "grkd-jisho.dry_run_rate_limit_change",
+    {
+      description: "Dry-run: estimate impact of rate limit change (no DB write)",
+      inputSchema: z.object({
+        role_id: z.string().min(1),
+        new_daily_limit: z.number().int().min(0).max(100000),
+        guild_id: z.string().optional(),
+      }),
+    },
+    async (args: { role_id: string; new_daily_limit: number; guild_id?: string | undefined }) => {
+      const result = await withAudit(
+        "grkd-jisho.dry_run_rate_limit_change",
+        args,
+        { dryRun: true },
+        async () =>
+          dryRunRateLimitChange({
+            roleId: args.role_id,
+            newDailyLimit: args.new_daily_limit,
+            guildId: args.guild_id,
+          }),
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
+
+  server.registerTool(
+    "grkd-jisho.dry_run_cache_refresh",
+    {
+      description: "Dry-run: estimate cache refresh deletions (manual overrides excluded)",
+      inputSchema: z.object({
+        normalized_query: z.string().min(1),
+        role_key: z.string().optional(),
+        dictionary_id: z.number().int().optional(),
+      }),
+    },
+    async (args: { normalized_query: string; role_key?: string | undefined; dictionary_id?: number | undefined }) => {
+      const result = await withAudit(
+        "grkd-jisho.dry_run_cache_refresh",
+        args,
+        { dryRun: true },
+        async () =>
+          dryRunCacheRefresh({
+            normalizedQuery: args.normalized_query,
+            roleKey: args.role_key,
+            dictionaryId: args.dictionary_id,
+          }),
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
+}
+
 async function main(): Promise<void> {
   if (!env.readOnlyMode) {
-    throw new Error("MCP_READONLY_MODE must be true in Phase 2");
+    throw new Error("MCP_READONLY_MODE must be true in Phase 3");
   }
 
   const transport = new StdioServerTransport();
