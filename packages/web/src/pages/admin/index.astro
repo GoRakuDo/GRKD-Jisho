@@ -1,0 +1,96 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout title="Dashboard" active="dashboard">
+  <section class="metrics">
+    <div class="metric-card">
+      <span class="metric-label">Lookups Today</span>
+      <span class="metric-value">—</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Cache Hit Ratio</span>
+      <span class="metric-value">—</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Pending Ops Jobs</span>
+      <span class="metric-value">—</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-label">Recent Errors</span>
+      <span class="metric-value">—</span>
+    </div>
+  </section>
+
+  <section class="dashboard-panels">
+    <div class="panel trace-panel">
+      <h2 class="panel-title">Recent Traces</h2>
+      <p class="panel-empty">No traces loaded yet.</p>
+    </div>
+    <div class="panel health-panel">
+      <h2 class="panel-title">System Health</h2>
+      <p class="panel-empty">Waiting for heartbeat data.</p>
+    </div>
+  </section>
+</AdminLayout>
+
+<style>
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .metric-card {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .metric-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-graphite-500);
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+  }
+
+  .metric-value {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--color-graphite-900);
+    letter-spacing: -0.015em;
+  }
+
+  .dashboard-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .panel {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-panel);
+    padding: 20px;
+    min-height: 200px;
+  }
+
+  .panel-title {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+  }
+
+  .panel-empty {
+    color: var(--color-graphite-500);
+    font-size: 14px;
+    margin: 0;
+  }
+</style>

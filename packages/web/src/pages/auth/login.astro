@@ -1,0 +1,44 @@
+---
+const errorMessages: Record<string, string> = {
+  guild_required: "You must be a member of the GRKD-Jisho Discord server to access this admin panel.",
+  admin_required: "You need administrator or manager permissions in the Discord server to access this admin panel.",
+  oauth_failed: "Authentication with Discord failed. Please try again.",
+  session_expired: "Your session has expired. Please log in again.",
+};
+
+const error = Astro.url.searchParams.get("error");
+const errorMessage = error ? errorMessages[error] ?? "An unexpected error occurred." : null;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login — GRKD-Jisho Admin</title>
+    <link rel="stylesheet" href="/src/styles/globals.css" />
+  </head>
+  <body class="bg-porcelain-50 min-h-dvh flex items-center justify-center font-grkd-sans">
+    <main class="w-full max-w-md px-6">
+      <div class="bg-porcelain-100 border border-graphite-180 rounded-panel p-8">
+        <h1 class="text-heading-sm font-bold text-graphite-800 mb-2">GRKD-Jisho Admin</h1>
+        <p class="text-body-sm text-graphite-650 mb-8">
+          Sign in with Discord to manage the dictionary bot.
+        </p>
+
+        {errorMessage && (
+          <div class="bg-danger-100 text-danger-600 text-body-sm rounded-button px-4 py-3 mb-6">
+            {errorMessage}
+          </div>
+        )}
+
+        <a
+          href="/api/auth/authorize"
+          class="inline-flex items-center justify-center w-full bg-royal-blue-600 text-porcelain-50 border border-royal-blue-700 hover:bg-royal-blue-700 rounded-button px-6 py-3 text-body-sm font-semibold transition-colors no-underline"
+        >
+          Sign in with Discord
+        </a>
+      </div>
+    </main>
+  </body>
+</html>

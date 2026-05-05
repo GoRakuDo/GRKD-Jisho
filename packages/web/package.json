@@ -6,10 +6,23 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "check": "astro check",
+    "typecheck": "astro check"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@astrojs/node": "^9.5.5",
+    "@astrojs/react": "^5.0.4",
     "@grkd-jisho/db": "workspace:*",
-    "astro": "^5.7.8"
+    "@tailwindcss/vite": "^4.2.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "astro": "^5.7.8",
+    "drizzle-orm": "^0.41.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "tailwindcss": "^4.2.4",
+    "zod": "^4.4.3"
   }
 }
