@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { getIsAuthenticated } from "../../../lib/locals";
 import { getSession } from "../../../lib/session";
-import { eq, and } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import {
   db,
   schema,
@@ -101,7 +101,7 @@ export const DELETE: APIRoute = async (context) => {
     const existing = await db
       .select({ id: schema.responseCache.id, isManualOverride: schema.responseCache.isManualOverride })
       .from(schema.responseCache)
-      .where(and(...numericIds.map((nid) => eq(schema.responseCache.id, nid))));
+      .where(inArray(schema.responseCache.id, numericIds));
 
     const deletableIds = existing
       .filter((e) => !e.isManualOverride)

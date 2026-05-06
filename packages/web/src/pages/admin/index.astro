@@ -3,7 +3,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 import { MetricCard } from "../../components/admin/MetricCard";
 import { getSession } from "../../lib/session";
 import { eq, and, gte, sql, count } from "drizzle-orm";
-import { db, schema, getCacheStats, toGMT7Date } from "@grkd-jisho/db";
+import { db, schema, toGMT7Date } from "@grkd-jisho/db";
 
 const session = getSession(Astro);
 
@@ -25,9 +25,19 @@ if (session?.isAdmin) {
       .where(gte(schema.lookupLogs.createdAt, sql`${today}::date`));
     lookupsToday = lookupRow ? Number(lookupRow.count) : 0;
 
-    const cacheStats = await getCacheStats();
+    const [hitRow] = await db
+      .select({ count: count(schema.lookupLogs.id) })
+      .from(schema.lookupLogs)
+      .where(
+        and(
+          eq(schema.lookupLogs.cacheHit, true),
+          gte(schema.lookupLogs.createdAt, sql`${today}::date`),
+        ),
+      );
+    const hitsToday = hitRow ? Number(hitRow.count) : 0;
+
     cacheHitRatio = lookupsToday > 0
-      ? ((cacheStats.total / lookupsToday) * 100).toFixed(1)
+      ? ((hitsToday / lookupsToday) * 100).toFixed(1)
       : "0.0";
 
     const [pendingRow] = await db

@@ -34,7 +34,7 @@ WebUI = 管理・品質改善の拠点
 | Fallback LLM | OpenRouter (Claude / GPT-4o) | Gemini 障害時の自動フォールバック |
 | Database | PostgreSQL 16 | JSONB 対応、全文検索、信頼性 |
 | ORM | Drizzle ORM | TypeSafe、軽量、migration が明確 |
-| Web UI | Astro 4 + React islands | 静的優先、管理画面に適したSSR |
+| Web UI | Astro 5 SSR + React 19 + Tailwind v4 + @astrojs/node v9 | 管理画面に適したSSRと最小限のReact islands |
 | Agent Control Plane | MCP Server (Node.js + TypeScript) | 外側AIエージェントが安全に監視・診断・限定操作するため |
 | Monorepo | pnpm workspaces | bot / web / db 共通パッケージの共有 |
 | Containerize | Docker + docker-compose | ローカル → クラウドのmigration が容易 |
@@ -99,11 +99,14 @@ Discord Guild
         │
                  ▼
 ┌─────────────────────────────────────────────────┐
-│  Web UI  (packages/web)  — Astro + React        │
+│  Web UI  (packages/web)  — Astro 5 SSR + React  │
+│  ├ /admin                (Dashboard)             │
 │  ├ /admin/responses      (回答検索・編集)        │
 │  ├ /admin/dictionaries   (辞書管理・優先順位)    │
+│  ├ /admin/cache          (キャッシュ削除)        │
 │  ├ /admin/logs           (検索ログ・統計)        │
-│  └ /admin/cache          (キャッシュ削除)        │
+│  ├ /admin/traces         (Trace Viewer)           │
+│  └ /admin/ops-jobs       (Agent Ops 承認)         │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -432,7 +435,7 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 |---------|------|
 | `/search-jisho <word>` | Response-DB を検索して回答を表示 |
 | `/edit-jisho <response_id>` | 指定 ID の回答をモーダルで編集 |
-| `/refresh-jisho <word> [role]` | キャッシュを削除して再生成 |
+| `/refresh-jisho <word> [role]` | `is_manual_override = true` を除外してキャッシュを削除し、次回検索で再生成 |
 | `/source-jisho <word>` | どの辞典から取得したかを表示 |
 | `/priority-jisho` | 辞書の優先順位一覧を表示 |
 | `/override-jisho <response_id>` | 手動回答を設定 (is_manual_override) |
@@ -443,17 +446,21 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 
 ## 11. Web UI — Admin Panel
 
-Astro + React islands で構築。認証は Discord OAuth2 を使用。
+Astro 5 SSR + React 19 + Tailwind v4 で構築。SSR は `@astrojs/node` v9 を使う。
+React islands は編集フォーム、確認ダイアログ、Trace Timeline など状態が必要な部分に絞る。
+認証は Discord OAuth2 を使用する。
 
 ### ページ構成
 
 ```
 /admin
+  /admin                  — Dashboard・主要メトリクス
   /admin/responses        — 回答一覧・検索・編集
-  /admin/responses/[id]   — 回答詳細・編集履歴
   /admin/dictionaries     — 辞書一覧・優先順位変更・有効/無効切替
   /admin/cache            — キャッシュ一括削除・再生成トリガー
   /admin/logs             — 検索ログ・人気単語ランキング・キャッシュヒット率
+  /admin/traces           — trace_id 検索・イベントタイムライン
+  /admin/ops-jobs         — ops_jobs 承認・拒否・result/audit 表示
 ```
 
 ### 認証フロー
@@ -462,7 +469,8 @@ Astro + React islands で構築。認証は Discord OAuth2 を使用。
 Discord OAuth2
   → /auth/callback
   → セッション検証 (guild 所属確認 + 管理ロール確認)
-  → Cookie セッション発行
+  → HMAC-SHA256 署名付き Cookie セッション発行 (8時間TTL)
+  → 非GETの /admin/* と /api/* は CSRF token 必須
 ```
 
 ---
@@ -489,6 +497,7 @@ PROMPT_VERSION=v1
 # Web UI Auth
 DISCORD_CLIENT_SECRET=
 SESSION_SECRET=
+WEB_BASE_URL=
 ADMIN_ROLE_IDS=role_id_1,role_id_2
 ```
 
@@ -995,6 +1004,7 @@ CREATE TABLE ops_jobs (
   status            TEXT NOT NULL DEFAULT 'pending', -- pending / approved / running / succeeded / failed / rejected
   approval_required BOOLEAN NOT NULL DEFAULT true,
   approved_by       TEXT,
+  rejected_by       TEXT,
   result_json       JSONB DEFAULT '{}',
   error_message     TEXT,
   created_at        TIMESTAMPTZ DEFAULT now(),
@@ -1030,7 +1040,8 @@ CREATE INDEX idx_mcp_audit_logs_created_at ON mcp_audit_logs (created_at);
 
 ### 18-6. MCP Tools
 
-最初は read-only で始める。
+Phase 3 でも `MCP_READONLY_MODE=true` を維持する。
+Level 2 dry-run tools は `MCP_ENABLE_DRY_RUN=true` の時だけ登録する。
 書き込み系は dry-run と audit log が揃ってから解禁する。
 
 #### Level 1: Read-only tools
@@ -1046,6 +1057,10 @@ CREATE INDEX idx_mcp_audit_logs_created_at ON mcp_audit_logs (created_at);
 | `grkd-jisho.wipe_status` | wipe_enabled、last_wipe_at、失敗履歴を見る |
 
 #### Level 2: Dry-run tools
+
+デフォルトでは無効。
+有効化する場合は `MCP_ENABLE_DRY_RUN=true` を明示する。
+全 tool call は `mcp_audit_logs.dry_run = true` で記録する。
 
 | Tool | 説明 |
 |---|---|

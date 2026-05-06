@@ -12,7 +12,7 @@
 Phase 0: 環境構築とDB基盤             ~1週間
 Phase 1: MVP — Bot コア機能           ~2週間
 Phase 2: 管理コマンド + Read-only MCP ~1週間
-Phase 3: Web Admin UI + Agent Ops     ~2週間
+Phase 3: Web Admin UI + Agent Ops     完了済み
 Phase 4: 品質改善・最適化             ongoing
 ```
 
@@ -173,7 +173,7 @@ Phase 4: 品質改善・最適化             ongoing
   - `response_edits` に編集履歴 INSERT
 
 - [ ] **2-4** `/refresh-jisho <word> [role]` 実装
-  - 指定クエリ（+ ロール）のキャッシュを削除
+  - 指定クエリ（+ ロール）のキャッシュを削除。ただし `is_manual_override = true` は削除しない
   - 再生成は次の検索時に自動で行う
   - 管理者確認プロンプト（Ephemeral メッセージ）
 
@@ -229,69 +229,74 @@ Phase 4: 品質改善・最適化             ongoing
 
 ---
 
-## Phase 3 — Web Admin UI (Week 5-6)
+## Phase 3 — Web Admin UI (Week 5-6) — 完了済み
 
 **目的:** ブラウザから快適に管理操作できる UI を作る
 
 ### Tasks
 
-- [ ] **3-1** Astro プロジェクトセットアップ (`packages/web`)
-  - `@astrojs/react` アダプター追加
-  - Tailwind CSS 設定
+- [x] **3-1** Astro 5 SSR プロジェクトセットアップ (`packages/web`)
+  - `@astrojs/node` v9 + `@astrojs/react` 追加
+  - React 19 + Tailwind v4 設定
   - `packages/db` を共有パッケージとして参照
 
-- [ ] **3-2** Discord OAuth2 認証実装
+- [x] **3-2** Discord OAuth2 認証実装
   - `/auth/login` → Discord OAuth2 リダイレクト
-  - `/auth/callback` → コード検証 → セッション発行
+  - `/auth/callback` → コード検証 → HMAC-SHA256 署名付きセッション発行
   - Guild 所属確認 + 管理ロール確認
+  - 非GETの `/admin/*` と `/api/*` は CSRF token 必須
   - 未認証は `/auth/login` にリダイレクト
 
-- [ ] **3-3** `/admin/responses` — 回答一覧ページ
+- [x] **3-3** `/admin` + `/admin/responses` — Dashboard / 回答一覧ページ
+  - Dashboard で主要メトリクスを表示
   - 単語・ロールでフィルター検索
   - `is_manual_override` フラグ表示
   - ページネーション
   - 各行から編集ページへリンク
 
-- [ ] **3-4** `/admin/responses/[id]` — 回答詳細・編集ページ
-  - 現在の回答テキスト表示
-  - インライン編集フォーム
+- [x] **3-4** `/admin/responses` — 回答編集UI
+  - 回答一覧から既存回答を確認
+  - `/api/admin/responses` の詳細取得・編集API
   - 保存時に `response_edits` に履歴記録
-  - 編集履歴タイムライン表示
+  - 詳細編集画面の分離はPhase 4へ延期
 
-- [ ] **3-5** `/admin/dictionaries` — 辞書管理ページ
+- [x] **3-5** `/admin/dictionaries` — 辞書管理ページ
   - 辞書一覧（priority順）
-  - ドラッグ＆ドロップで優先順位変更
-  - enabled/disabled トグル
-  - 新規辞書インポートのトリガー（アップロードフォーム）
+  - entry count 表示
+  - enabled/disabled と priority 更新API
+  - 新規辞書インポートUIはPhase 4へ延期
 
-- [ ] **3-6** `/admin/cache` — キャッシュ管理ページ
+- [x] **3-6** `/admin/cache` — キャッシュ管理ページ
   - 単語・ロール指定でキャッシュ削除
-  - 一括削除（辞書別 or 全削除）
+  - `is_manual_override = true` を除外して削除
   - 削除前に確認ダイアログ
 
-- [ ] **3-7** `/admin/logs` — 検索ログ・統計ページ
+- [x] **3-7** `/admin/logs` — 検索ログ・統計ページ
   - 人気単語ランキング（過去7日・30日）
   - キャッシュヒット率グラフ
   - ユーザー別検索回数（user_id のみ表示）
   - 辞書別ヒット率
 
-- [ ] **3-8** `/admin/traces` — Trace Viewer
+- [x] **3-8** `/admin/traces` — Trace Viewer
   - `trace_id` で検索
   - Bot処理のイベントタイムライン表示
   - LLM error / DB error / Discord error を区別して表示
 
-- [ ] **3-9** `/admin/ops-jobs` — Agent Ops 承認画面
+- [x] **3-9** `/admin/ops-jobs` — Agent Ops 承認画面
   - AIエージェントが作成した `ops_jobs` を一覧表示
   - dangerous job は人間が approve / reject
   - job 実行結果と audit log を表示
+  - rejector は `ops_jobs.rejected_by` に保存
 
-- [ ] **3-10** Dry-run MCP tools
+- [x] **3-10** Dry-run MCP tools
+  - `MCP_ENABLE_DRY_RUN=false` がデフォルト
   - `grkd-jisho.dry_run_wipe`
   - `grkd-jisho.dry_run_rate_limit_change`
   - `grkd-jisho.dry_run_cache_refresh`
+  - 全dry-run tool call は `mcp_audit_logs.dry_run=true` で記録
 
 **完了基準:**  
-ブラウザで Discord 認証後、回答の編集・辞書管理・ログ確認ができること。Trace Viewer で1回の検索フローを追え、AIエージェントが作成した運営ジョブを人間が承認・拒否できること。
+ブラウザで Discord 認証後、Dashboard、回答編集、辞書管理、キャッシュ管理、ログ確認ができること。Trace Viewer で1回の検索フローを追え、AIエージェントが作成した運営ジョブを人間が承認・拒否できること。
 
 ---
 
@@ -336,6 +341,7 @@ Phase 4: 品質改善・最適化             ongoing
   - Guild 別許可チャンネル設定の DB 管理
 
 - [ ] **4-8** Limited write MCP tools
+  - Phase 3 では `MCP_READONLY_MODE=true` を維持し、Level 2 dry-run は `MCP_ENABLE_DRY_RUN=true` の時だけ有効化する
   - `grkd-jisho.request_cache_refresh`
   - `grkd-jisho.request_user_usage_reset`
   - `grkd-jisho.request_rate_limit_change`
@@ -357,7 +363,7 @@ Phase 4: 品質改善・最適化             ongoing
 | M0 | Week 1 | DB + 辞書インポート完了 |
 | M1 | Week 3 | Bot が @メンションに返答 |
 | M2 | Week 4 | 管理 Slash Command + Read-only MCP 完動 |
-| M3 | Week 6 | Web Admin UI + Agent Ops 承認画面 公開 |
+| M3 | Week 6 | Web Admin UI + Agent Ops 承認画面 公開済み |
 | M4 | Ongoing | 本番デプロイ + AI Agent 自律監視 + 継続改善 |
 
 ---
