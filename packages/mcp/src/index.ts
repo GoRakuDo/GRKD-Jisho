@@ -17,6 +17,12 @@ import {
   dryRunRateLimitChange,
   dryRunWipe,
 } from "./tools/dry-run-tools.js";
+import {
+  requestCacheRefresh,
+  requestUserUsageReset,
+  requestRateLimitChange,
+  requestToggleWipe,
+} from "./tools/write-request-tools.js";
 
 type RecentErrorsArgs = { limit: number; level?: "warn" | "error" | undefined };
 type LookupStatsArgs = { days: number };
@@ -211,7 +217,7 @@ if (env.enableDryRun) {
       description: "Dry-run: estimate impact of rate limit change (no DB write)",
       inputSchema: z.object({
         role_id: z.string().min(1),
-        new_daily_limit: z.number().int().min(0).max(100000),
+        new_daily_limit: z.number().int().min(-1).max(100000),
         guild_id: z.string().optional(),
       }),
     },
@@ -259,13 +265,137 @@ if (env.enableDryRun) {
 }
 
 async function main(): Promise<void> {
-  if (!env.readOnlyMode) {
-    throw new Error("MCP_READONLY_MODE must be true in Phase 3");
+  if (env.readOnlyMode) {
+    // Read-only mode: Level 1 tools only
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("[mcp] grkd-jisho MCP server started (read-only mode)");
+    return;
+  }
+
+  // Read-write mode: require dry-run to be enabled before allowing write
+  if (!env.enableDryRun) {
+    throw new Error("MCP_ENABLE_DRY_RUN must be true when MCP_READONLY_MODE=false");
+  }
+  // dry-run tools are already registered above via env.enableDryRun guard
+
+  if (env.enableLimitedWrite) {
+    registerLevel3Tools();
   }
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("[mcp] grkd-jisho MCP server started on stdio");
+  console.error("[mcp] grkd-jisho MCP server started (read-write mode)");
+}
+
+function registerLevel3Tools(): void {
+  server.registerTool(
+    "grkd-jisho.request_cache_refresh",
+    {
+      description: "Request a cache refresh job (queues ops_job; manual overrides excluded). Use dry_run_cache_refresh first.",
+      inputSchema: z.object({
+        normalized_query: z.string().min(1),
+        role_key: z.string().optional(),
+        dictionary_id: z.number().int().optional(),
+        reason: z.string().min(1),
+      }),
+    },
+    async (args: {
+      normalized_query: string;
+      role_key?: string | undefined;
+      dictionary_id?: number | undefined;
+      reason: string;
+    }) => {
+      const result = await withAudit(
+        "grkd-jisho.request_cache_refresh",
+        args,
+        { dryRun: false },
+        async () => requestCacheRefresh(args),
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
+
+  server.registerTool(
+    "grkd-jisho.request_user_usage_reset",
+    {
+      description: "Request user usage reset job (queues ops_job; single user only).",
+      inputSchema: z.object({
+        guild_id: z.string().min(1),
+        user_id: z.string().min(1),
+        usage_date: z.string().optional(),
+        reason: z.string().min(1),
+      }),
+    },
+    async (args: {
+      guild_id: string;
+      user_id: string;
+      usage_date?: string | undefined;
+      reason: string;
+    }) => {
+      const result = await withAudit(
+        "grkd-jisho.request_user_usage_reset",
+        args,
+        { dryRun: false },
+        async () => requestUserUsageReset(args),
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
+
+  server.registerTool(
+    "grkd-jisho.request_rate_limit_change",
+    {
+      description: "Request a rate limit change job (requires human approval). Use dry_run_rate_limit_change first.",
+      inputSchema: z.object({
+        discord_role_id: z.string().min(1),
+        daily_limit: z.number().int().min(-1).max(100000),
+        role_label: z.string().optional(),
+        reason: z.string().min(1),
+      }),
+    },
+    async (args: {
+      discord_role_id: string;
+      daily_limit: number;
+      role_label?: string | undefined;
+      reason: string;
+    }) => {
+      const result = await withAudit(
+        "grkd-jisho.request_rate_limit_change",
+        args,
+        { dryRun: false },
+        async () => requestRateLimitChange(args),
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
+
+  server.registerTool(
+    "grkd-jisho.request_toggle_wipe",
+    {
+      description: "Request a wipe toggle job (requires human approval). Use dry_run_wipe first.",
+      inputSchema: z.object({
+        guild_id: z.string().min(1),
+        channel_id: z.string().min(1),
+        wipe_enabled: z.boolean(),
+        reason: z.string().min(1),
+      }),
+    },
+    async (args: {
+      guild_id: string;
+      channel_id: string;
+      wipe_enabled: boolean;
+      reason: string;
+    }) => {
+      const result = await withAudit(
+        "grkd-jisho.request_toggle_wipe",
+        args,
+        { dryRun: false },
+        async () => requestToggleWipe(args),
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result) }] };
+    },
+  );
 }
 
 main().catch((error) => {
