@@ -97,13 +97,13 @@ export const JobDetailPanel = ({ job }: JobDetailProps) => {
           </div>
         )}
 
-        {job.status.toLowerCase() === 'rejected' && (job.rejectedBy ?? job.approvedBy) && (
+        {job.status.toLowerCase() === 'rejected' && job.rejectedBy && (
           <div>
             <div className="text-xs uppercase text-graphite-500 font-medium mb-1 font-grkd-sans">
               Rejected By
             </div>
             <div className="text-sm text-graphite-650 font-grkd-sans">
-              {job.rejectedBy ?? job.approvedBy}
+              {job.rejectedBy}
             </div>
           </div>
         )}

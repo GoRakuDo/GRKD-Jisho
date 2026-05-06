@@ -865,6 +865,49 @@ Step G: MCP dry-run
 - `packages/mcp/src/index.ts`（tool登録条件分岐 + withAudit拡張）
 - `packages/mcp/src/tools/dry-run-tools.ts`（新規: dry-run tool実装）
 
+---
+
+## 31. Step H — 最終検証ログ
+
+> 実施日: 2026-05-06  
+> 実行者: main agent + code-reviewer  
+> 状態: Step H verification 実施中
+
+### 実行した検証
+
+| 検証 | 結果 |
+|---|---|
+| `pnpm --filter @grkd-jisho/db exec tsc --noEmit` | pass |
+| `pnpm --filter @grkd-jisho/bot exec tsc --noEmit` | pass |
+| `pnpm --filter @grkd-jisho/mcp exec tsc --noEmit` | pass |
+| `pnpm --filter @grkd-jisho/web typecheck` | 0 errors / 0 warnings / 2 hints |
+| `pnpm --filter @grkd-jisho/web build` | pass |
+| `pnpm --filter @grkd-jisho/bot test` | 1 passed / 3 skipped / 13 todo |
+| `as any` / `as never` / `eslint-disable` 検索 | 0件 |
+| `Asia/Bangkok` / `@grkd/` / `grkd.` 検索 | 0件 |
+| Web色違反検索 (`#000000`, `#ffffff`) | 色値違反0件 |
+
+### code-reviewer findings
+
+| Severity | Finding | 対応 |
+|---|---|---|
+| HIGH | rejected job UI が `rejectedBy` 欠損時に `approvedBy` へfallbackしていた | **対応済み**: `Rejected By` は `rejectedBy` がある場合のみ表示 |
+| MED | `getCacheStats()` が2回count queryを発行 | Phase 3 sign-off blockerではない。後続の小改善候補 |
+| MED | Bot test suiteに skipped/todo が残る | 既定方針どおり、Phase 3後に `rate-limit`, `response-cache`, `response-admin` unit test を追加 |
+| LOW | Astro typecheck hintsが2件 | 型エラーではない。後続の整備候補 |
+
+### HIGH修正
+
+| ファイル | 変更 |
+|---|---|
+| `packages/web/src/components/admin/JobDetailPanel.tsx` | rejected job の `Rejected By` 表示から `approvedBy` fallback を削除 |
+
+根拠:
+
+- `rejectJob()` は `ops_jobs.rejected_by` に rejector を保存する。
+- `approved_by` と `rejected_by` は別カラム。
+- rejected jobで `approved_by` を表示すると、承認者と拒否者の意味が混ざる。
+
 
 Step H: Verification
   23. typecheck/build/test
