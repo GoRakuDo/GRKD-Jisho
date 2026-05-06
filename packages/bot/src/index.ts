@@ -8,6 +8,7 @@ import { interactionCreateHandler } from "./events/interactionCreate.js";
 import { recordHeartbeat } from "./services/observability.service.js";
 import { wipeChannel } from "./services/channel-wipe.service.js";
 import { pollAndExecuteJobs } from "./services/ops-job.service.js";
+import { purgeOldLogs } from "./services/log-purge.service.js";
 
 const client = new Client({
   intents: [
@@ -63,6 +64,26 @@ client.once("ready", () => {
   setInterval(async () => {
     await pollAndExecuteJobs();
   }, 30_000);
+
+  // Log Purge スケジューラ: 毎日 00:10 GMT+7（wipe 00:00 との競合回避）
+  const logRetentionDays = Math.max(30, Math.min(365, Number(process.env["LOG_RETENTION_DAYS"]) || 90));
+  cron.schedule(
+    "10 0 * * *",
+    async () => {
+      console.log("[LogPurge] Starting daily log purge...");
+      try {
+        const result = await purgeOldLogs(logRetentionDays);
+        console.log(
+          `[LogPurge] Deleted ${result.lookupLogsDeleted} lookup_logs, ${result.botEventsDeleted} bot_events`,
+        );
+      } catch (err) {
+        console.error("[LogPurge] Failed:", err);
+      }
+    },
+    {
+      timezone: "Asia/Jakarta",
+    },
+  );
 });
 
 client.on(Events.MessageCreate, messageCreateHandler);
