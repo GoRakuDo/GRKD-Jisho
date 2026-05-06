@@ -1,8 +1,11 @@
 import { eq, asc, and } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 import type { LookupResult } from "../types.js";
+import { normalizeQuery } from "./normalize-query.js";
 
-export async function lookupWord(query: string): Promise<LookupResult | null> {
+export async function lookupWord(rawQuery: string): Promise<LookupResult | null> {
+  const query = normalizeQuery(rawQuery);
+
   const dictionaries = await db
     .select()
     .from(schema.dictionaries)
@@ -10,7 +13,8 @@ export async function lookupWord(query: string): Promise<LookupResult | null> {
     .orderBy(asc(schema.dictionaries.priority));
 
   for (const dict of dictionaries) {
-    const [entry] = await db
+    // 1. term exactly
+    const [termEntry] = await db
       .select()
       .from(schema.dictionaryEntries)
       .where(
@@ -21,8 +25,34 @@ export async function lookupWord(query: string): Promise<LookupResult | null> {
       )
       .limit(1);
 
-    if (entry) {
-      return { dictionary: dict, entry };
+    if (termEntry) {
+      return {
+        dictionary: dict,
+        entry: termEntry,
+        matchedBy: "term",
+        normalizedQuery: query,
+      };
+    }
+
+    // 2. reading exactly (within same dictionary)
+    const [readingEntry] = await db
+      .select()
+      .from(schema.dictionaryEntries)
+      .where(
+        and(
+          eq(schema.dictionaryEntries.dictionaryId, dict.id),
+          eq(schema.dictionaryEntries.reading, query),
+        ),
+      )
+      .limit(1);
+
+    if (readingEntry) {
+      return {
+        dictionary: dict,
+        entry: readingEntry,
+        matchedBy: "reading",
+        normalizedQuery: query,
+      };
     }
   }
 

@@ -2,9 +2,15 @@ import type { dictionaries, dictionaryEntries } from "@grkd-jisho/db";
 
 export type RoleKey = "pemula" | "pemula-atas" | "menengah" | "mahir";
 
+export type LookupMatchType = "term" | "reading";
+
 export interface LookupResult {
   dictionary: typeof dictionaries.$inferSelect;
   entry: typeof dictionaryEntries.$inferSelect;
+  /** 一致したカラム種別: "term" か "reading" */
+  matchedBy: LookupMatchType;
+  /** 実際に使用した検索クエリ（正規化後） */
+  normalizedQuery: string;
 }
 
 export interface CacheKey {

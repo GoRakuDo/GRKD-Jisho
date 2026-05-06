@@ -134,10 +134,14 @@ async function handleMessage(message: Message): Promise<void> {
     });
     return;
   }
-  await traceEvent(traceId, "dictionary.hit", "info", { dict: result.dictionary.name });
+  await traceEvent(traceId, "dictionary.hit", "info", {
+    dict: result.dictionary.name,
+    matchedBy: result.matchedBy,
+    normalizedQuery: result.normalizedQuery,
+  });
 
   const cacheKey = {
-    normalizedQuery: query,
+    normalizedQuery: result.normalizedQuery,
     dictionaryId: result.dictionary.id,
     entryId: result.entry.id,
     roleKey,
