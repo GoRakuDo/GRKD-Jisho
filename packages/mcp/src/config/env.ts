@@ -21,5 +21,5 @@ export const env = {
   readOnlyMode: parsed.data.MCP_READONLY_MODE === "true",
   enableDryRun: parsed.data.MCP_ENABLE_DRY_RUN === "true",
   enableLimitedWrite: parsed.data.MCP_ENABLE_LIMITED_WRITE === "true",
-  maxCacheRefreshRows: Number(parsed.data.MCP_MAX_CACHE_REFRESH_ROWS) || 100,
+  maxCacheRefreshRows: (() => { const n = Number(parsed.data.MCP_MAX_CACHE_REFRESH_ROWS); return Number.isFinite(n) && n >= 0 ? n : 100; })(),
 };
