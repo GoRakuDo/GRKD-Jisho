@@ -4,3 +4,4 @@ dist/
 /drizzle/
 *.log
 .codesight/
+bun.lock
