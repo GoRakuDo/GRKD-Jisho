@@ -10,19 +10,26 @@ import { getSession } from "../../../lib/session";
  * for all POST / PUT / DELETE requests.
  */
 export const GET: APIRoute = async (context) => {
-  const session = getSession(context);
+  try {
+    const session = getSession(context);
 
-  if (!session || !session.isAdmin) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
-      status: 401,
+    if (!session || !session.isAdmin) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const token = generateCsrfToken(session.discordUserId);
+
+    return new Response(JSON.stringify({ token }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch {
+    return new Response(JSON.stringify({ error: "internal error" }), {
+      status: 500,
       headers: { "Content-Type": "application/json" },
     });
   }
-
-  const token = generateCsrfToken(session.discordUserId);
-
-  return new Response(JSON.stringify({ token }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
 };

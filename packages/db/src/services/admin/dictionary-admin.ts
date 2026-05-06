@@ -1,4 +1,4 @@
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, count } from "drizzle-orm";
 import { db } from "../../index";
 import * as schema from "../../schema";
 
@@ -40,7 +40,7 @@ export async function setDictionaryPriority(
 
 export async function getDictionaryEntryCount(dictionaryId: number): Promise<number> {
   const [result] = await db
-    .select({ count: schema.dictionaryEntries.id })
+    .select({ count: count(schema.dictionaryEntries.id) })
     .from(schema.dictionaryEntries)
     .where(eq(schema.dictionaryEntries.dictionaryId, dictionaryId));
   return result ? Number(result.count) : 0;
