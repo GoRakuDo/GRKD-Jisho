@@ -1055,6 +1055,30 @@ Step A 実装ログ
 Step B 実装ログ
 Step C 実装ログ
 Step D 実装ログ
+実施日: 2026-05-06
+変更ファイル:
+  - packages/mcp/src/config/env.ts (修正) — MCP_ENABLE_LIMITED_WRITE, MCP_MAX_CACHE_REFRESH_ROWS 追加、NaN guard修正
+  - packages/mcp/src/index.ts (修正) — main()にregisterLevel2Tools()追加、Phase 3 hard guard置換
+  - packages/mcp/src/services/audit.service.ts (修正) — writeMcpAuditLog維持、createOpsJobWithAudit追加
+  - packages/mcp/src/tools/write-request-tools.ts (新規) — 4つのLevel 3 request tools実装
+  - .env.example (修正) — MCP section追加
+検証コマンド:
+  - pnpm --filter @grkd-jisho/mcp exec tsc --noEmit → 0 errors
+  - pnpm --filter @grkd-jisho/bot exec tsc --noEmit → 0 errors
+  - pnpm --filter @grkd-jisho/db exec tsc --noEmit → 0 errors
+  - pnpm --filter @grkd-jisho/bot test → 6 files / 39 tests / 0 failed
+code-reviewer結果:
+  - HIGH-1: env.ts maxCacheRefreshRows NaN guard (0 overrides 100) → 修正済み (L24 IIFE pattern)
+  - HIGH-2: dry-run tools module-level registration violates readOnlyMode guard → 修正済み (registerLevel2Tools()をmain()内に移動)
+  - MED: createOpsJobWithAudit return value wrapping → 修正不要 (機能的に正しい)
+  - その他LOW/MED findings → 修正済み
+残リスク:
+  - Level 3 toolsのreason文字列がそのままops_jobs.argsJsonに入る（redactionなし）。悪意ある入力でのデータリークはaudit logに依存
+  - registerLevel2Tools()とregisterLevel3Tools()の分岐がmain()内でしっかりしているが、env.enableDryRun=falseでLevel 3を呼べないことを保証するにはE2Eテストが必要
+Git commit hash: 
+  - 初期実装: 8275802 (feat: implement Phase 4 Step D MCP Level 3 limited write)
+  - 修正版: 0aab647 (fix: MCP Level 3 env NaN guard and dry-run scope)
+
 Step E 実装ログ
 Step F 実装ログ
 Step G 実装ログ
