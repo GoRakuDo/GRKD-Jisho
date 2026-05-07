@@ -156,7 +156,7 @@ R-3 Pre-Release Plan 記録時点
 | MCP default read-only | pass | `packages/mcp/src/config/env.ts:6` — `MCP_READONLY_MODE` のデフォルトは `"true"` |
 | MCP Level 3 全経路 audit | pass | `write-request-tools.ts:68,100,132,160` — 全4ツールが `createOpsJobWithAudit` 経由。直接DB変更なし |
 | MCP Level 4 human approval | pass | Level 4 ツールは未実装。設計上 `AGENTS.md 11-3` に human approval 必須と規定 |
-| Wipe safety | pass | `wipe-now.command.ts:55,59,73` — ManageMessages permission 確認、wipe_enabled ガード。`channel-wipe.service.ts:59` — bulkDelete + pin保持 + 24h範囲 |
+| Wipe safety | pass | `wipe-now.command.ts:55,59,74-75` — ManageMessages permission 確認、wipe_enabled ガード。`channel-wipe.service.ts:59` — bulkDelete + pin保持 + 24h範囲 |
 | Manual override 保護 | pass | `ops-job.service.ts:183` — bulkDelete で除外。`cache-admin.ts:76` — bulkDelete で除外。`response-cache.service.ts:19` — 優先順位づけ |
 | Pattern scan | pass | `as any`, `eslint-disable`, `Asia/Bangkok`, `#000000/#ffffff` — コードファイル 0 件 |
 | code-reviewer | pass | 本ドキュメント内 R-5 完了後に code-reviewer 確認予定 |
