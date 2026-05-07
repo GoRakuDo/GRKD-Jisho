@@ -1154,8 +1154,46 @@ Git commit hash: 981b4c7
 LOW follow-up: `originalQuery === normalizedQuery` のとき OR をスキップする `matchColumn` ヘルパーを抽出。同一条件の重複 eq を回避。
 Git commit hash: d483527
 
-Step G 実装ログ
-Step H 実装ログ
+**Step G 実装ログ**
+
+| 項目 | 内容 |
+|---|---|
+| 日付 | 2026-05-07 |
+| 従属 | Step F (prompt v2) 完了後、独立して実装 |
+| 作業 | G-1: response詳細ページ / G-2: 辞書import preview |
+| 状態 | ✅ 完了 |
+
+**修正ファイル:**
+
+| ファイル | 変更 |
+|---|---|
+| `packages/db/src/services/admin/response-admin.ts` | `getResponseDetail()` 追加（response + edits + source を1クエリグループで） |
+| `packages/web/src/pages/api/admin/responses.ts` | GET id時は `getResponseDetail()` → enriched JSON を返す |
+| `packages/web/src/pages/admin/responses/[id].astro` | 新規: SSR詳細ページ（bigint/Date→string変換） |
+| `packages/web/src/pages/admin/responses.astro` | 行クリックで詳細ページへリンク追加 |
+| `packages/web/src/components/admin/ResponseDetailPanel.tsx` | React コンポーネント（kuraudo-uidesigner 再デザイン） |
+| `packages/web/src/components/admin/ResponseEditTimeline.tsx` | React コンポーネント（kuraudo-uidesigner 再デザイン） |
+| `packages/web/src/pages/api/admin/dictionaries/import-preview.ts` | 新規: zip parse → index.json → term_bank estimate preview |
+| `packages/web/src/pages/admin/dictionaries/import.astro` | 新規: import preview SSRページ |
+| `packages/web/src/components/admin/ImportPreviewForm.tsx` | React コンポーネント（kuraudo-uidesigner 再デザイン） |
+| `packages/web/package.json` | `adm-zip` 追加 |
+| `pnpm-lock.yaml` | lock更新 |
+
+**検証:**
+
+- `astro check`: 0 errors, 0 warnings
+- `bot tsc --noEmit`: 0 errors
+- `bot vitest run`: 39 passed
+- `db tsc --noEmit`: 0 errors
+- code-reviewer: 後日Step H統合で実施予定
+
+**残リスク:**
+
+- import preview は API単体での動作確認のみ。zipアップロード画面はプレビュー実装までで、実際のimport（DB保存）は未実装（Phase計画通り）
+- UIコンポーネントのPUT /api/admin/responses はCSRF対応済みだが、エラーハンドリングはサイレント（将来強化）
+- adm-zip 依存追加済み。大きなzip（50MB超）は一貫して拒否
+
+**Git commit hash:** 6522c2a
 Step I 実装ログ
 Step J 調査ログ
 Step K 最終検証ログ
