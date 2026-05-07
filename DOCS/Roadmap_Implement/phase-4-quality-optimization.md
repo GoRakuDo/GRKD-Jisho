@@ -1124,7 +1124,32 @@ code-reviewer結果:
   - v2プロンプトは実環境でテストしていない。実際のLLM出力品質はPhase 4後半で評価する
   - v2テンプレートを llm.service.ts に組み込むのは Phase 4 post-Step F に委ねる
   - A/B test 基盤は Phase 4 対象外（計画通り）
-Git commit hash: まだコミットしていない（次回push時に）
+Git commit hash: a0c264b
+
+---
+
+### Step 0→F regression verification (2026-05-06)
+
+Phase 4 Steps 0→F の全コードを1ファイルずつ読み直して、バグ・regressionの有無を検証。
+発見されたバグは以下の2件。
+
+| Step | Severity | バグ内容 | 修正内容 | ファイル |
+|------|----------|---------|---------|---------|
+| B | 🔴 BLOCKER | `normalizeQuery` で全角カタカナ→ひらがな変換 (`テレビ`→`てれび`) により、Yomitan辞書の term=`テレビ` が検索不能に | `or(eq(term, rawQuery), eq(term, normalizedQuery))` で両方OR検索。reading も同様 | `dictionary.service.ts` |
+| C | 🟡 MED | `index.ts` L69 が `process.env["LOG_RETENTION_DAYS"]` を直接読んでいた。env.ts に zod 検証がなく env 経由の統一ルール違反 | env.ts に `LOG_RETENTION_DAYS` (z min 30 max 365 default 90) 追記。`index.ts` を `env.LOG_RETENTION_DAYS` 経由に変更 | `env.ts`, `index.ts` |
+
+検証コマンド（修正後）:
+  - pnpm --filter @grkd-jisho/bot exec tsc --noEmit → 0 errors
+  - pnpm --filter @grkd-jisho/db exec tsc --noEmit → 0 errors
+  - pnpm --filter @grkd-jisho/mcp exec tsc --noEmit → 0 errors
+  - npx astro check (web) → 0 errors / 0 warnings / 2 hints
+  - pnpm --filter @grkd-jisho/bot test → 6 files / 39 tests / 0 passed
+  - pnpm --filter @grkd-jisho/db exec tsc --noEmit → 0 errors
+
+残リスク（既知のまま）:
+  - normalizeQuery でも「カタカナ→ひらがな」後の最終的な形は依然として正規化クエリ。reading が null かつ term がカタカナのみのエントリは、いずれかの term が元の表記と一致すれば発見可能（OR条件でカバー）
+  - web heartbeat の unique constraint は composite (service_name, instance_id)。Drizzle onConflictDoUpdate で正しく動作確認済み
+Git commit hash: 981b4c7
 
 Step G 実装ログ
 Step H 実装ログ
