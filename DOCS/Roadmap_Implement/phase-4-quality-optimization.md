@@ -1197,6 +1197,55 @@ Phase 4では一気に完全対応しない。
 
 ---
 
+### Step J 実装ログ
+
+実施日: 2026-05-07 | 状態: ✅ 完了
+
+#### 作成ファイル
+
+`DOCS/Operations/multi-guild-assessment.md` — 全297行、6セクション構成
+
+#### 調査方法
+
+コードベース全 grep による実検索（`packages/bot` / `packages/web` / `packages/mcp` / `packages/db`）。
+
+#### 主要発見
+
+| 観点 | 発見 |
+|---|---|
+| DB schema | `channel_settings` / `user_usage` / `lookup_logs` / `bot_events` に `guild_id` あり。`role_rate_limits` と `ops_jobs` はグローバル設定で guild_id なし。 |
+| Bot サービス層 | guild 固有サービス（rate-limit / channel-settings / ops-job）は全関数が `guildId` パラメータ対応済み。dictionary / LLM / cache は guild-agnostic。 |
+| env 固定 | `DISCORD_GUILD_ID` が bot + web の両 env で単一値。 |
+| register-commands | 1 guild にのみコマンド登録。 |
+| Web OAuth2 | `fetchGuildMember` が `DISCORD_GUILD_ID` 固定。 |
+| MCP stats tools | 4ツール中4ツールが guild filter なし。 |
+
+#### 総合判定
+
+**Phase 5 に送る。** 中規模変更。env / register / OAuth / MCP の4領域に閉じており、single guild 運用を壊さず段階的に導入可能。
+
+#### code-reviewer 指摘対応
+
+| severity | 件数 | 主な修正 |
+|---|---|---|
+| 🔴 BLOCKER | 3 | DB schema 対応範囲修正 / guildId対応をguild固有サービスに限定 / env変数名をDISCORD_GUILD_ID維持に統一 |
+| 🟠 HIGH | 3 | rate_limit_status フィルタ制限注釈 / botEvents nullable注釈 / コードカウント修正 |
+| 🟡 MED | 3 | wipe-admin.tsパス明記 / DM処理部分的対応済み注釈 / deploy.md確認 |
+| 🟢 LOW | 2 | 体裁・軽微な修正 |
+
+#### 整合性確認
+
+- MASTER_PLAN.md: ✅ Phase 5 送り判定と整合
+- ROADMAP.md: ✅ Step J タスク定義と調査結果一致
+- AGENTS.md: ✅ single guild 前提と矛盾なし
+- 既存コード: ✅ 全発見が実際のコードベース検索に基づく
+
+ドリフトなし。
+
+**Git commit hash:** `cc7c973`
+
+---
+
 ## 15. Step K — 最終検証 / Phase 4 sign-off
 
 ### 静的検証
