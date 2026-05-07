@@ -66,13 +66,12 @@ client.once("ready", () => {
   }, 30_000);
 
   // Log Purge スケジューラ: 毎日 00:10 GMT+7（wipe 00:00 との競合回避）
-  const logRetentionDays = Math.max(30, Math.min(365, Number(process.env["LOG_RETENTION_DAYS"]) || 90));
   cron.schedule(
     "10 0 * * *",
     async () => {
       console.log("[LogPurge] Starting daily log purge...");
       try {
-        const result = await purgeOldLogs(logRetentionDays);
+        const result = await purgeOldLogs(env.LOG_RETENTION_DAYS);
         console.log(
           `[LogPurge] Deleted ${result.lookupLogsDeleted} lookup_logs, ${result.botEventsDeleted} bot_events`,
         );

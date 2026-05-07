@@ -22,6 +22,7 @@ const envSchema = z.object({
 
   // Ops
   CACHE_REFRESH_MAX_ROWS: z.coerce.number().int().min(0).max(10000).default(100),
+  LOG_RETENTION_DAYS: z.coerce.number().int().min(30).max(365).default(90),
 
   // Web UI Auth (optional at bot startup)
   DISCORD_CLIENT_SECRET: z.string().optional(),
