@@ -457,3 +457,12 @@ DOCS/Operations/release-notes-v0.1.0.md
 | Guild selector UI | multi-guild 実装後に必要なら検討 |
 | NPM package 公開拡張 | 標準経路は GitHub Release + Docker。公開ニーズが生じた場合に v0.2.0 以降で再検討 |
 | 複数辞書定義マージ | MVP方針に反するため、Phase 5 以降で再検討 |
+
+code-reviewer 指摘対応:
+
+```txt
+- MED: release-notes 内の重複整理（Single guild only / NPM publish / Known risks → Deferred scope に集約）
+- release-checklist に後倒し項目の追記は適切と確認
+```
+
+Commit: `3fcd82a`
