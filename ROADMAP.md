@@ -458,6 +458,13 @@ Phase 5 の日程は **TBA**。
   - `grkd-jisho.wipe_status` に `guild_id?` を追加
   - 未指定時は従来どおり全 guild 集計にして後方互換を保つ
 
+- [ ] **5-4** MCP Level 4 dangerous tools 実装
+  - `grkd-jisho.request_wipe_now`（即時wipe、human approval 必須）
+  - `grkd-jisho.request_bulk_cache_delete`（一括cache削除、manual override 除外）
+  - `grkd-jisho.request_prompt_version_rotate`（prompt version 切り替え投票）
+  - 全 Level 4 ツールは `ops_jobs` + `mcp_audit_logs` + human approval 必須
+  - 設計は Phase 4 で完了済み（`DOCS/Prompts/prompt-v2.md` / `DOCS/Operations/agent-runbook.md`）
+
 ---
 
 ## Milestone Summary

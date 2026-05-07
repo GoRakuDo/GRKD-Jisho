@@ -76,6 +76,7 @@ v0.1.0 で意図的に実装を見送った項目。
 | Guild selector UI | multi-guild 実装後に必要なら検討 |
 | NPM package 公開拡張 | 標準経路は GitHub Release + Docker。公開ニーズが生じた場合に v0.2.0 以降で再検討 |
 | 複数辞書定義マージ | MVP方針（最初に見つかった1件のみ使用）に反するため、Phase 5 以降で再検討 |
+| MCP Level 4 dangerous tools 実装 | Phase 4 で設計完了。human approval 必須。Phase 5 TBA |
 
 ---
 

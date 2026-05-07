@@ -1255,6 +1255,7 @@ Phase 5 は **TBA** とする。
 | 5-1 Multi-guild対応 | `DISCORD_GUILD_ID` を後方互換のままカンマ区切り配列として扱う。Bot command登録、Web OAuth2 guild所属確認、MCP stats `guild_id?` filter を対応する。 | Phase 4 Step J `DOCS/Operations/multi-guild-assessment.md` |
 | 5-2 Guild別運用UI | 必要になった場合のみ、Web UI に guild selector / guild別statsを追加する。 | YAGNI。複数guild運用開始後に判断 |
 | 5-3 NPM package公開拡張 | Phase 5 時点で外部利用ニーズがある場合のみ、`@grkd-jisho/db` / `@grkd-jisho/mcp` のNPM公開を進める。 | Pre-Release のNPM判断結果 |
+| 5-4 MCP Level 4 dangerous tools | `request_wipe_now` / `request_bulk_cache_delete` / `request_prompt_version_rotate` を実装する。Level 4 は human approval 必須。 | Phase 4 で設計済み（`DOCS/Prompts/prompt-v2.md` / `DOCS/Operations/agent-runbook.md`）だが実装未完了 |
 
 ### 20-2. Phase 5 に送る理由
 
