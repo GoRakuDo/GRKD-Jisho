@@ -1214,7 +1214,12 @@ reviewed: 2026-05-07 | Verdict: ✅ Approve (after fixes)
 - `bot vitest run`: 39 passed
 - `db tsc --noEmit`: 0 errors
 
-**Fix commit hash:** 未コミット（Step H完了後に一括push予定）
+**Fix commit hash:** 1c4b96d
+
+**Astro hint fix:** `FormEvent` 非推奨 (×2) → `React.SyntheticEvent` に変更。`z.string().url()` 非推奨 → `z.url()` に変更（zod v4 トップレベルAPI）。
+- Git commit hash: d333d17 (FormEvent), 67bbad7 (z.url)
+- 検証: `astro check`: 0 errors / 0 warnings / 0 hints
+
 Step I 実装ログ
 Step J 調査ログ
 Step K 最終検証ログ
