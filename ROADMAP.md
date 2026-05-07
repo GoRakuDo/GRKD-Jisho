@@ -331,6 +331,14 @@ Phase 4: 品質改善・最適化             ongoing
   - 環境変数を Railway / Fly.io の Secrets に移行
   - `DATABASE_URL` を managed PostgreSQL サービスに変更
   - デプロイ手順書作成
+  - Windows / Linux 対応の初回セットアップスクリプトを追加
+    - `scripts/install-dev.ps1`
+    - `scripts/install-dev.sh`
+  - Windows / Linux 対応のデプロイ前チェック用スクリプトを追加
+    - `scripts/deploy-precheck.ps1`
+    - `scripts/deploy-precheck.sh`
+  - スクリプトは危険操作を自動実行しない
+    - 本番DB migration、wipe有効化、MCP Level 3有効化は確認表示に留める
 
 - [ ] **4-6** 読み仮名検索対応
   - `reading` フィールドで検索をフォールバックとして追加

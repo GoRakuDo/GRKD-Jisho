@@ -538,6 +538,46 @@ volumes:
   pg_data:
 ```
 
+### 13-1. Cross-platform install scripts (Phase 4 H.5)
+
+Step H の Docker / env / deploy docs に続けて、Windows と Linux の初回セットアップを軽くするスクリプトを追加する。
+
+対象は2系統に分ける。
+
+```txt
+scripts/install-dev.ps1        # Windows PowerShell 7+ 用
+scripts/install-dev.sh         # Linux/macOS Bash 用
+scripts/deploy-precheck.ps1    # Windows PowerShell 7+ 用
+scripts/deploy-precheck.sh     # Linux/macOS Bash 用
+```
+
+`install-dev` はローカル開発の初回セットアップ用。
+
+```txt
+Node.js / pnpm / Docker の存在確認
+-> .env がなければ .env.example から作成
+-> pnpm install
+-> docker compose up -d postgres
+-> pnpm db:migrate
+-> pnpm db:seed
+-> db / bot / web / mcp の最低限チェック
+-> 次に実行する dev コマンドを表示
+```
+
+`deploy-precheck` は本番デプロイ前の安全確認用。
+
+```txt
+必須 env の存在確認
+-> bot / web Docker build
+-> migration 実行前チェック
+-> MCP_READONLY_MODE / MCP_ENABLE_LIMITED_WRITE の安全確認
+-> wipe_enabled 運用注意の表示
+-> 手動確認が必要な項目を最後に一覧表示
+```
+
+危険操作は自動化しない。
+本番DB migration、wipe有効化、MCP Level 3有効化、外部API課金に関わる操作は、スクリプト内で実行せず確認メッセージに留める。
+
 ---
 
 ## 14. Yomitan Dictionary Import

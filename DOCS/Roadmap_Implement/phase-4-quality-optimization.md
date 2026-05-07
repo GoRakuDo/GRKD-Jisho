@@ -85,6 +85,7 @@ Step E: Bot ops job executor 実処理化
 Step F: Prompt version management
 Step G: Web Admin UIの残タスク（response detail / import preview）
 Step H: Production deploy preparation
+Step H.5: Cross-platform install scripts（Windows / Linux）
 Step I: Agent runbook / 運用ドキュメント
 Step J: 複数Guild optional調査
 Step K: 最終検証 / Phase 4 sign-off
@@ -865,7 +866,190 @@ LOG_RETENTION_DAYS=90
 - `bot vitest run`: 39 passed ✅
 - Docker build: bot/web both success ✅
 
-**Git commit hash:** 未コミット（Step H完了後に一括push）
+**Git commit hash:** `6f6ec37`
+
+---
+
+## 12.5. Step H.5 — Cross-platform install scripts
+
+### 目的
+
+Step H の deploy 手順が長くなったため、Windows と Linux の初回セットアップをスクリプトで補助する。
+
+ただし、危険操作は自動化しない。
+スクリプトは「安全な準備」と「確認漏れ防止」に絞る。
+
+### 対象スクリプト
+
+```txt
+scripts/install-dev.ps1
+scripts/install-dev.sh
+scripts/deploy-precheck.ps1
+scripts/deploy-precheck.sh
+```
+
+### H.5-1 install-dev scripts
+
+ローカル開発環境の初回セットアップ用。
+
+対象:
+
+```txt
+scripts/install-dev.ps1
+scripts/install-dev.sh
+```
+
+やること:
+
+```txt
+1. Node.js 20+ の存在確認
+2. pnpm の存在確認
+3. Docker / Docker Compose の存在確認
+4. .env がなければ .env.example から作成
+5. pnpm install
+6. docker compose up -d postgres
+7. pnpm db:migrate
+8. pnpm db:seed
+9. pnpm --filter @grkd-jisho/db run build
+10. pnpm --filter @grkd-jisho/bot exec tsc --noEmit
+11. pnpm --filter @grkd-jisho/mcp exec tsc --noEmit
+12. pnpm --filter @grkd-jisho/web exec astro check
+13. 次に実行する dev command を表示
+```
+
+出力する次コマンド:
+
+```txt
+pnpm bot:register
+pnpm bot:dev
+pnpm web:dev
+```
+
+### H.5-2 deploy-precheck scripts
+
+本番デプロイ前チェック用。
+
+対象:
+
+```txt
+scripts/deploy-precheck.ps1
+scripts/deploy-precheck.sh
+```
+
+やること:
+
+```txt
+1. 必須 env の存在確認
+2. .env.example と実装 env の差分チェック
+3. docker build -f packages/bot/Dockerfile -t grkd-jisho-bot:precheck .
+4. docker build -f packages/web/Dockerfile -t grkd-jisho-web:precheck .
+5. pnpm --filter @grkd-jisho/db run build
+6. pnpm --filter @grkd-jisho/bot exec tsc --noEmit
+7. pnpm --filter @grkd-jisho/mcp exec tsc --noEmit
+8. pnpm --filter @grkd-jisho/web exec astro check
+9. MCP safety flags を表示
+10. wipe 運用前チェックリストを表示
+11. migration は自動実行せず、手動コマンドだけ表示
+```
+
+### 安全ルール
+
+スクリプトで自動実行してよいもの:
+
+```txt
+pnpm install
+docker compose up -d postgres（local postgres のみ）
+pnpm db:migrate（local DATABASE_URL のみ）
+pnpm db:seed（local DATABASE_URL のみ）
+typecheck / astro check / docker build
+```
+
+スクリプトで自動実行しないもの:
+
+```txt
+本番DB migration
+wipe有効化
+wipe即時実行
+MCP Level 3 有効化
+Discord Bot Token の検証API呼び出し
+外部API課金が増える処理
+git push / git commit
+```
+
+### 実装時の注意
+
+- PowerShell版は PowerShell 7+ 前提。
+- Bash版は Linux/macOS 前提。
+- Windows版とLinux版で処理順を揃える。
+- 失敗時は即停止する。
+- env値そのものは表示しない。存在有無だけ出す。
+- `.env` が既にある場合は上書きしない。
+- 本番向け `DATABASE_URL` を検出した場合、migration は実行せず警告する。
+
+### 完了基準
+
+- Windows用 `install-dev.ps1` がある。
+- Linux用 `install-dev.sh` がある。
+- Windows用 `deploy-precheck.ps1` がある。
+- Linux用 `deploy-precheck.sh` がある。
+- 4スクリプトが secrets を出力しない。
+- ローカル開発手順が `DOCS/Operations/deploy.md` と矛盾しない。
+- MASTER_PLAN / ROADMAP / Phase 4 plan の3文書が一致している。
+
+---
+
+### Step H.5 実装ログ
+
+実施日: 2026-05-07 | 状態: ✅ 完了
+
+#### 作成したスクリプト
+
+| スクリプト | 用途 | 対象OS |
+|---|---|---|
+| `scripts/install-dev.ps1` | 初回セットアップ | Windows (PowerShell 7+) |
+| `scripts/install-dev.sh` | 初回セットアップ | Linux / macOS (Bash) |
+| `scripts/deploy-precheck.ps1` | デプロイ前チェック | Windows (PowerShell 7+) |
+| `scripts/deploy-precheck.sh` | デプロイ前チェック | Linux / macOS (Bash) |
+
+#### code-reviewer 結果と修正内容
+
+code-reviewer 判定: ✅ Approve（全修正後）
+
+🔴 BLOCKER 2件:
+- `readlink -f` が macOS で非互換 → 両 `.sh` スクリプトを `SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"` に変更
+- `Assert-DockerCompose` が PowerShell で `try/catch` を使っており終了コードを捕捉できない → `$LASTEXITCODE` チェックに変更
+
+🟠 HIGH 4件:
+- PowerShell スクリプトがリポジトリルートに移動していない → 両 `.ps1` の先頭に `Set-Location (Split-Path -Parent $PSScriptRoot)` 追加
+- `deploy-precheck.ps1` の env 値抽出で `-match` が配列を返すと `.Trim()` でエラー → `Select-Object -First 1` で単一行に絞る
+- 両 `deploy-precheck` スクリプトが不合格時に非ゼロ終了コードを返さない → `exit 1` / `exit 0` 追加
+- `install-dev.ps1` の pg_isready 待機ループで未使用変数 `$ready` → `| Out-Null` に変更
+
+🟡 MED 4件:
+- Docker daemon 未起動チェックがない → 両 `install-dev` に `docker info` チェック追加
+- その他は fix 不要（既存設計の範囲内）
+
+#### 安全ルール遵守確認
+
+| ルール | 結果 |
+|---|---|
+| secrets を出力しない | ✅ env値そのものは非表示、存在有無のみ |
+| `.env` が既にあれば上書きしない | ✅ チェックしてからスキップ |
+| 本番DATABASE_URL検出時に警告 | ✅ migration 実行せず警告表示 |
+| 危険操作を自動実行しない | ✅ 本番migration / wipe / MCP Level3有効化 は一切実行しない |
+
+#### 整合性確認
+
+| 文書 | 状態 |
+|---|---|
+| **MASTER_PLAN.md** (L541-579) | ✅ Step H.5 定義とスクリプト名が一致 |
+| **ROADMAP.md** (L334-341) | ✅ Phase 4 タスクとスクリプト名が一致 |
+| **phase-4-quality-optimization.md** (plan) | ✅ H.5-1/H.5-2 の手順と実装が一致 |
+| **DOCS/Operations/deploy.md** | ✅ ローカル開発手順と矛盾なし |
+
+ドリフトなし。
+
+**Git commit hash:** 未コミット（Step H.5完了後に一括push）
 
 ---
 
