@@ -1078,6 +1078,9 @@ code-reviewer結果:
 Git commit hash: 
   - 初期実装: 8275802 (feat: implement Phase 4 Step D MCP Level 3 limited write)
   - 修正版: 0aab647 (fix: MCP Level 3 env NaN guard and dry-run scope)
+  - 追加修正: dd30985 (fix: add missing registerLevel2Tools() call in main())
+
+> **修正経緯:** git reset --hard origin/main 後に修正を再適用した際、registerLevel2Tools() の定義は追加したが main() からの呼び出しを忘れていた。aad3df7（reset前のamend）では正しく呼ばれていたため、reset+reapply の過程で欠落した reggression。現コードは aad3df7 と同じ状態に復元済み。
 
 Step E 実装ログ
 Step F 実装ログ
