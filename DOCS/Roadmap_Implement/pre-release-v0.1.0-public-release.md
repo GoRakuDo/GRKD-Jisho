@@ -411,3 +411,29 @@ deploy-precheck の警告6件は、local .env の Discord/LLM 値が空である
 これは本番secretをgitに置かないためのローカル状態であり、release前に外部secretで設定する。
 Linux/macOS deploy-precheck は未実行。
 ```
+
+### 12-4. R-3 NPM公開判断
+
+**Status:** Completed — A. v0.1.0 では NPM公開しない
+
+判断根拠:
+
+```txt
+1. 標準公開経路（GitHub Release + Docker）で配布可能。
+2. @grkd-jisho/db / @grkd-jisho/mcp は公開候補だが、private: true / mainがsrc参照 / declaration未出力 / pack確認未実施。
+3. bot / web はアプリケーションであり NPM公開対象外。
+```
+
+更新ファイル:
+
+```txt
+DOCS/Operations/release-checklist.md
+DOCS/Operations/release-notes-v0.1.0.md
+```
+
+反映内容:
+
+```txt
+- release-checklist.md: NPM公開判断 → pass (A. 公開しない)
+- release-notes-v0.1.0.md: 判断理由を追記、条件4をdoneに更新
+```

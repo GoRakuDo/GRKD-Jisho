@@ -63,18 +63,17 @@ multi-guild は Phase 5 Deferred Scope (TBA) に送る。
 
 ### NPM publish
 
-NPM公開は未判断。
+**v0.1.0 では NPM公開しない。**
 
-標準の公開経路は GitHub Release + Docker。
-
-NPM公開候補は以下だけ。
+判断理由:
 
 ```txt
-@grkd-jisho/db
-@grkd-jisho/mcp
+- 標準公開経路は GitHub Release + Docker で十分。
+- @grkd-jisho/db / @grkd-jisho/mcp は公開候補だが、private: true / mainがsrc参照 / declaration未出力のため、公開形が未整備。
+- 公開ニーズが生じた場合は v0.2.0 以降で検討。
 ```
 
-`packages/bot` と `packages/web` はアプリケーションなので、原則NPM公開しない。
+`packages/bot` と `packages/web` はアプリケーションであり、原則NPM公開しない。
 
 ---
 
@@ -146,6 +145,6 @@ Release can proceed only after:
 1. release-checklist.md has no fail entries
 2. not tested items are either verified or listed as known untested scope
 3. Docker build and deploy-precheck pass
-4. NPM publish decision is recorded
+4. NPM publish decision is recorded (A. not publish — done)
 5. code-reviewer reports BLOCKER/HIGH 0
 ```
