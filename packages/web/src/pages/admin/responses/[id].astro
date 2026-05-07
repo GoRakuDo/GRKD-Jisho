@@ -1,0 +1,212 @@
+---
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import { getSession } from "../../../lib/session";
+import { getResponseDetail } from "@grkd-jisho/db";
+import ResponseDetailPanel from "../../../components/admin/ResponseDetailPanel";
+import ResponseEditTimeline from "../../../components/admin/ResponseEditTimeline";
+
+const session = getSession(Astro);
+const { id } = Astro.params;
+
+interface ResponseDetailData {
+  id: string;
+  query: string;
+  roleKey: string;
+  modelName: string;
+  promptVersion: string;
+  isManualOverride: boolean;
+  updatedAt: string | null;
+  responseText: string;
+  edits: Array<{
+    id: string;
+    responseCacheId: string;
+    editorDiscordId: string;
+    beforeText: string;
+    afterText: string;
+    reason: string | null;
+    createdAt: string | null;
+  }>;
+  source: Array<{
+    dictionaryName: string | null;
+    dictionaryId: number | null;
+    cacheId: string | null;
+    cacheHit: boolean;
+    createdAt: string | null;
+  }>;
+}
+
+let detail: ResponseDetailData | null = null;
+let errorMessage: string | null = null;
+
+if (session?.isAdmin && id) {
+  try {
+    const raw = await getResponseDetail(id);
+    if (raw) {
+      detail = {
+        ...raw,
+        updatedAt: raw.updatedAt?.toISOString() ?? null,
+        edits: raw.edits.map((e) => ({
+          ...e,
+          id: String(e.id),
+          responseCacheId: String(e.responseCacheId),
+          createdAt: e.createdAt?.toISOString() ?? null,
+        })),
+        source: raw.source.map((s) => ({
+          ...s,
+          createdAt: s.createdAt?.toISOString() ?? null,
+        })),
+      };
+    } else {
+      errorMessage = "Response not found.";
+    }
+  } catch (err) {
+    console.error("Response detail SSR error:", err);
+    errorMessage = "Failed to load response detail.";
+  }
+} else if (!session?.isAdmin) {
+  errorMessage = "Unauthorized.";
+} else {
+  errorMessage = "Missing response ID.";
+}
+---
+
+<AdminLayout title={`Response #${id ?? "?"}`} active="responses">
+  {errorMessage && (
+    <div class="error-state">
+      <p>{errorMessage}</p>
+      <a href="/admin/responses" class="btn-secondary">← Back to Responses</a>
+    </div>
+  )}
+
+  {detail && (
+    <div class="detail-layout">
+      <ResponseDetailPanel
+        client:load
+        id={detail.id}
+        query={detail.query}
+        role={detail.roleKey}
+        model={detail.modelName}
+        promptVersion={detail.promptVersion}
+        isOverride={detail.isManualOverride}
+        text={detail.responseText}
+      />
+
+      <div class="source-section">
+        <h2 class="section-title">Dictionary Source</h2>
+        {detail.source.length > 0 ? (
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Dictionary</th>
+                <th>Cache Hit</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detail.source.map((s) => (
+                <tr>
+                  <td>{s.dictionaryName ?? `#${s.dictionaryId ?? "?"}`}</td>
+                  <td>{s.cacheHit ? "Yes" : "No"}</td>
+                  <td class="mono">{s.createdAt ? new Date(s.createdAt).toLocaleString("en-US", { timeZone: "Asia/Jakarta" }) : "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p class="empty-hint">No lookup source data available.</p>
+        )}
+      </div>
+
+      <ResponseEditTimeline
+        client:load
+        edits={detail.edits}
+      />
+    </div>
+  )}
+</AdminLayout>
+
+<style>
+  .detail-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .error-state {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    padding: 40px;
+    text-align: center;
+    color: var(--color-graphite-500);
+    font-size: 14px;
+  }
+
+  .source-section {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    padding: 16px;
+  }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-graphite-500);
+    text-transform: uppercase;
+    margin: 0 0 12px;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .data-table th {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-graphite-500);
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .data-table td {
+    padding: 8px 10px;
+    font-size: 13px;
+    color: var(--color-graphite-650);
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .data-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .mono {
+    font-family: var(--font-grkd-mono);
+    font-size: 12px;
+  }
+
+  .empty-hint {
+    color: var(--color-graphite-500);
+    font-size: 13px;
+    margin: 0;
+  }
+
+  .btn-secondary {
+    display: inline-block;
+    margin-top: 12px;
+    background: var(--color-porcelain-150);
+    color: var(--color-graphite-700);
+    border: 1px solid var(--color-graphite-300);
+    border-radius: var(--radius-button);
+    padding: 8px 16px;
+    font-size: 13px;
+    text-decoration: none;
+    transition: background 0.1s;
+  }
+
+  .btn-secondary:hover {
+    background: var(--color-porcelain-200);
+  }
+</style>

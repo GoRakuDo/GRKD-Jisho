@@ -3,9 +3,8 @@ import { getIsAuthenticated } from "../../../lib/locals";
 import { getSession } from "../../../lib/session";
 import {
   searchResponse,
-  getResponseById,
+  getResponseDetail,
   updateResponse,
-  getLookupSource,
 } from "@grkd-jisho/db";
 import { validateCsrfRequest } from "../../../lib/csrf";
 import { adminAuditEvent } from "@grkd-jisho/db";
@@ -25,16 +24,15 @@ export const GET: APIRoute = async (context) => {
 
   try {
     if (id) {
-      const response = await getResponseById(id);
-      if (!response) {
+      const detail = await getResponseDetail(id);
+      if (!detail) {
         return new Response(JSON.stringify({ error: "not found" }), {
           status: 404,
           headers: { "Content-Type": "application/json" },
         });
       }
-      const source = await getLookupSource(response.query);
       return new Response(
-        JSON.stringify({ response, source }),
+        JSON.stringify({ response: detail, source: detail.source, edits: detail.edits }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     }

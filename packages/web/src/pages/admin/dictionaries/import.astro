@@ -1,0 +1,32 @@
+---
+import AdminLayout from "../../../layouts/AdminLayout.astro";
+import ImportPreviewForm from "../../../components/admin/ImportPreviewForm";
+---
+
+<AdminLayout title="Import Dictionary" active="dictionaries">
+  <div class="page-header">
+    <h1 class="page-title">Import Dictionary</h1>
+    <p class="page-description">Upload a Yomitan-compatible dictionary .zip file to preview and import.</p>
+  </div>
+
+  <ImportPreviewForm client:load />
+</AdminLayout>
+
+<style>
+  .page-header {
+    margin-bottom: 20px;
+  }
+
+  .page-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+    margin: 0;
+  }
+
+  .page-description {
+    font-size: 13px;
+    color: var(--color-graphite-500);
+    margin: 4px 0 0;
+  }
+</style>

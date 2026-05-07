@@ -1,6 +1,7 @@
 import { eq, desc, and, sql } from "drizzle-orm";
 import { db } from "../../index";
 import * as schema from "../../schema";
+import type { ResponseEdit } from "../../schema/response-edits";
 
 // ── Types ──
 
@@ -78,6 +79,32 @@ export async function getResponseById(
 
   if (!row) return null;
   return { ...row, id: String(row.id) };
+}
+
+// ── Response detail (with edits + source) ──
+
+export interface ResponseDetailResult extends SearchResult {
+  edits: ResponseEdit[];
+  source: SourceResult[];
+}
+
+export async function getResponseDetail(
+  id: string,
+): Promise<ResponseDetailResult | null> {
+  const base = await getResponseById(id);
+  if (!base) return null;
+
+  const numericId = BigInt(id);
+  const [edits, source] = await Promise.all([
+    db
+      .select()
+      .from(schema.responseEdits)
+      .where(eq(schema.responseEdits.responseCacheId, numericId))
+      .orderBy(desc(schema.responseEdits.createdAt)),
+    getLookupSource(base.query, 5),
+  ]);
+
+  return { ...base, edits, source };
 }
 
 // ── Update (override) ──

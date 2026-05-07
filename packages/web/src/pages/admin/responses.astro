@@ -53,7 +53,7 @@ if (session?.isAdmin && query) {
         </thead>
         <tbody>
           {responses.map((r) => (
-            <tr class="clickable-row" data-id={r.id}>
+            <tr class="clickable-row" data-id={r.id} data-href={`/admin/responses/${r.id}`} onclick="window.location.href=this.dataset.href">
               <td class="mono">{r.id}</td>
               <td>{r.query}</td>
               <td class="mono">{r.roleKey}</td>
