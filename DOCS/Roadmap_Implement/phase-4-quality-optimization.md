@@ -1117,6 +1117,51 @@ dry-run
 
 ---
 
+### Step I 実装ログ
+
+実施日: 2026-05-07 | 状態: ✅ 完了
+
+#### 作成ファイル
+
+`DOCS/Operations/agent-runbook.md` — 全409行、7セクション構成
+
+#### セクション概要
+
+| セクション | 内容 |
+|---|---|
+| 0\. 前提条件 | MCP接続設定例、L1-L4アクセスレベルテーブル、MCP_AGENT_IDとaudit log説明 |
+| 1\. 通常監視フロー | health→recent_errors→get_trace→lookup_stats→cache_stats→rate_limit_status→wipe_status（7step固定順） |
+| 2\. Dry-runフロー | dry_run_wipe / dry_run_rate_limit_change / dry_run_cache_refresh 解説 |
+| 3\. 操作依頼フロー | dry_run→request_*→Bot自動実行→get_trace確認→audit log確認（6step） |
+| 4\. 危険操作フロー | request_wipe_now / request_bulk_cache_delete / request_prompt_version_rotate（人間承認必須） |
+| 5\. 緊急停止判断 | 即時停止条件5項目 / 操作中断条件4項目 / 報告テンプレート |
+| 6\. 禁止事項 | Discord Bot Token禁止含む全7項目 |
+| 7\. トラブルシューティング | 9ケースの症状×原因×対処表 |
+
+#### code-reviewer 指摘対応（全10件修正）
+
+| severity | 件数 | 主な修正内容 |
+|---|---|---|
+| 🔴 BLOCKER | 1 | L4ツール名に `request_` プレフィックスが不足していたのを修正 |
+| 🟠 HIGH | 4 | L3フローの人間承認表記削除（L4のみ承認必須）、`/ratelimit-set`→MCPツール参照、Discord Bot Token禁止追加、audit log記述追加 |
+| 🟡 MED | 3 | L1ツール一覧を明示、`MCP_AGENT_ID`がaudit logに記録されることを説明、「月間集計には影響しない」削除 |
+| 🟢 LOW | 2 | cross-ref（セクション1-2参照）追加、prompt-v2.mdを汎用的な表現に変更 |
+
+#### 整合性確認
+
+| 文書 | 状態 |
+|---|---|
+| **MASTER_PLAN.md** | ✅ Step I定義とrunbook内容一致 |
+| **ROADMAP.md** | ✅ Phase 4 Step Iタスクと一致 |
+| **AGENTS.md** (MCP禁止事項 §11-5) | ✅ runbook §6 に反映済み |
+| **phase-4-quality-optimization.md** (plan) | ✅ 全完了基準（固定順/Lv区分/停止判断）充足 |
+
+ドリフトなし。
+
+**Git commit hash:** `20ef0e8`
+
+---
+
 ## 14. Step J — 複数Guild optional調査
 
 ### 目的
