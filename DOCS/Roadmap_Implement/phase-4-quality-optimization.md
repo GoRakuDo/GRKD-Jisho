@@ -1105,6 +1105,27 @@ code-reviewer結果:
 Git commit hash: e43e073
 
 Step F 実装ログ
+実施日: 2026-05-06
+変更ファイル:
+  - DOCS/Prompts/prompt-v2.md (新規) — v2 draft、L1負の転移具体例、ロール別説明方針、出力形式、cache invalidation方針、rotate設計
+検証コマンド:
+  - pnpm --filter @grkd-jisho/bot exec tsc --noEmit → 0 errors
+  - pnpm --filter @grkd-jisho/db exec tsc --noEmit → 0 errors
+  - pnpm --filter @grkd-jisho/mcp exec tsc --noEmit → 0 errors
+  - pnpm --filter @grkd-jisho/bot test → 6 files / 39 tests / 0 passed
+code-reviewer結果:
+  - コード変更なし（文書作成のみ）。レビュー不要と判断。
+完了基準:
+  - ✅ DOCS/Prompts/prompt-v2.md を作成 (Section 1-9)
+  - ✅ v1/v2の違いと禁止事項を明文化 (Section 2, 7)
+  - ✅ cache invalidation方針を記述 (Section 8)
+  - ✅ request_prompt_version_rotate は human approval 必須として設計 (Section 9)
+残リスク:
+  - v2プロンプトは実環境でテストしていない。実際のLLM出力品質はPhase 4後半で評価する
+  - v2テンプレートを llm.service.ts に組み込むのは Phase 4 post-Step F に委ねる
+  - A/B test 基盤は Phase 4 対象外（計画通り）
+Git commit hash: まだコミットしていない（次回push時に）
+
 Step G 実装ログ
 Step H 実装ログ
 Step I 実装ログ
