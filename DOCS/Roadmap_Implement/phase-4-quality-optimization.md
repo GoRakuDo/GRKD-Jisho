@@ -1029,6 +1029,19 @@ code-reviewer 判定: ✅ Approve（全修正後）
 - Docker daemon 未起動チェックがない → 両 `install-dev` に `docker info` チェック追加
 - その他は fix 不要（既存設計の範囲内）
 
+#### Post-review: $PSScriptRoot パス簡略化
+
+`Set-Location` でリポジトリルートに移動しているため、相対パスから `$PSScriptRoot` 経由の不要な間接参照を除去:
+
+| ファイル | 変更前 | 変更後 |
+|---|---|---|
+| `install-dev.ps1` | `Join-Path $PSScriptRoot "..\.env"` | `".\env"` |
+| `install-dev.ps1` | `Join-Path $PSScriptRoot "..\docker-compose.yml"` | `"docker-compose.yml"` |
+| `deploy-precheck.ps1` | `Join-Path $PSScriptRoot "..\packages\bot\Dockerfile"` | `"packages/bot/Dockerfile"` |
+| `deploy-precheck.ps1` | `Join-Path $PSScriptRoot "..\packages\web\Dockerfile"` | `"packages/web/Dockerfile"` |
+
+`$PSScriptRoot` は `Set-Location` 行の1箇所のみ残存（正しい使い方）。
+
 #### 安全ルール遵守確認
 
 | ルール | 結果 |
@@ -1049,7 +1062,7 @@ code-reviewer 判定: ✅ Approve（全修正後）
 
 ドリフトなし。
 
-**Git commit hash:** 未コミット（Step H.5完了後に一括push）
+**Git commit hash:** `1923c1a`
 
 ---
 
