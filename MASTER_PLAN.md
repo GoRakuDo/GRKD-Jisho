@@ -1151,10 +1151,124 @@ Level 2 dry-run tools は `MCP_ENABLE_DRY_RUN=true` の時だけ登録する。
 
 ---
 
-## 19. Open Questions (Flag for Later)
+## 19. Pre-Release Plan (v0.1.0 Public Release Criteria)
+
+この章は **Phase 5 ではない**。
+
+Phase 4 完了後、`v0.1.0` を GitHub Release / Docker release として公開する前に満たす公開基準を定義する。
+
+詳細な実行計画は `DOCS/Roadmap_Implement/pre-release-v0.1.0-public-release.md` に置く。
+
+Phase 4 Step J で「Phase 5送り」と決めた複数Guild対応は、別章の **Phase 5 — Deferred Scope (TBA)** に後倒しする。
+Pre-Release では multi-guild を実装しない。公開版が single guild 前提であることを release note に明記する。
+
+### 19-1. 目的
+
+```txt
+Pre-Release = 公開前の最後の品質ゲート
+
+1. Phase 4 Step K の手動検証を完了する
+2. GitHub Release / Docker release として配布できる状態にする
+3. NPM公開するかどうかを判断し、公開する場合だけ package 形を整える
+4. Phase 5（TBA）へ後倒しした項目を release note に明記する
+```
+
+### 19-2. Pre-Release 必須タスク
+
+| Task | 内容 | 完了基準 |
+|---|---|---|
+| R-1 Release verification | Step K の手動検証を実行する。Bot検索、cache hit/miss、manual override、Web OAuth2、CSRF、MCP L1/L2/L3、ops job実行を確認する。詳細項目は `DOCS/Roadmap_Implement/pre-release-v0.1.0-public-release.md` を正とする。 | 手動検証結果を `DOCS/Operations/release-checklist.md` に残す。 |
+| R-2 GitHub / Docker release | `v0.1.0` release note、Docker build、deploy-precheck、env sample を確認する。 | GitHub Release に必要な成果物と手順が揃う。 |
+| R-3 NPM公開判断 | `@grkd-jisho/db` / `@grkd-jisho/mcp` を公開するか判断する。公開する場合だけ `private: false`、`main/types/exports/files`、declaration出力、publishConfigを整える。 | NPM公開する package と公開しない app package の境界が明文化される。公開しない判断も許容する。 |
+| R-4 Security release gate | secret混入、MCP read-only default、Level 4 human approval、wipe safety、manual override保護を再確認する。 | BLOCKER/HIGHなしで code-reviewer 承認。 |
+| R-5 Deferred scope note | Phase 5（TBA）へ後倒しした複数Guild対応などを release note に明記する。 | 公開版が single guild 前提の場合、制限として明記される。 |
+
+### 19-3. NPM公開方針
+
+NPM公開は Pre-Release の判断事項とする。これは「必ずNPM公開する」という意味ではない。
+
+現時点では `packages/bot` と `packages/web` はアプリケーションであり、NPM library として公開しない。配布は Docker / GitHub Release を優先する。
+
+公開候補は以下に限定する。
+
+```txt
+@grkd-jisho/db   — 共有schema / services / importer系 API
+@grkd-jisho/mcp  — MCP server を外部エージェントから使う場合のみ候補
+```
+
+NPM公開すると判断した場合のみ、公開前に以下を満たすこと。
+
+```txt
+- private: false
+- main は dist の JavaScript を指す
+- types は dist の .d.ts を指す
+- exports / files を明示する
+- workspace:* 依存が publish 時に具体versionへ解決されることを pack で確認する
+- npm package に .env / secret / internal-only docs が混入しないことを確認する
+```
+
+### 19-4. Public release gate
+
+`v0.1.0` は以下を満たすまで公開しない。
+
+```txt
+1. Phase 4 Step K の自動検証 + 手動検証が完了
+2. Phase 5（TBA）へ後倒しした項目が release note に明記されている
+3. deploy-precheck が bot/web Docker build を通す
+4. MCP Level 1/2/3 の安全境界が崩れていない
+5. Level 4 dangerous tool は human approval 必須のまま
+6. release note に既知の未検証領域を明記
+7. code-reviewer で BLOCKER/HIGH が0件
+```
+
+### 19-5. Security release gate details
+
+ROADMAP.md の `R-5 Security release gate` と同じ基準を MASTER_PLAN 側にも固定する。
+
+`v0.1.0` 公開前に以下を確認する。
+
+```txt
+1. secret / token / API key / .env がコミット・release artifact・NPM package に混入していない
+2. MCP_READONLY_MODE=true がデフォルトのまま
+3. MCP Level 3 は ops_jobs + mcp_audit_logs 経由で、直接DB変更しない
+4. Level 4 dangerous tool は human approval 必須のまま
+5. channel wipe は wipe_enabled=true のチャンネルのみ、pin保持、24時間範囲、安全権限チェックを維持
+6. response_cache.is_manual_override=true は LLM / refresh / bulk delete で上書き・削除されない
+7. 禁止パターン scan が0件: as any / eslint-disable / Asia/Bangkok / @grkd/ / grkd. / pure black-white
+8. code-reviewer で BLOCKER/HIGH が0件
+```
+
+`Asia/Bangkok` は旧timezone残骸検出用の禁止パターン。GRKD-Jisho の GMT+7 canonical timezone は `Asia/Jakarta` とする。
+
+---
+
+## 20. Phase 5 — Deferred Scope (TBA)
+
+Phase 5 は **TBA** とする。
+
+ここには Phase 4 で「今すぐ実装しない」と判断した中規模以上の改善を置く。`v0.1.0` 公開基準とは別扱いにする。
+
+### 20-1. Phase 5 候補タスク
+
+| Task | 内容 | 根拠 |
+|---|---|---|
+| 5-1 Multi-guild対応 | `DISCORD_GUILD_ID` を後方互換のままカンマ区切り配列として扱う。Bot command登録、Web OAuth2 guild所属確認、MCP stats `guild_id?` filter を対応する。 | Phase 4 Step J `DOCS/Operations/multi-guild-assessment.md` |
+| 5-2 Guild別運用UI | 必要になった場合のみ、Web UI に guild selector / guild別statsを追加する。 | YAGNI。複数guild運用開始後に判断 |
+| 5-3 NPM package公開拡張 | Phase 5 時点で外部利用ニーズがある場合のみ、`@grkd-jisho/db` / `@grkd-jisho/mcp` のNPM公開を進める。 | Pre-Release のNPM判断結果 |
+
+### 20-2. Phase 5 に送る理由
+
+- single guild で `v0.1.0` 公開は可能。
+- multi-guild は env / command登録 / OAuth / MCP stats にまたがる中規模変更。
+- 公開直前に入れるより、公開後の運用データを見てから入れる方が安全。
+- 公開版では single guild 前提を release note に明記すれば、利用者の誤解を避けられる。
+
+---
+
+## 21. Open Questions (Flag for Later)
 
 - [ ] 辞書インポート時に `reading` が空の場合、どう全文検索するか（`pg_trgm` or `tsvector` 検討）
 - [ ] WebUI の認証に Bearer Token か Cookie セッションどちらを使うか
 - [ ] LLM の `prompt_version` を変えたとき、古いキャッシュをどう扱うか（自動無効化 vs 手動 refresh）
 - [ ] `lookup_logs` の 90日パージをどのタイミングで実行するか（pg_cron or Bot の定期タスク）
-- [ ] 将来的に複数 Guild に対応するか（現時点はシングル Guild 前提）
+- [x] 将来的に複数 Guild に対応するか → Phase 4 Step J 調査により、Phase 5 Deferred Scope（TBA）へ後倒し

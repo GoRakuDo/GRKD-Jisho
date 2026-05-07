@@ -14,6 +14,8 @@ Phase 1: MVP — Bot コア機能           ~2週間
 Phase 2: 管理コマンド + Read-only MCP ~1週間
 Phase 3: Web Admin UI + Agent Ops     完了済み
 Phase 4: 品質改善・最適化             ongoing
+Pre-Release Plan: v0.1.0公開基準      Phase 4後
+Phase 5: Deferred Scope               TBA
 ```
 
 ---
@@ -344,9 +346,11 @@ Phase 4: 品質改善・最適化             ongoing
   - `reading` フィールドで検索をフォールバックとして追加
   - 例: 「かれん」で検索 → `term` にない場合 `reading` から「可憐」を見つける
 
-- [ ] **4-7** 複数 Guild 対応（Optional）
-  - `lookup_logs` の `guild_id` を利用した Guild 別統計
-  - Guild 別許可チャンネル設定の DB 管理
+- [x] **4-7** 複数 Guild 対応（Optional調査のみ）
+  - Phase 4 Step J で影響範囲を調査済み
+  - 実装は Phase 5 Deferred Scope（TBA）へ後倒し
+  - この項目では Phase 5 の詳細実装計画を定義しない
+  - `v0.1.0` 公開版の single guild 注意書きは、別セクションの Pre-Release Plan R-4 で扱う
 
 - [ ] **4-8** Limited write MCP tools
   - Phase 3 では `MCP_READONLY_MODE=true` を維持し、Level 2 dry-run は `MCP_ENABLE_DRY_RUN=true` の時だけ有効化する
@@ -364,6 +368,98 @@ Phase 4: 品質改善・最適化             ongoing
 
 ---
 
+## Pre-Release Plan (v0.1.0 Public Release Criteria)
+
+**目的:** Phase 4 で作った本番運用基盤を、`v0.1.0` として公開できる品質まで固める。
+
+詳細な実行計画は `DOCS/Roadmap_Implement/pre-release-v0.1.0-public-release.md` に置く。
+
+これは Phase 5 ではない。Phase 5 は別セクションの Deferred Scope として **TBA** に後倒しする。
+Pre-Release では multi-guild を実装しない。公開版が single guild 前提であることを release note に明記する。
+
+### Scope
+
+- `v0.1.0` GitHub Release / Docker release の公開基準を満たす
+- NPM公開の可否と公開対象 package を決める。NPM公開しない判断も許容する
+- Phase 4 Step K の手動検証を完了する
+- Phase 5（TBA）へ後倒しした項目を release note に明記する
+
+### Tasks
+
+- [ ] **R-1** Release checklist 作成
+  - `DOCS/Operations/release-checklist.md` を作成
+  - Bot login / search / cache / manual override / Web OAuth2 / CSRF / MCP L1-L3 / ops job 実行を記録する
+  - 詳細な手動検証項目は `DOCS/Roadmap_Implement/pre-release-v0.1.0-public-release.md` を正とする
+  - 未検証領域は release note に明記する
+
+- [ ] **R-2** GitHub Release / Docker release 準備
+  - `v0.1.0` release note を作る
+  - bot/web Docker build と `scripts/deploy-precheck.*` を通す
+  - `.env.example` が公開版の single guild 前提を明記していることを確認する
+
+- [ ] **R-3** NPM公開判断
+  - 現状のデフォルトは GitHub Release / Docker 優先
+  - NPM公開候補は `@grkd-jisho/db` と `@grkd-jisho/mcp` に限定
+  - 公開する場合だけ `private: false`、`main/types/exports/files`、declaration出力、publishConfig、pack内容確認を完了する
+  - NPM公開しない場合は、その判断理由を release note または release checklist に残す
+  - `packages/bot` と `packages/web` は app package として扱い、原則NPM公開しない
+
+- [ ] **R-4** Deferred scope note
+  - Phase 5（TBA）へ後倒しした複数Guild対応を release note に明記する
+  - 公開版が single guild 前提である場合、運用制限として明記する
+
+- [ ] **R-5** Security release gate
+  - secret混入がないことを確認する
+  - MCP read-only default が維持されていることを確認する
+  - Level 4 dangerous tool が human approval 必須のままであることを確認する
+  - wipe safety と manual override 保護が崩れていないことを確認する
+  - 禁止パターン scan が0件であることを確認する: `as any`, `eslint-disable`, `Asia/Bangkok`, `@grkd/`, `grkd.`, pure black-white
+  - `Asia/Bangkok` は旧timezone残骸検出用。canonical timezone は `Asia/Jakarta`
+
+### 完了基準
+
+`v0.1.0` 公開前に以下を満たすこと。
+
+```txt
+1. Phase 4 Step K の自動検証と手動検証が完了
+2. Phase 5（TBA）へ後倒しした項目が release note に明記済み
+3. Web OAuth2 / CSRF / response編集履歴 / ops job approve-reject が手動確認済み
+4. MCP Level 1/2/3 の安全境界が維持されている
+5. Level 4 dangerous tool は human approval 必須のまま
+6. Docker release 手順が deploy-precheck で確認済み
+7. NPM公開する/しないの判断が文書化済み
+8. code-reviewer で BLOCKER/HIGH が0件
+```
+
+---
+
+## Phase 5 — Deferred Scope (TBA)
+
+**目的:** Phase 4 で調査済みだが、`v0.1.0` 公開前に無理に入れない中規模改善を扱う。
+
+Phase 5 の日程は **TBA**。
+
+### Tasks
+
+- [ ] **5-1** Multi-guild対応を後方互換で実装
+  - `DISCORD_GUILD_ID` は env key 名を維持したまま、カンマ区切り配列として解釈できるようにする
+  - 既存の `DISCORD_GUILD_ID=guild_1` はそのまま動くこと
+  - `register-commands.ts` は全 guild に Slash Command を登録する
+
+- [ ] **5-2** Web OAuth2 の複数Guild所属確認
+  - `DISCORD_GUILD_ID` 配列を順に確認する
+  - ユーザーが所属し、管理権限を持つ guild を session に保存する
+  - 将来の guild selector UI は必要になるまで入れない（YAGNI）
+
+- [ ] **5-3** MCP stats tools の guild filter
+  - `grkd-jisho.recent_errors` に `guild_id?` を追加
+  - `grkd-jisho.lookup_stats` に `guild_id?` を追加
+  - `grkd-jisho.rate_limit_status` に `guild_id?` を追加。ただし `role_rate_limits` は現状グローバル設定として扱う
+  - `grkd-jisho.wipe_status` に `guild_id?` を追加
+  - 未指定時は従来どおり全 guild 集計にして後方互換を保つ
+
+---
+
 ## Milestone Summary
 
 | Milestone | Target | Deliverable |
@@ -373,6 +469,8 @@ Phase 4: 品質改善・最適化             ongoing
 | M2 | Week 4 | 管理 Slash Command + Read-only MCP 完動 |
 | M3 | Week 6 | Web Admin UI + Agent Ops 承認画面 公開済み |
 | M4 | Ongoing | 本番デプロイ + AI Agent 自律監視 + 継続改善 |
+| MR | Phase 4後 | Pre-Release Plan (`v0.1.0` Public Release Criteria) |
+| M5 | TBA | Deferred Scope: multi-guild completion and future improvements |
 
 ---
 
