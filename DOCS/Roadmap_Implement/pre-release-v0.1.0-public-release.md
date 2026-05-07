@@ -482,7 +482,7 @@ Commit: `3fcd82a`
 | Wipe safety | pass | `wipe-now.command.ts:55,59,73` + `channel-wipe.service.ts:59` |
 | Manual override 保護 | pass | `ops-job.service.ts:183` / `cache-admin.ts:76` / `response-cache.service.ts:19` |
 | Pattern scan | pass | as any/eslint-disable/Asia/Bangkok/@grkd/ 全 0 件（コードファイル限定） |
-| code-reviewer | 本節記述後実行 | - |
+| code-reviewer | pass | Approve。LOW 2件 fix済み。BLOCKER/HIGH 0 |
 
 更新ファイル:
 
