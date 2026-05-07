@@ -48,18 +48,7 @@ Docker build と Windows deploy-precheck は通ったが、手動検証とNPM公
 
 `v0.1.0` は single guild 前提。
 
-multi-guild は Phase 5 Deferred Scope (TBA) に送る。
-
-理由は、multi-guild が以下にまたがる中規模変更だから。
-
-```txt
-- env parsing
-- Slash Command registration
-- Web OAuth2 guild membership check
-- MCP stats guild filter
-```
-
-公開直前に入れるより、`v0.1.0` 公開後の運用データを見てから進める。
+multi-guild 対応を含む後倒し項目の一覧は、下記「Deferred scope」節を参照。
 
 ### NPM publish
 
@@ -74,6 +63,19 @@ multi-guild は Phase 5 Deferred Scope (TBA) に送る。
 ```
 
 `packages/bot` と `packages/web` はアプリケーションであり、原則NPM公開しない。
+
+NPM package 公開拡張を含む後倒し項目の一覧は、下記「Deferred scope」節を参照。
+
+### Deferred scope
+
+v0.1.0 で意図的に実装を見送った項目。
+
+| 項目 | 扱い |
+|---|---|
+| multi-guild 対応 | Phase 5 Deferred Scope (TBA) |
+| Guild selector UI | multi-guild 実装後に必要なら検討 |
+| NPM package 公開拡張 | 標準経路は GitHub Release + Docker。公開ニーズが生じた場合に v0.2.0 以降で再検討 |
+| 複数辞書定義マージ | MVP方針（最初に見つかった1件のみ使用）に反するため、Phase 5 以降で再検討 |
 
 ---
 
@@ -104,7 +106,7 @@ multi-guild は Phase 5 Deferred Scope (TBA) に送る。
 - BigInt/String conversion in some Drizzle bigserial flows remains lightly tested
 - Discord interaction deferUpdate/editReply flow is not runtime-tested
 - Yomitan import still needs a real dictionary zip fixture
-- NPM packaging is not ready unless R-3 decides to prepare db/mcp packages
+- NPM packaging 準備状況は Deferred scope 節「NPM package 公開拡張」を参照
 ```
 
 ---

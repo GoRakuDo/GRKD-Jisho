@@ -437,3 +437,23 @@ DOCS/Operations/release-notes-v0.1.0.md
 - release-checklist.md: NPM公開判断 → pass (A. 公開しない)
 - release-notes-v0.1.0.md: 判断理由を追記、条件4をdoneに更新
 ```
+
+### 12-5. R-4 Deferred scope note
+
+**Status:** Completed
+
+実施内容:
+
+```txt
+- release-notes-v0.1.0.md に「Deferred scope」節を追加
+- release-checklist.md の必須記載リストに後倒し項目を追加
+```
+
+追加した後倒し項目（release-notes-v0.1.0.md より）:
+
+| 項目 | 扱い |
+|---|---|
+| multi-guild 対応 | Phase 5 Deferred Scope (TBA) |
+| Guild selector UI | multi-guild 実装後に必要なら検討 |
+| NPM package 公開拡張 | 標準経路は GitHub Release + Docker。公開ニーズが生じた場合に v0.2.0 以降で再検討 |
+| 複数辞書定義マージ | MVP方針に反するため、Phase 5 以降で再検討 |

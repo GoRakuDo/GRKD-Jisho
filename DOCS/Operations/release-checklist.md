@@ -112,6 +112,7 @@ not tested = 未確認。release note に既知の未検証領域として残す
 ```txt
 - v0.1.0 は single guild 前提
 - multi-guild は Phase 5 Deferred Scope (TBA)
+- 後倒し項目: Guild selector UI（multi-guild後）、複数辞書定義マージ（Phase 5+）
 - NPM公開判断: A. 公開しない（判断記録済み）
 - 未検証領域: 本ドキュメント「5. 手動検証」節を参照（全項目 not tested）
 - 既知リスク: DOCS/Operations/release-notes-v0.1.0.md「Known risks」節を参照
