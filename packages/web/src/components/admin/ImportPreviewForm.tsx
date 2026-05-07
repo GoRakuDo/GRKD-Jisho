@@ -40,7 +40,7 @@ export default function ImportPreviewForm() {
     }
   };
 
-  const handlePreview = async (e: React.FormEvent) => {
+  const handlePreview = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!file) {
       setError('Please select a file first.');

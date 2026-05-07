@@ -9,7 +9,7 @@ export type TraceSearchProps = {
 export const TraceSearch = ({ initialValue = '' }: TraceSearchProps) => {
   const [value, setValue] = useState(initialValue);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (value.trim()) {
       window.location.href = `/admin/traces?traceId=${encodeURIComponent(value.trim())}`;
