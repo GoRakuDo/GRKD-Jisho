@@ -466,3 +466,28 @@ code-reviewer 指摘対応:
 ```
 
 Commit: `3fcd82a`
+
+### 12-6. R-5 Security release gate
+
+**Status:** Completed — pass / 全8項目検証済み
+
+検証結果:
+
+| チェック項目 | 結果 | 根拠ファイル:L行 |
+|---|---|---|
+| secret混入防止 | pass | `.dockerignore` / `.gitignore` |
+| MCP default read-only | pass | `packages/mcp/src/config/env.ts:6` — default("true") |
+| MCP Level 3 全経路 audit | pass | `write-request-tools.ts:68,100,132,160` — 全4ツール createOpsJobWithAudit |
+| MCP Level 4 human approval | pass | 未実装。設計原則として `AGENTS.md 11-3` に規定済み |
+| Wipe safety | pass | `wipe-now.command.ts:55,59,73` + `channel-wipe.service.ts:59` |
+| Manual override 保護 | pass | `ops-job.service.ts:183` / `cache-admin.ts:76` / `response-cache.service.ts:19` |
+| Pattern scan | pass | as any/eslint-disable/Asia/Bangkok/#000000/#ffffff 全 0 件 |
+| code-reviewer | 本節記述後実行 | - |
+
+更新ファイル:
+
+```txt
+DOCS/Operations/release-checklist.md: R-5 節追加、Sign-off 更新
+```
+
+Commit: `（R-5 コミット後確定）`
