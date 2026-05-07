@@ -1,6 +1,6 @@
 # GRKD-Jisho v0.1.0 Release Notes (Draft)
 
-> **Status:** Draft / NOT READY  
+> **Status:** Pre-Release Published  
 > **Release type:** GitHub Release + Docker  
 > **NPM publish:** TBD  
 > **Scope:** single guild only  

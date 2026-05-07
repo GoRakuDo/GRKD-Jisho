@@ -42,7 +42,7 @@ not tested = 未確認。release note に既知の未検証領域として残す
 |---|---|
 | Date | 2026-05-07 |
 | Reviewer | AI-assisted local verification |
-| Commit SHA | `87f5920` + R-2 working tree changes |
+| Commit SHA | `823beda` (v0.1.0 tag) |
 | Node.js | `v24.15.0` local. Docker builds use `node:20-alpine` and passed in R-2 |
 | pnpm | `10.33.0` |
 | PostgreSQL | PostgreSQL 16 |
@@ -112,9 +112,9 @@ not tested = 未確認。release note に既知の未検証領域として残す
 ```txt
 - v0.1.0 は single guild 前提
 - multi-guild は Phase 5 Deferred Scope (TBA)
-- NPM公開判断: TBD
-- 未検証領域: TBD
-- 既知リスク: TBD
+- NPM公開判断: A. 公開しない（判断記録済み）
+- 未検証領域: 本ドキュメント「5. 手動検証」節を参照（全項目 not tested）
+- 既知リスク: DOCS/Operations/release-notes-v0.1.0.md「Known risks」節を参照
 - Docker / deploy 手順: DOCS/Operations/deploy.md
 - Agent runbook: DOCS/Operations/agent-runbook.md
 ```
