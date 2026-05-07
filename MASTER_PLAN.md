@@ -1234,7 +1234,7 @@ ROADMAP.md の `R-5 Security release gate` と同じ基準を MASTER_PLAN 側に
 4. Level 4 dangerous tool は human approval 必須のまま
 5. channel wipe は wipe_enabled=true のチャンネルのみ、pin保持、24時間範囲、安全権限チェックを維持
 6. response_cache.is_manual_override=true は LLM / refresh / bulk delete で上書き・削除されない
-7. 禁止パターン scan が0件: as any / eslint-disable / Asia/Bangkok / @grkd/ / grkd. / pure black-white
+7. 禁止パターン scan が0件: as any / eslint-disable / Asia/Bangkok / @grkd/ / grkd. / pure black/white
 8. code-reviewer で BLOCKER/HIGH が0件
 ```
 

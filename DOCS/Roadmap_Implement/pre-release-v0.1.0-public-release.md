@@ -288,11 +288,52 @@ GRKD-Jisho の GMT+7 canonical timezone は `Asia/Jakarta` とする。
 理由:
 
 ```txt
-- Step K の自動検証は実施済みだが、手動検証が未完了
-- release-checklist.md が未作成
+- release-checklist.md は作成済みだが、各検証は not tested のまま
+- Step K の自動検証は Pre-Release sign-off 前に再実行が必要
+- 手動検証が未完了
 - release note が未作成
 - NPM公開判断が未記録
 - security release gate の最終確認が未完了
 ```
 
-したがって、次の作業は **R-1 Release checklist 作成** とする。
+したがって、次の作業は **R-1 checklist の実検証記入** または **R-2 GitHub / Docker release 準備** とする。
+
+---
+
+## 12. 実装ログ
+
+### 12-1. R-1 Release checklist 作成
+
+**Status:** Completed as checklist skeleton / verification not executed
+
+作成ファイル:
+
+```txt
+DOCS/Operations/release-checklist.md
+```
+
+内容:
+
+```txt
+- 自動検証チェック表
+- 手動検証チェック表
+- Security release gate
+- Release note 必須記載
+- NPM公開判断欄
+- Sign-off 判定欄
+```
+
+判断:
+
+```txt
+現時点では NOT READY。
+理由は、チェックリストは作成済みだが、実検証はまだ not tested のままだから。
+```
+
+次の作業:
+
+```txt
+1. Step K 自動検証を再実行して checklist に記録
+2. Bot / Web / MCP の手動検証を実施
+3. R-2 GitHub / Docker release 準備へ進む
+```
