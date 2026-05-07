@@ -1035,7 +1035,7 @@ code-reviewer 判定: ✅ Approve（全修正後）
 
 | ファイル | 変更前 | 変更後 |
 |---|---|---|
-| `install-dev.ps1` | `Join-Path $PSScriptRoot "..\.env"` | `".\env"` |
+| `install-dev.ps1` | `Join-Path $PSScriptRoot "..\.env"` | `".\.env"` |
 | `install-dev.ps1` | `Join-Path $PSScriptRoot "..\docker-compose.yml"` | `"docker-compose.yml"` |
 | `deploy-precheck.ps1` | `Join-Path $PSScriptRoot "..\packages\bot\Dockerfile"` | `"packages/bot/Dockerfile"` |
 | `deploy-precheck.ps1` | `Join-Path $PSScriptRoot "..\packages\web\Dockerfile"` | `"packages/web/Dockerfile"` |

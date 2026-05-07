@@ -362,3 +362,52 @@ code-reviewer: pass / BLOCKER 0, HIGH 0, MED 0, LOW 0
 ローカル実行環境は Node.js v24.15.0。
 プロジェクト標準は Node.js 20 LTS のため、Node 20 / Docker 環境での最終確認は R-2 で行う。
 ```
+
+### 12-3. R-2 GitHub / Docker release 準備
+
+**Status:** Partial pass / release still NOT READY
+
+作成ファイル:
+
+```txt
+DOCS/Operations/release-notes-v0.1.0.md
+```
+
+修正ファイル:
+
+```txt
+.env.example
+DOCS/Operations/deploy.md
+scripts/deploy-precheck.ps1
+scripts/deploy-precheck.sh
+scripts/install-dev.ps1
+DOCS/Operations/release-checklist.md
+```
+
+修正内容:
+
+```txt
+- .env.example に v0.1.0 は single guild 前提と明記
+- deploy.md の Bot権限一覧を bulkDelete方式に合わせ、clone方式時代の Manage Channels 権限を削除
+- deploy-precheck.ps1 の .env / .env.example パスを .\.env / .\.env.example に修正
+- deploy-precheck.sh が missing env で `set -e` 終了しないよう `|| true` guard を追加
+- install-dev.ps1 の .env / .env.example パスを .\.env / .\.env.example に修正
+- v0.1.0 release note draft を作成
+```
+
+実行結果:
+
+```txt
+bot Docker build: pass
+web Docker build: pass
+Windows deploy-precheck.ps1: pass / exit 0 / warnings 6
+code-reviewer: pass / BLOCKER 0, HIGH 0, MED 0, LOW 0
+```
+
+注意:
+
+```txt
+deploy-precheck の警告6件は、local .env の Discord/LLM 値が空であることと MCP_READONLY_MODE 未設定によるもの。
+これは本番secretをgitに置かないためのローカル状態であり、release前に外部secretで設定する。
+Linux/macOS deploy-precheck は未実行。
+```

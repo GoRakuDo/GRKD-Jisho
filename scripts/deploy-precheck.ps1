@@ -54,7 +54,7 @@ $requiredVars = @(
     "DATABASE_URL",
     "GEMINI_API_KEY"
 )
-$envPath = ".\env"
+$envPath = ".\.env"
 if (Test-Path $envPath) {
     Write-Pass ".env ファイルが存在します"
     $envContent = Get-Content $envPath
@@ -86,7 +86,7 @@ if (Test-Path $envPath) {
 }
 
 Write-Step ".env.example との比較"
-$envExamplePath = ".\env.example"
+$envExamplePath = ".\.env.example"
 if ((Test-Path $envPath) -and (Test-Path $envExamplePath)) {
     $exampleKeys = (Get-Content $envExamplePath) | Where-Object { $_ -match '^[A-Z_]+\=' } |
         ForEach-Object { ($_ -split '=')[0] }

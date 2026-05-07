@@ -39,7 +39,7 @@ REQUIRED_VARS=(
 if [ -f .env ]; then
     ok ".env ファイルが存在します"
     for var in "${REQUIRED_VARS[@]}"; do
-        val=$(grep -E "^${var}=" .env | head -1 | sed "s/^${var}=//")
+        val=$(grep -E "^${var}=" .env | head -1 | sed "s/^${var}=//" || true)
         if [ -z "$val" ]; then
             warn "$var が空か見つかりません"
         else
@@ -48,8 +48,8 @@ if [ -f .env ]; then
     done
 
     # Production DB detection
-    db_url=$(grep -E "^DATABASE_URL=" .env | head -1 | sed 's/^DATABASE_URL=//')
-    if echo "$db_url" | grep -qvE 'localhost|127\.0\.0\.1'; then
+    db_url=$(grep -E "^DATABASE_URL=" .env | head -1 | sed 's/^DATABASE_URL=//' || true)
+    if [ -n "$db_url" ] && echo "$db_url" | grep -qvE 'localhost|127\.0\.0\.1'; then
         warn "本番 DATABASE_URL を検出しました。migration は手動で実行してください。"
     fi
 else

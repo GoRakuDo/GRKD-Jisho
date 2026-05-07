@@ -190,7 +190,6 @@ Bot invite URL 生成時:
   - `Send Messages`
   - `Read Message History`
   - `Manage Messages`（wipe機能に必須）
-  - `Manage Channels`（wipe機能--clone方式に必須）
   - `Use Slash Commands`
 
 ---
