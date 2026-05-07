@@ -3,6 +3,7 @@ import { getIsAuthenticated } from "../../../../lib/locals";
 import { getSession } from "../../../../lib/session";
 import { validateCsrfRequest } from "../../../../lib/csrf";
 import AdmZip from "adm-zip";
+import path from "node:path";
 
 interface IndexJson {
   title: string;
@@ -45,7 +46,7 @@ export const POST: APIRoute = async (context) => {
       });
     }
 
-    // 安全制約: サイズ上限 50MB
+    // 安全制約: サイズ上限 50MB (compressed)
     const MAX_SIZE = 50 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
       return new Response(JSON.stringify({ error: "File too large (max 50MB)" }), {
@@ -57,14 +58,45 @@ export const POST: APIRoute = async (context) => {
     const buffer = Buffer.from(await file.arrayBuffer());
     const zip = new AdmZip(buffer);
 
-    // path traversal 拒否
+    // 安全制約: path traversal / absolute path / decompression bomb をまとめてチェック
+    const MAX_UNCOMPRESSED_PER_ENTRY = 100 * 1024 * 1024; // 100MB per entry
+    let totalUncompressed = 0;
     const zipEntries = zip.getEntries();
     for (const entry of zipEntries) {
-      if (entry.entryName.includes("..")) {
-        return new Response(
-          JSON.stringify({ error: `Path traversal detected in entry: ${entry.entryName}` }),
-          { status: 400, headers: { "Content-Type": "application/json" } },
-        );
+      const name = entry.entryName;
+
+      // path traversal (..) 拒否
+      if (name.includes("..")) {
+        return new Response(JSON.stringify({ error: "Path traversal detected" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // 絶対パス拒否
+      if (path.win32.isAbsolute(name) || path.posix.isAbsolute(name) || name.startsWith("/") || name.startsWith("\\")) {
+        return new Response(JSON.stringify({ error: "Absolute path detected" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      // 解凍後サイズ上限チェック (zip bomb / decompression bomb 対策)
+      const uncompressedSize = entry.header.size;
+      if (uncompressedSize > MAX_UNCOMPRESSED_PER_ENTRY) {
+        return new Response(JSON.stringify({ error: "Entry too large (max 100MB uncompressed)" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      totalUncompressed += uncompressedSize;
+
+      // 500MB total uncompressed limit
+      if (totalUncompressed > 500 * 1024 * 1024) {
+        return new Response(JSON.stringify({ error: "Total uncompressed data exceeds 500MB limit" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
       }
     }
 

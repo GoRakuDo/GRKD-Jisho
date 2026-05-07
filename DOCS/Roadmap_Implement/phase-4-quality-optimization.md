@@ -1194,6 +1194,27 @@ Git commit hash: d483527
 - adm-zip 依存追加済み。大きなzip（50MB超）は一貫して拒否
 
 **Git commit hash:** 6522c2a
+
+### 🔍 Step G Code Review Findings & Fixes
+reviewed: 2026-05-07 | Verdict: ✅ Approve (after fixes)
+
+| Severity | Finding | File | Fix |
+|---|---|---|---|
+| 🔴 BLOCKER | CSRF token のfetch先が間違い (`/api/admin/csrf-token` → `/api/auth/csrf-token`) | ResponseDetailPanel.tsx:29, ImportPreviewForm.tsx:22 | 両方のfetch URLを修正 |
+| 🔴 BLOCKER | PUT response.ok をチェックしていない。保存失敗時にユーザーに気付かれない | ResponseDetailPanel.tsx:42-60 | `saveError` state追加、非OK時にエラー表示＋編集モード維持 |
+| 🟠 HIGH | Path traversalが `..` のみで絶対パスを検出できない | import-preview.ts:63 | `path.win32.isAbsolute()` + `path.posix.isAbsolute()` + `/` / `\\` 先頭チェック追加 |
+| 🟠 HIGH | Zip bomb対策なし。圧縮50MB制限のみで解凍後サイズ未チェック | import-preview.ts:80,96 | `entry.header.size` (uncompressed) 上限100MB/entry + total 500MB チェック追加 |
+| 🟠 HIGH | Path traversalエラーでentry名を返し情報漏洩 | import-preview.ts:65 | エラーメッセージを `"Path traversal detected"` に変更（entry名除去） |
+| 🟡 MED | getResponseDetail() 内の BigInt変換が重複して見える | response-admin.ts:97 | 設計意図を説明するコメント追加（Promise.all共用のため独立変換） |
+| 🟡 MED | ResponseDetailData が SearchResult の手動再定義リスク | [id].astro:11 | シリアライズ型であることの設計意図コメント追加 |
+
+**検証（fix後）:**
+- `astro check`: 0 errors, 0 warnings
+- `bot tsc --noEmit`: 0 errors  
+- `bot vitest run`: 39 passed
+- `db tsc --noEmit`: 0 errors
+
+**Fix commit hash:** 未コミット（Step H完了後に一括push予定）
 Step I 実装ログ
 Step J 調査ログ
 Step K 最終検証ログ

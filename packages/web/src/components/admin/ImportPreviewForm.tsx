@@ -19,7 +19,7 @@ export default function ImportPreviewForm() {
   const [preview, setPreview] = useState<PreviewData | null>(null);
 
   useEffect(() => {
-    fetch('/api/admin/csrf-token')
+    fetch('/api/auth/csrf-token')
       .then(res => res.json())
       .then(data => {
         if (data && data.token) {

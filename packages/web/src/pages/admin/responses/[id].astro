@@ -8,6 +8,10 @@ import ResponseEditTimeline from "../../../components/admin/ResponseEditTimeline
 const session = getSession(Astro);
 const { id } = Astro.params;
 
+// ResponseDetailData は getResponseDetail() の戻り値型から bigint→string、
+// Date→string に変換した SSR→React 用のシリアライズ型。
+// SearchResult/ResponseDetailResult とは Date/bigint の有無で型が異なるため、
+// 自動継承ではなく明示的に定義している。
 interface ResponseDetailData {
   id: string;
   query: string;

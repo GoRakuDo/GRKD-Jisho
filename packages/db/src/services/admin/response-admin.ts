@@ -95,6 +95,9 @@ export async function getResponseDetail(
   if (!base) return null;
 
   const numericId = BigInt(id);
+  // getResponseById 内で BigInt 変換済みの base が返っているが、edits と source の
+  // クエリで再変換が必要なため、ここで独立して BigInt(id) を実行する。
+  // numericId は Promise.all の両方の分岐で参照するため、1回の変換で共用している。
   const [edits, source] = await Promise.all([
     db
       .select()

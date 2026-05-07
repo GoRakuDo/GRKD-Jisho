@@ -23,10 +23,11 @@ export default function ResponseDetailPanel({
   const [text, setText] = useState(initialText);
   const [editedText, setEditedText] = useState(initialText);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [csrfToken, setCsrfToken] = useState('');
 
   useEffect(() => {
-    fetch('/api/admin/csrf-token')
+    fetch('/api/auth/csrf-token')
       .then(res => res.json())
       .then(data => {
         if (data && data.token) setCsrfToken(data.token);
@@ -41,8 +42,9 @@ export default function ResponseDetailPanel({
 
   const handleSave = async () => {
     setIsSaving(true);
+    setSaveError(null);
     try {
-      await fetch('/api/admin/responses', {
+      const res = await fetch('/api/admin/responses', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -50,10 +52,15 @@ export default function ResponseDetailPanel({
         },
         body: JSON.stringify({ id, responseText: editedText }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setSaveError(err.error ?? `Save failed (${res.status})`);
+        return;
+      }
       setText(editedText);
       setIsEditing(false);
     } catch (error) {
-      // Intentionally ignored as per requirements
+      setSaveError('Network error');
     } finally {
       setIsSaving(false);
     }
@@ -190,6 +197,19 @@ export default function ResponseDetailPanel({
                 boxSizing: 'border-box',
               }}
             />
+            {saveError && (
+              <div style={{
+                padding: '8px 12px',
+                backgroundColor: 'var(--color-porcelain-50)',
+                border: '1px solid oklch(0.8 0.1 25)',
+                borderLeft: '4px solid oklch(0.6 0.2 25)',
+                borderRadius: 'var(--radius-card)',
+                color: 'oklch(0.4 0.15 25)',
+                fontSize: '0.8rem',
+              }}>
+                {saveError}
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button
                 onClick={handleCancel}
