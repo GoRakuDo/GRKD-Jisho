@@ -20,6 +20,9 @@ const envSchema = z.object({
   // Prompt
   PROMPT_VERSION: z.string().default("v1"),
 
+  // Ops
+  CACHE_REFRESH_MAX_ROWS: z.coerce.number().int().min(0).max(10000).default(100),
+
   // Web UI Auth (optional at bot startup)
   DISCORD_CLIENT_SECRET: z.string().optional(),
   SESSION_SECRET: z.string().optional(),
