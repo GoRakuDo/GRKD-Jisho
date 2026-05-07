@@ -203,7 +203,7 @@ async function main(): Promise<void> {
   if (!env.enableDryRun) {
     throw new Error("MCP_ENABLE_DRY_RUN must be true when MCP_READONLY_MODE=false");
   }
-  // dry-run tools are already registered above via env.enableDryRun guard
+  registerLevel2Tools();
 
   if (env.enableLimitedWrite) {
     registerLevel3Tools();
