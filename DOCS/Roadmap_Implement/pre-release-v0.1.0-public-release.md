@@ -288,8 +288,9 @@ GRKD-Jisho の GMT+7 canonical timezone は `Asia/Jakarta` とする。
 理由:
 
 ```txt
-- release-checklist.md は作成済みだが、各検証は not tested のまま
-- Step K の自動検証は Pre-Release sign-off 前に再実行が必要
+- release-checklist.md は作成済み
+- 主要自動検証は pass: db/bot/mcp typecheck、web typecheck/build、bot tests、pattern scan
+- Docker build / deploy-precheck は not tested のまま
 - 手動検証が未完了
 - release note が未作成
 - NPM公開判断が未記録
@@ -304,7 +305,7 @@ GRKD-Jisho の GMT+7 canonical timezone は `Asia/Jakarta` とする。
 
 ### 12-1. R-1 Release checklist 作成
 
-**Status:** Completed as checklist skeleton / verification not executed
+**Status:** Completed as checklist skeleton / automatic verification partially recorded / manual verification not executed
 
 作成ファイル:
 
@@ -327,13 +328,37 @@ DOCS/Operations/release-checklist.md
 
 ```txt
 現時点では NOT READY。
-理由は、チェックリストは作成済みだが、実検証はまだ not tested のままだから。
+理由は、主要自動検証は pass になったが、手動検証・Docker build・deploy-precheck がまだ not tested のままだから。
 ```
 
 次の作業:
 
 ```txt
-1. Step K 自動検証を再実行して checklist に記録
-2. Bot / Web / MCP の手動検証を実施
-3. R-2 GitHub / Docker release 準備へ進む
+1. Bot / Web / MCP の手動検証を実施
+2. R-2 GitHub / Docker release 準備へ進む
+3. Node 20 LTS / Docker 環境でも確認する
+```
+
+### 12-2. R-1 自動検証記録
+
+**Status:** Partial pass / manual verification not executed
+
+実行結果:
+
+```txt
+DB typecheck: pass / 0 errors
+Bot typecheck: pass / 0 errors
+MCP typecheck: pass / 0 errors
+Web typecheck: pass / 0 errors, 0 warnings, 0 hints
+Web build: pass
+Bot tests: pass / 6 files, 39 tests
+Pattern scan: pass / as any, eslint-disable, Asia/Bangkok, @grkd/, grkd., pure black/white all 0 in code/config files
+code-reviewer: pass / BLOCKER 0, HIGH 0, MED 0, LOW 0
+```
+
+注意:
+
+```txt
+ローカル実行環境は Node.js v24.15.0。
+プロジェクト標準は Node.js 20 LTS のため、Node 20 / Docker 環境での最終確認は R-2 で行う。
 ```
