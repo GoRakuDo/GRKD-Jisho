@@ -2,9 +2,11 @@
   "name": "@grkd-jisho/db",
   "version": "0.0.1",
   "private": true,
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
   "type": "module",
   "scripts": {
+    "build": "tsc",
     "generate": "dotenv -e ../../.env -- drizzle-kit generate",
     "migrate": "dotenv -e ../../.env -- drizzle-kit migrate",
     "import-yomitan": "dotenv -e ../../.env -- tsx scripts/import-yomitan.ts",

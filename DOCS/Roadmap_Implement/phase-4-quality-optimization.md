@@ -805,6 +805,70 @@ LOG_RETENTION_DAYS=90
 
 ---
 
+### Step H 実装ログ
+
+実施日: 2026-05-07 | 状態: ✅ 完了
+
+#### H-1 Root .dockerignore
+- `.dockerignore` 作成（node_modules, .git, .env, dist, *.md を除外）
+- ファイル: `.dockerignore`
+
+#### H-2 Bot Dockerfile (multi-stage)
+- builder stage: pnpm install → db build → bot build
+- runtime stage: node:20-alpine, non-root appuser, CMD `node packages/bot/dist/index.js`
+- ファイル: `packages/bot/Dockerfile`
+- 検証: `docker build -f packages/bot/Dockerfile -t grkd-jisho-bot:test .` → ✅ 成功 (0 errors)
+
+#### H-3 Web Dockerfile (multi-stage)
+- builder stage: pnpm install → db build → astro build
+- runtime stage: node:20-alpine, non-root appuser, CMD `node packages/web/dist/server/entry.mjs`
+- ファイル: `packages/web/Dockerfile`
+- 検証: `docker build -f packages/web/Dockerfile -t grkd-jisho-web:test .` → ✅ 成功 (0 errors)
+
+#### H-4 .env.example 整備
+- `MCP_AGENT_ID` 追加（audit log 記録用）
+- `CACHE_REFRESH_MAX_ROWS` / `MCP_MAX_CACHE_REFRESH_ROWS` の重複を整理（両方維持、用途をコメントで明確化）
+- `LOG_RETENTION_DAYS` に clamp範囲 (30-365) をコメント追記
+- 各セクションを見出しコメントで整理
+- 検証: bot env.ts / web env.ts / mcp env.ts と一致確認 ✅
+
+#### H-5 DOCS/Operations/deploy.md
+- アーキテクチャ概要図（ASCII）
+- ローカル開発（Docker Compose）手順
+- Railway / Fly.io デプロイ手順
+- DB migration / rollback 手順
+- Bot Token / OAuth2 設定手順
+- Wipe 運用ガイド
+- MCP Control Plane 接続設定
+- トラブルシューティング
+- ファイル: `DOCS/Operations/deploy.md`
+
+#### Side effect: db package.json `main` 変更
+- `main`: `./src/index.ts` → `./dist/index.js`（Docker runtime で .ts が読めない問題の修正）
+- `types`: `./src/index.ts` を追加
+- `build` script 追加
+- 影響確認: bot tsc / web astro build / mcp tsc 全パス ✅
+
+#### 完了基準チェック
+| 基準 | 結果 |
+|------|------|
+| bot Docker build が通る | ✅ `grkd-jisho-bot:test` build success |
+| web Docker build が通る | ✅ `grkd-jisho-web:test` build success |
+| `.env.example` が実装envと一致 | ✅ bot/web/mcp env.ts と整合確認 |
+| deploy手順書がある | ✅ `DOCS/Operations/deploy.md` |
+
+#### 検証
+- `db tsc --noEmit`: 0 errors ✅
+- `bot tsc --noEmit`: 0 errors ✅
+- `mcp tsc --noEmit`: 0 errors ✅
+- `web astro check`: 0 errors / 0 warnings / 0 hints ✅
+- `bot vitest run`: 39 passed ✅
+- Docker build: bot/web both success ✅
+
+**Git commit hash:** 未コミット（Step H完了後に一括push）
+
+---
+
 ## 13. Step I — Agent runbook / 自律監視
 
 ### 目的
