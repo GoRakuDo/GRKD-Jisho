@@ -1083,6 +1083,27 @@ Git commit hash:
 > **修正経緯:** git reset --hard origin/main 後に修正を再適用した際、registerLevel2Tools() の定義は追加したが main() からの呼び出しを忘れていた。aad3df7（reset前のamend）では正しく呼ばれていたため、reset+reapply の過程で欠落した reggression。現コードは aad3df7 と同じ状態に復元済み。
 
 Step E 実装ログ
+実施日: 2026-05-06
+変更ファイル:
+  - packages/bot/src/services/ops-job.service.ts (書き換え) — 4 job type 実処理化
+  - packages/bot/src/config/env.ts (修正) — CACHE_REFRESH_MAX_ROWS 追加 (min 0)
+  - .env.example (修正) — CACHE_REFRESH_MAX_ROWS=100 追記
+検証コマンド:
+  - pnpm --filter @grkd-jisho/bot exec tsc --noEmit → 0 errors
+  - pnpm --filter @grkd-jisho/db exec tsc --noEmit → 0 errors
+  - pnpm --filter @grkd-jisho/bot test → 6 files / 39 tests / 0 passed
+code-reviewer結果:
+  - 🔴 BLOCKER: ops-job.service.ts のインターフェースが snake_case、write-request-tools.ts は camelCase → 修正済み（インターフェース全プロパティを camelCase に統一）
+  - 🟠 HIGH: executeCacheRefresh に normalizedQuery 必須チェック不足 → 修正済み（早期 throw 追加）
+  - 🟠 HIGH: lte 未使用 import → 削除済み
+  - 🟡 MED: CACHE_REFRESH_MAX_ROWS min(1) だと無効化不可 → min(0) に変更、maxRows===0 で早期 return
+  - 🟡 MED: claim race condition（select→update の2段階ガード） → 現状の atomic UPDATE WHERE でOK、コメント追加
+残リスク:
+  - argsJson の runtime 検証が isRecord のみ。Zod schema 導入は YAGNI のため保留
+  - write-request-tools.ts の jobArgs と executor のインターフェースは手動同期。shared types 化は今後の課題
+  - executeUserUsageReset の usageDate が文字列で渡される（write-request-tools.ts L98）
+Git commit hash: e43e073
+
 Step F 実装ログ
 Step G 実装ログ
 Step H 実装ログ
