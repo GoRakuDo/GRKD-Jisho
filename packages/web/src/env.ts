@@ -6,7 +6,7 @@ const envSchema = z.object({
   DISCORD_CLIENT_SECRET: z.string().min(1),
   DISCORD_GUILD_ID: z.string().min(1),
   SESSION_SECRET: z.string().min(32),
-  WEB_BASE_URL: z.string().url(),
+  WEB_BASE_URL: z.url(),
   ADMIN_ROLE_IDS: z
     .string()
     .optional()
