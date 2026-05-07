@@ -3,6 +3,13 @@ import { db, schema } from "@grkd-jisho/db";
 import type { LookupResult } from "../types.js";
 import { normalizeQuery } from "./normalize-query.js";
 
+/** カラム検索条件: 元クエリと正規化クエリが同じなら1つ、違うならOR */
+function matchColumn(column: any, original: string, normalized: string) {
+  return original !== normalized
+    ? or(eq(column, original), eq(column, normalized))
+    : eq(column, normalized);
+}
+
 export async function lookupWord(rawQuery: string): Promise<LookupResult | null> {
   const query = normalizeQuery(rawQuery);
   const originalQuery = rawQuery.trim();
@@ -21,10 +28,7 @@ export async function lookupWord(rawQuery: string): Promise<LookupResult | null>
       .where(
         and(
           eq(schema.dictionaryEntries.dictionaryId, dict.id),
-          or(
-            eq(schema.dictionaryEntries.term, originalQuery),
-            eq(schema.dictionaryEntries.term, query),
-          ),
+          matchColumn(schema.dictionaryEntries.term, originalQuery, query),
         ),
       )
       .limit(1);
@@ -45,10 +49,7 @@ export async function lookupWord(rawQuery: string): Promise<LookupResult | null>
       .where(
         and(
           eq(schema.dictionaryEntries.dictionaryId, dict.id),
-          or(
-            eq(schema.dictionaryEntries.reading, originalQuery),
-            eq(schema.dictionaryEntries.reading, query),
-          ),
+          matchColumn(schema.dictionaryEntries.reading, originalQuery, query),
         ),
       )
       .limit(1);
