@@ -23,6 +23,9 @@ export const POST: APIRoute = async (context) => {
   // NOTE: This route is exempted from middleware CSRF checks.
   // Keep this route-level validation as the required CSRF gate.
   if (!validateCsrfRequest(session.discordUserId, context.request)) {
+    const token = context.request.headers.get("x-csrf-token");
+    const tokenState = token && token.length > 0 ? "present" : "missing";
+    console.warn(`[ImportPreviewAPI] CSRF validation failed: token=${tokenState} user=${session.discordUserId.slice(0, 6)}... → Refresh page and retry; if persistent, re-login and re-fetch CSRF token`);
     return new Response(JSON.stringify({ error: "CSRF validation failed" }), {
       status: 403,
       headers: { "Content-Type": "application/json" },
