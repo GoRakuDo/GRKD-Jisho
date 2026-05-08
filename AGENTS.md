@@ -511,3 +511,36 @@ DOCS/Roadmap_Implement/phase-0-foundation.md
 Discordチャンネル削除、DB削除、履歴改変、外部API課金に関わる判断は必ず確認する。
 
 「動くけど危ない」より、「少し遅いが壊さない」を選ぶ。
+
+---
+
+## 17. ログ出力フォーマット
+
+Bot のログは常に以下のフォーマットに従う。
+
+```txt
+console.error / console.warn:
+  [Tag] {問題の要約}: {err.message} → {ユーザーへの具体的な直し方}
+
+console.log（情報表示）:
+  従来通り。運用状態の可視性を保つためフォーマット変更しない。
+```
+
+### ルール
+
+1. **生の `err`（スタックトレース）を `console.error` の第2引数に渡さない**
+   - NG: `console.error("[Foo] failed:", err);`
+   - OK: `console.error("[Foo] failed: ${err.message} → Check BAR in .env");`
+
+2. **ヒントは具体的に書く**
+   - NG: `→ Error occurred`
+   - OK: `→ Check GEMINI_API_KEY in .env`
+   - OK: `→ Check bot permissions (MANAGE_MESSAGES)`
+
+3. **不明なエラーやデバッグ用の完全スタックトレースは DB（bot_events）に書き込む**
+   - `console.error` には短いメッセージ
+   - 詳細は `traceEvent()` で `payloadJson` に `String(err)` を入れる
+
+4. **例外: 起動時のログ（Bot logged in 等）や情報ログは対象外**
+
+このルールは、Kasouデプロイ時に「生スタックトレースを見ても何を直せばいいかわからない」という問題を解決するために導入された。
