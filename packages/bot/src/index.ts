@@ -89,6 +89,68 @@ client.on(Events.MessageCreate, messageCreateHandler);
 client.on(Events.InteractionCreate, interactionCreateHandler);
 
 client.login(env.DISCORD_TOKEN).catch((err) => {
-  console.error("Failed to login:", err);
+  const message = parseLoginError(err);
+  console.error(message);
   process.exit(1);
 });
+
+function parseLoginError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+
+  // @discordjs/ws: close code 4014 — intent exists but not enabled in Developer Portal
+  if (msg.includes("disallowed intents")) {
+    return [
+      "❌ Login failed: Discord Gateway Intents が有効になっていません。",
+      "",
+      "   Go to: https://discord.com/developers/applications",
+      "   Select your Bot → Bot → Privileged Gateway Intents",
+      "   Enable: MESSAGE CONTENT INTENT (and GUILD_MEMBERS if needed)",
+      "",
+      "   Then restart the bot.",
+    ].join("\n");
+  }
+
+  // @discordjs/ws: close code 4013 — intent constant doesn't exist
+  if (msg.includes("invalid intents")) {
+    return [
+      "❌ Login failed: 不正な Intent 値が指定されています。",
+      "",
+      "   コード内の GatewayIntentBits の指定を確認してください。",
+    ].join("\n");
+  }
+
+  // @discordjs/ws: close code 4004 — wrong token
+  if (msg.includes("Authentication failed")) {
+    return [
+      "❌ Login failed: Discord Bot Token が間違っています。",
+      "",
+      "   Check: .env の DISCORD_TOKEN",
+      "   Reset: Discord Developer Portal → Bot → Reset Token",
+    ].join("\n");
+  }
+
+  // discord.js Messages.js / older versions fallback
+  if (msg.includes("invalid token") || msg.includes("Incorrect login details")) {
+    return [
+      "❌ Login failed: Discord Bot Token が間違っています。",
+      "",
+      "   Check .env DISCORD_TOKEN or reset at:",
+      "   Discord Developer Portal → Bot → Reset Token",
+    ].join("\n");
+  }
+
+  if (
+    msg.includes("ECONNREFUSED") ||
+    msg.includes("ENOTFOUND") ||
+    msg.includes("ETIMEDOUT")
+  ) {
+    return [
+      "❌ Login failed: Cannot connect to Discord.",
+      "",
+      "   Check your network connection and proxy settings.",
+    ].join("\n");
+  }
+
+  // Unknown error: print raw message for debugging
+  return `❌ Login failed: ${msg}`;
+}

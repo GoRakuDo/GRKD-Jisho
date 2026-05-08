@@ -288,6 +288,80 @@ scripts/deploy-precheck.ps1 # `pnpm deploy:check` のみ呼ぶ純粋ラッパー
 
 ---
 
+## C-7: Bot エラーメッセージ改善（新規）
+
+### 何をするか
+
+Bot がログインに失敗したとき、生のスタックトレースを吐くのをやめる。
+ユーザーが「何を直せばいいか」をひと目で理解できる案内メッセージを表示する。
+
+### 対象エラー
+
+| エラー | 現在の出力 | 改善後 |
+|---|---|---|
+| Intent 未有効 | `Error: Used disallowed intents ... (stack)` | ❌ **Login failed: Discord Gateway Intents が有効になっていません。** Discord Developer Portal → Bot → Privileged Gateway Intents で `MESSAGE_CONTENT` を有効にしてください。 |
+| Token 無効 | `Error: Incorrect login details ... (stack)` | ❌ **Login failed: Discord Bot Token が間違っています。** .env の `DISCORD_TOKEN` を確認してください。 |
+| ネットワーク | `Error: connect ECONNREFUSED ... (stack)` | ❌ **Login failed: Discord に接続できません。** ネットワーク / プロキシ設定を確認してください。 |
+
+### 実装
+
+`packages/bot/src/index.ts` の `client.login().catch()` を拡張:
+
+```typescript
+client.login(env.DISCORD_TOKEN).catch((err) => {
+  const message = parseLoginError(err);
+  console.error(message);
+  process.exit(1);
+});
+
+function parseLoginError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+
+  if (msg.includes("disallowed intents")) {
+    return [
+      "❌ Login failed: Discord Gateway Intents が有効になっていません。",
+      "",
+      "   Discord Developer Portal (https://discord.com/developers/applications) で",
+      "   Bot → Privileged Gateway Intents から MESSAGE_CONTENT を有効にしてください。",
+    ].join("\n");
+  }
+
+  if (msg.includes("Incorrect login details") || msg.includes("401")) {
+    return [
+      "❌ Login failed: Discord Bot Token が間違っています。",
+      "",
+      "   .env の DISCORD_TOKEN を確認してください。",
+      "   Token は Discord Developer Portal → Bot → Reset Token で再発行できます。",
+    ].join("\n");
+  }
+
+  if (msg.includes("ECONNREFUSED") || msg.includes("ENOTFOUND") || msg.includes("ETIMEDOUT")) {
+    return [
+      "❌ Login failed: Discord に接続できません。",
+      "",
+      "   ネットワーク接続とプロキシ設定を確認してください。",
+    ].join("\n");
+  }
+
+  // 予期しないエラー → 従来通り出力
+  return `❌ Login failed: ${msg}`;
+}
+```
+
+### 既存コードとの関係
+
+| ファイル | 変更 |
+|---|---|
+| `packages/bot/src/index.ts` | `client.login().catch()` のエラー処理を `parseLoginError()` に置き換え |
+
+### ファイル構成（変更のみ）
+
+```
+packages/bot/src/index.ts  ← 追記（parseLoginError + 呼び出し修正）
+```
+
+---
+
 ## 実装優先順位
 
 | 優先度 | ID | 内容 | 工数 | 理由 |
@@ -297,11 +371,13 @@ scripts/deploy-precheck.ps1 # `pnpm deploy:check` のみ呼ぶ純粋ラッパー
 | P1 | C-3 | `pnpm deploy:check` | 2-3h | デプロイ前に不足がわかる安心感 |
 | P1 | C-2 | `pnpm deploy:pg-config` | 1-2h | sed 不要になる。DRY_RUN 対応で安全 |
 | P2 | C-5 | 既存スクリプト強化 | 0.5h | 上記が全部できてから呼び出し追加 |
+| P2 | C-7 | Bot エラーメッセージ改善 | 0.5h | デプロイ後に「Intent未有効」の生スタックトレースが表示されるのを、人間にわかる案内に改善 |
 
-**推奨順序**: C-4 → C-1 → C-2 → C-3 → C-5
+**推奨順序**: C-4 → C-1 → C-2 → C-3 → C-5 → C-7
 
 C-4（env:validate）が一番カンタンで一番早く効果が出る。
 C-1（db:setup）が最大の価値だが、C-4で肩ならししてから取りかかるのが現実的。
+C-7（エラーメッセージ改善）はBotが動き始めてから気づく問題に対応する。Kasouデプロイ時に顕在化した。
 
 ---
 
