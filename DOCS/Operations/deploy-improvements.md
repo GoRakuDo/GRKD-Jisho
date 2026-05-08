@@ -12,9 +12,26 @@ Kasou（t620, Debian 13.4.0）への初回デプロイで発生した
 > 環境が整う状態を目指す。
 
 ---
+### コードレビュー発見: redirect_uri 未更新（3件のBLOCKER）
 
-## 設計原則
+**発生日**: 2026-05-08 | **原因**: callback.ts を移動したが、OAuth2 ライブラリ内の `redirect_uri` と middleware の `PUBLIC_PATHS` が古いパスのままだった。
 
+| # | 深刻度 | ファイル | 問題 | 修正 |
+|---|--------|---------|------|------|
+| 1 | 🚨 HIGH | `packages/web/src/lib/discord-oauth.ts:42` | `buildAuthorizeUrl()` の `redirect_uri` が旧パス `/auth/callback` | → `/api/auth/callback` |
+| 2 | 🚨 HIGH | `packages/web/src/lib/discord-oauth.ts:62` | `exchangeCode()` の `redirect_uri` が旧パス `/auth/callback` | → `/api/auth/callback` |
+| 3 | 🚨 HIGH | `packages/web/src/middleware.ts:7` | `PUBLIC_PATHS` に旧パス `/auth/callback`（callback リクエストが認証必須扱いになる） | → `/api/auth/callback` |
+
+**影響**: 3件とも本番で OAuth2 が動作しない（`redirect_uri_mismatch` エラー）。修正せずに出荷すると Bot 管理画面に一切ログインできない。
+
+**型チェック**: ✅ astro check 0 errors | ✅ GitHub push `093899e` | ✅ Kasou pull + build + restart 完了
+
+**教訓**: API ルートのパスを変更する場合、以下を必ず確認する：
+1. OAuth2 ライブラリ内の `redirect_uri` 文字列（authorize URL と token exchange の2箇所）
+2. middleware の `PUBLIC_PATHS`（認証スキップ設定）
+3. Discord Developer Portal の登録済み redirect URL
+
+---
 1. **1コマンド = 1責任** — 各CLIは1つのことだけやる
 2. **DRY-RUN対応** — `DRY_RUN=true` で変更せず表示のみ
 3. **冪等** — 何回叩いても安全。既存状態を壊さない
