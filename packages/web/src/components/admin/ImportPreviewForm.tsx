@@ -14,20 +14,30 @@ interface PreviewData {
 export default function ImportPreviewForm() {
   const [file, setFile] = useState<File | null>(null);
   const [csrfToken, setCsrfToken] = useState<string>('');
+  const [isCsrfReady, setIsCsrfReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewData | null>(null);
 
   useEffect(() => {
     fetch('/api/auth/csrf-token')
-      .then(res => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`CSRF token fetch failed (${res.status})`);
+        }
+        return res.json();
+      })
       .then(data => {
         if (data && data.token) {
           setCsrfToken(data.token);
+          setIsCsrfReady(true);
+          return;
         }
+        throw new Error('CSRF token missing in response');
       })
       .catch(() => {
-        // Silently handle CSRF fetch failure
+        setIsCsrfReady(false);
+        setError('Security token could not be initialized. Refresh this page and try again.');
       });
   }, []);
 
@@ -42,6 +52,10 @@ export default function ImportPreviewForm() {
 
   const handlePreview = async (e: React.SyntheticEvent) => {
     e.preventDefault();
+    if (!csrfToken) {
+      setError('Security token is missing or expired. Refresh this page and try again.');
+      return;
+    }
     if (!file) {
       setError('Please select a file first.');
       return;
@@ -179,7 +193,7 @@ export default function ImportPreviewForm() {
           </label>
         </div>
 
-        <button type="submit" disabled={isLoading || !file} style={buttonStyle}>
+        <button type="submit" disabled={isLoading || !file || !isCsrfReady} style={buttonStyle}>
           {isLoading ? 'Generating Preview...' : 'Preview Import'}
         </button>
       </form>
