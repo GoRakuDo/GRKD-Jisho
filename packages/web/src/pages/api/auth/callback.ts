@@ -7,12 +7,12 @@ import {
   PERM_ADMINISTRATOR,
   PERM_MANAGE_GUILD,
   type DiscordGuildMember,
-} from "../../lib/discord-oauth";
-import { getEnv } from "../../env";
+} from "../../../lib/discord-oauth";
+import { getEnv } from "../../../env";
 import {
   setSession,
   verifyOAuthState,
-} from "../../lib/session";
+} from "../../../lib/session";
 
 const DISCORD_API = "https://discord.com/api/v10";
 
