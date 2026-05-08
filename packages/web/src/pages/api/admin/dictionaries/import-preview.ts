@@ -97,9 +97,9 @@ export const POST: APIRoute = async (context) => {
       }
       totalUncompressed += uncompressedSize;
 
-      // 500MB total uncompressed limit
-      if (totalUncompressed > 500 * 1024 * 1024) {
-        return new Response(JSON.stringify({ error: "Total uncompressed data exceeds 500MB limit" }), {
+      // 1.5GB total uncompressed limit
+      if (totalUncompressed > 1536 * 1024 * 1024) {
+        return new Response(JSON.stringify({ error: "Total uncompressed data exceeds 1.5GB limit" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
