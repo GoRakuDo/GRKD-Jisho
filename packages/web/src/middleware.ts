@@ -50,6 +50,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
       if (!["GET", "HEAD"].includes(method)) {
         const isValid = validateCsrfRequest(session.discordUserId, request);
         if (!isValid) {
+          const token = request.headers.get("x-csrf-token");
+          const tokenState = token && token.length > 0 ? "present" : "missing";
+          console.warn(`[CSRF] Validation failed on ${method} ${pathname}: token=${tokenState} → Refresh page and retry; if persistent, check /api/auth/csrf-token response and session cookie`);
           return new Response("CSRF validation failed", { status: 403 });
         }
       }

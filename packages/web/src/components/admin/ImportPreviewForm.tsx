@@ -21,7 +21,7 @@ export default function ImportPreviewForm() {
 
   useEffect(() => {
     fetch('/api/auth/csrf-token')
-      .then(async (res) => {
+      .then((res) => {
         if (!res.ok) {
           throw new Error(`CSRF token fetch failed (${res.status})`);
         }
@@ -71,6 +71,7 @@ export default function ImportPreviewForm() {
     try {
       const response = await fetch('/api/admin/dictionaries/import-preview', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'x-csrf-token': csrfToken,
         },
