@@ -45,60 +45,19 @@ Write-Output "╔═════════════════════
 Write-Output "║   GRKD-Jisho デプロイ前チェック             ║"
 Write-Output "╚══════════════════════════════════════════════╝"
 
-Write-Step "必須 env の確認"
-$requiredVars = @(
-    "DISCORD_TOKEN",
-    "DISCORD_CLIENT_ID",
-    "DISCORD_GUILD_ID",
-    "DISCORD_ALLOWED_CHANNELS",
-    "DATABASE_URL",
-    "GEMINI_API_KEY"
-)
-$envPath = ".\.env"
-if (Test-Path $envPath) {
-    Write-Pass ".env ファイルが存在します"
-    $envContent = Get-Content $envPath
-    foreach ($var in $requiredVars) {
-        $matchLine = ($envContent -match "^${var}=") | Select-Object -First 1
-        if ($matchLine) {
-            $val = ($matchLine -replace "^${var}=", '').Trim()
-            if ([string]::IsNullOrEmpty($val)) {
-                Write-Warn "$var が空です"
-            } else {
-                Write-Pass "$var が設定されています"
-            }
-        } else {
-            Write-Warn "$var が見つかりません (.env に追加してください)"
-        }
-    }
-
-    # 本番DB判定
-    $dbLine = $envContent | Where-Object { $_ -match "^DATABASE_URL=" }
-    if ($dbLine) {
-        $dbUrl = ($dbLine -replace "^DATABASE_URL=", '').Trim()
-        if ($dbUrl -notmatch 'localhost' -and $dbUrl -notmatch '127\.0\.0\.1') {
-            Write-Warn "本番 DATABASE_URL を検出しました。migration は手動で実行してください。"
-        }
-    }
-} else {
-    Write-Fail ".env ファイルが見つかりません"
-    Write-Warn ".env.example をコピーして必要な値を設定してください:  cp .env.example .env"
-}
-
-Write-Step ".env.example との比較"
-$envExamplePath = ".\.env.example"
-if ((Test-Path $envPath) -and (Test-Path $envExamplePath)) {
-    $exampleKeys = (Get-Content $envExamplePath) | Where-Object { $_ -match '^[A-Z_]+\=' } |
-        ForEach-Object { ($_ -split '=')[0] }
-    $envKeys = (Get-Content $envPath) | Where-Object { $_ -match '^[A-Z_]+\=' } |
-        ForEach-Object { ($_ -split '=')[0] }
-    $missingFromExample = Compare-Object $exampleKeys $envKeys | Where-Object { $_.SideIndicator -eq '=>' }
-    if ($missingFromExample) {
-        Write-Warn ".env.example にない env キーがあります:"
-        $missingFromExample | ForEach-Object { Write-Output "      $($_.InputObject)" }
+Write-Step "pnpm deploy:check (環境変数・前提条件)"
+try {
+    $result = & pnpm --filter @grkd-jisho/db run deploy:check 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Pass "pnpm deploy:check 合格"
     } else {
-        Write-Pass ".env は .env.example と一致しています"
+        Write-Fail "pnpm deploy:check で不合格項目あり"
+        Write-Warn "上記の不合格項目を修正してから再度実行してください"
+        Write-Output $result
     }
+}
+catch {
+    Write-Fail "pnpm deploy:check の実行に失敗: $($_.Exception.Message)"
 }
 
 Write-Step "Docker build テスト"

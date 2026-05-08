@@ -10,18 +10,28 @@
     "generate": "dotenv -e ../../.env -- drizzle-kit generate",
     "migrate": "dotenv -e ../../.env -- drizzle-kit migrate",
     "import-yomitan": "dotenv -e ../../.env -- tsx scripts/import-yomitan.ts",
-    "seed-defaults": "dotenv -e ../../.env -- tsx scripts/seed-defaults.ts"
+    "seed-defaults": "dotenv -e ../../.env -- tsx scripts/seed-defaults.ts",
+    "env:validate": "tsx src/bin/env-validate.ts",
+    "env:validate:strict": "tsx src/bin/env-validate.ts --strict",
+    "db:setup": "dotenv -e ../../.env -- tsx src/bin/setup-db.ts",
+    "db:setup:dry": "dotenv -e ../../.env -- tsx src/bin/setup-db.ts --dry-run",
+    "deploy:pg-config": "tsx src/bin/pg-config.ts",
+    "deploy:pg-config:dry": "tsx src/bin/pg-config.ts --dry-run",
+    "deploy:pg-config:show": "tsx src/bin/pg-config.ts --show",
+    "deploy:check": "tsx src/bin/deploy-check.ts",
+    "deploy:check:json": "tsx src/bin/deploy-check.ts --json"
   },
   "dependencies": {
+    "adm-zip": "^0.5.10",
     "drizzle-orm": "^0.41.0",
     "postgres": "^3.4.5",
-    "adm-zip": "^0.5.10"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
+    "@types/node": "^22.15.3",
     "drizzle-kit": "^0.30.0",
     "tsx": "^4.19.3",
-    "typescript": "^5.8.3",
-    "@types/node": "^22.15.3",
-    "@types/adm-zip": "^0.5.5"
+    "typescript": "^5.8.3"
   }
 }

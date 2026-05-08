@@ -24,52 +24,15 @@ ok()   { PASS=$((PASS+1)); echo -e "  ${GREEN}✅${NC} $*"; }
 warn() { WARN=$((WARN+1)); echo -e "  ${YELLOW}⚠${NC} $*"; }
 fail() { FAIL=$((FAIL+1)); echo -e "  ${RED}❌${NC} $*"; }
 
-# ── Required env vars ────────────────────────────────────
-step "必須 env の確認"
+# ── pnpm deploy:check ────────────────────────────────────
+# C-4/C-3 CLI ツールによる環境変数・前提条件チェックに委譲
+step "pnpm deploy:check (環境変数・前提条件)"
 
-REQUIRED_VARS=(
-    DISCORD_TOKEN
-    DISCORD_CLIENT_ID
-    DISCORD_GUILD_ID
-    DISCORD_ALLOWED_CHANNELS
-    DATABASE_URL
-    GEMINI_API_KEY
-)
-
-if [ -f .env ]; then
-    ok ".env ファイルが存在します"
-    for var in "${REQUIRED_VARS[@]}"; do
-        val=$(grep -E "^${var}=" .env | head -1 | sed "s/^${var}=//" || true)
-        if [ -z "$val" ]; then
-            warn "$var が空か見つかりません"
-        else
-            ok "$var が設定されています"
-        fi
-    done
-
-    # Production DB detection
-    db_url=$(grep -E "^DATABASE_URL=" .env | head -1 | sed 's/^DATABASE_URL=//' || true)
-    if [ -n "$db_url" ] && echo "$db_url" | grep -qvE 'localhost|127\.0\.0\.1'; then
-        warn "本番 DATABASE_URL を検出しました。migration は手動で実行してください。"
-    fi
+if pnpm --filter @grkd-jisho/db run deploy:check 2>/dev/null; then
+    ok "pnpm deploy:check 合格"
 else
-    fail ".env ファイルが見つかりません"
-    warn ".env.example をコピーして必要な値を設定してください: cp .env.example .env"
-fi
-
-# ── .env.example diff ────────────────────────────────────
-step ".env.example との比較"
-
-if [ -f .env ] && [ -f .env.example ]; then
-    example_keys=$(grep -E '^[A-Z_]+=' .env.example | sed 's/=.*//' | sort)
-    env_keys=$(grep -E '^[A-Z_]+=' .env | sed 's/=.*//' | sort)
-    diff_keys=$(comm -13 <(echo "$example_keys") <(echo "$env_keys") 2>/dev/null || true)
-    if [ -n "$diff_keys" ]; then
-        warn ".env.example にない env キーがあります:"
-        echo "$diff_keys" | while IFS= read -r k; do echo "      $k"; done
-    else
-        ok ".env は .env.example と一致しています"
-    fi
+    fail "pnpm deploy:check で不合格項目あり"
+    warn "上記の不合格項目を修正してから再度実行してください"
 fi
 
 # ── Docker build ─────────────────────────────────────────
