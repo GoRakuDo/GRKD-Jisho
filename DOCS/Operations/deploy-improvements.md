@@ -13,6 +13,36 @@ Kasou（t620, Debian 13.4.0）への初回デプロイで発生した
 
 ---
 
+### 追加修正: OAuth cookie の `Secure` 固定で HTTP ローカル環境が失敗する問題
+
+**発生日**: 2026-05-08
+
+**問題**: Discord 承認後に `oauth_failed` へ戻る。画面はエラーのみで進行不可。
+
+**原因**:
+- `packages/web/src/lib/session.ts` で OAuth state cookie と session cookie を `secure: true` 固定にしていた
+- Kasou は `http://192.168.100.46:4321` で運用しているため、ブラウザが `Secure` cookie を callback リクエストで送信しない
+- その結果、`verifyOAuthState()` が常に失敗して `/auth/login?error=oauth_failed`
+
+**修正**:
+- `SESSION_COOKIE_SECURE=true|false` を追加（任意）
+- 未指定時は `WEB_BASE_URL` のスキームで自動判定
+  - `https://` → `true`
+  - `http://` → `false`
+- state 不一致時に原因と復旧ヒントをログ出力
+
+**変更ファイル**:
+- `packages/web/src/lib/session.ts`
+- `packages/web/src/pages/api/auth/callback.ts`
+- `packages/web/src/env.ts`
+- `.env.example`
+
+**期待結果**:
+- HTTP ローカル環境でも OAuth state cookie が返送され、callback が破綻せず通る
+- HTTPS 本番では引き続き secure cookie を維持
+
+---
+
 ### 追加修正: `/api/auth/authorize` が未認証でブロックされる問題
 
 **発生日**: 2026-05-08

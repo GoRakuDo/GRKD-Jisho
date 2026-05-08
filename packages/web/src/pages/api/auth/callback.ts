@@ -10,6 +10,8 @@ import {
 } from "../../../lib/discord-oauth";
 import { getEnv } from "../../../env";
 import {
+  OAUTH_STATE_MAX_AGE_SEC,
+  SESSION_MAX_AGE_MS,
   setSession,
   verifyOAuthState,
 } from "../../../lib/session";
@@ -26,6 +28,8 @@ export const GET: APIRoute = async (context) => {
   }
 
   if (!verifyOAuthState(context, stateParam)) {
+    const stateWindowMin = Math.floor(OAUTH_STATE_MAX_AGE_SEC / 60);
+    console.error(`[OAuth] State verification failed: OAuth state cookie missing or mismatched → If using HTTP, set SESSION_COOKIE_SECURE=false and retry within ${stateWindowMin} minutes in the same browser`);
     return context.redirect("/auth/login?error=oauth_failed");
   }
 
@@ -58,7 +62,7 @@ export const GET: APIRoute = async (context) => {
       discordUserId: user.id,
       guildId: env.DISCORD_GUILD_ID,
       isAdmin: true,
-      expiresAt: Date.now() + 8 * 60 * 60 * 1000,
+      expiresAt: Date.now() + SESSION_MAX_AGE_MS,
       authCheckedAt: Date.now(),
     });
 

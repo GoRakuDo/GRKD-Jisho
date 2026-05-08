@@ -3,7 +3,27 @@ import type { APIContext } from "astro";
 
 const SESSION_COOKIE = "grkd_session";
 const STATE_COOKIE = "grkd_oauth_state";
-const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
+export const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
+export const OAUTH_STATE_MAX_AGE_SEC = 300;
+
+// One-time warning guard to avoid repeated insecure-cookie logs.
+let hasWarnedInsecureHttps = false;
+
+function isSecureCookieEnabled(): boolean {
+  const explicit = process.env["SESSION_COOKIE_SECURE"];
+  const baseUrl = process.env["WEB_BASE_URL"] ?? "";
+
+  if (explicit === "true") return true;
+  if (explicit === "false") {
+    if (baseUrl.startsWith("https://") && !hasWarnedInsecureHttps) {
+      hasWarnedInsecureHttps = true;
+      console.warn("[Session] Insecure cookie config: SESSION_COOKIE_SECURE=false with HTTPS WEB_BASE_URL → Set SESSION_COOKIE_SECURE=true in production HTTPS");
+    }
+    return false;
+  }
+
+  return baseUrl.startsWith("https://");
+}
 
 export interface SessionData {
   discordUserId: string;
@@ -65,7 +85,7 @@ export function getSession(context: APIContext): SessionData | null {
 export function setSession(context: APIContext, data: SessionData): void {
   context.cookies.set(SESSION_COOKIE, encodeSession(data), {
     httpOnly: true,
-    secure: true,
+    secure: isSecureCookieEnabled(),
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_MAX_AGE_MS / 1000,
@@ -82,10 +102,10 @@ export function setOAuthState(context: APIContext): string {
   const state = randomBytes(32).toString("hex");
   context.cookies.set(STATE_COOKIE, state, {
     httpOnly: true,
-    secure: true,
+    secure: isSecureCookieEnabled(),
     sameSite: "lax",
     path: "/",
-    maxAge: 300, // 5 minutes
+    maxAge: OAUTH_STATE_MAX_AGE_SEC,
   });
   return state;
 }
