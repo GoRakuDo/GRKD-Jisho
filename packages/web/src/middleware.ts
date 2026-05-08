@@ -21,9 +21,14 @@ const CSRF_EXEMPT_PATHS = new Set([
   "/api/admin/dictionaries/import-preview",
 ]);
 
+function normalizePath(pathname: string): string {
+  if (pathname === "/") return pathname;
+  return pathname.replace(/\/+$/, "");
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const { url, request } = context;
-  const pathname = url.pathname;
+  const pathname = normalizePath(url.pathname);
 
   // Initialize locals
   setLocals(context, { user: null, isAuthenticated: false });
