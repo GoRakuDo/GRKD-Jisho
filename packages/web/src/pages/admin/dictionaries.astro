@@ -3,8 +3,10 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
 import {
   getDictionaryList,
-  getDictionaryEntryCount,
+  db,
+  schema,
 } from "@grkd-jisho/db";
+import { count } from "drizzle-orm";
 
 const session = getSession(Astro);
 
@@ -22,29 +24,45 @@ let dictionaries: DictWithCount[] = [];
 if (session?.isAdmin) {
   try {
     const dicts = await getDictionaryList();
-    dictionaries = await Promise.all(
-      dicts.map(async (d) => {
-        const entryCount = await getDictionaryEntryCount(d.id);
-        return {
-          id: String(d.id),
-          name: d.name,
-          slug: d.slug,
-          priority: d.priority,
-          enabled: d.enabled,
-          entryCount,
-        };
-      }),
-    );
+    const entryCounts = await db
+      .select({
+        dictId: schema.dictionaryEntries.dictionaryId,
+        count: count(schema.dictionaryEntries.id),
+      })
+      .from(schema.dictionaryEntries)
+      .groupBy(schema.dictionaryEntries.dictionaryId);
+
+    const countMap = new Map(entryCounts.map((r) => [String(r.dictId), Number(r.count)]));
+
+    dictionaries = dicts.map((d) => ({
+      id: String(d.id),
+      name: d.name,
+      slug: d.slug,
+      priority: d.priority,
+      enabled: d.enabled,
+      entryCount: countMap.get(String(d.id)) ?? 0,
+    }));
   } catch (err) {
-    console.error("Dictionaries SSR error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[Dictionaries] SSR error: ${reason} → Check DB connection and session validity`);
   }
 }
 ---
 
 <AdminLayout title="Dictionaries" active="dictionaries">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Dictionaries</h1>
+      <p class="page-description">Manage dictionary priority and import Yomitan-compatible dictionary ZIP files.</p>
+    </div>
+    <a href="/admin/dictionaries/import" class="import-button">Import Dictionary</a>
+  </div>
+
   {dictionaries.length === 0 && (
     <div class="empty-state">
-      <p>No dictionaries found.</p>
+      <p class="empty-title">No dictionaries available</p>
+      <p class="empty-description">Your dictionary library is currently empty. Import your first Yomitan-compatible ZIP file to begin providing meanings to your learners.</p>
+      <a href="/admin/dictionaries/import" class="empty-cta">Get Started: Import Dictionary</a>
     </div>
   )}
 
@@ -83,6 +101,53 @@ if (session?.isAdmin) {
 </AdminLayout>
 
 <style>
+  .page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .page-title {
+    font-size: 20px;
+    line-height: 1.3;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+    margin: 0;
+  }
+
+  .page-description {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--color-graphite-500);
+  }
+
+  .import-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 14px;
+    border-radius: var(--radius-button);
+    background: var(--color-royal-blue-600);
+    color: var(--color-porcelain-50);
+    border: 1px solid var(--color-royal-blue-700);
+    transition: background-color 0.18s ease;
+  }
+
+  .import-button:hover {
+    background: var(--color-royal-blue-700);
+  }
+
+  .import-button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-royal-blue-100);
+  }
+
   .table-container {
     background: var(--color-porcelain-100);
     border: 1px solid var(--color-graphite-180);
@@ -158,12 +223,59 @@ if (session?.isAdmin) {
   }
 
   .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
     background: var(--color-porcelain-100);
     border: 1px solid var(--color-graphite-180);
     border-radius: var(--radius-card);
     padding: 40px;
     text-align: center;
-    color: var(--color-graphite-500);
+  }
+
+  .empty-title {
+    margin: 0;
     font-size: 14px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+  }
+
+  .empty-description {
+    margin: 0;
+    max-width: 520px;
+    font-size: 13px;
+    color: var(--color-graphite-500);
+  }
+
+  .empty-cta {
+    margin-top: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 14px;
+    border-radius: var(--radius-button);
+    border: 1px solid var(--color-graphite-300);
+    color: var(--color-graphite-800);
+    background: var(--color-porcelain-150);
+    transition: background-color 0.18s ease;
+  }
+
+  .empty-cta:hover {
+    background: var(--color-porcelain-220);
+  }
+
+  @media (max-width: 760px) {
+    .page-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .import-button {
+      width: 100%;
+    }
   }
 </style>

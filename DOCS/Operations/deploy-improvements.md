@@ -13,6 +13,108 @@ Kasou（t620, Debian 13.4.0）への初回デプロイで発生した
 
 ---
 
+## C-10: WebUIフロー完成（C-9含む）
+
+### 目的
+
+WebUIを「見た目だけでなく、実運用で詰まらずに使える状態」まで仕上げる。
+対象は以下の2軸。
+
+1. **UI/UX完成度**（C-9: ログインページ改善 + Dictionaries導線改善）
+2. **フロー破綻防止**（ログイン認証で起きたようなルート/Cookie/ガード不整合を網羅検証）
+
+### 実装スコープ
+
+1) `auth/login` UI改善（C-9）
+- ヒーロー見出し、3ステップガイド、フッター（バージョン）
+- 既存のDiscordボタンは維持
+- エラー表示は現行仕様を維持しつつ視認性改善
+
+2) `admin/dictionaries` 導線改善
+- ページヘッダー右上に `Import Dictionary` ボタン追加
+- 空状態（No dictionaries found）に CTA 追加（`Import your first dictionary`）
+- `admin/dictionaries/import` への導線を明示
+
+3) `admin/dictionaries/import` 利用性改善
+- 戻るリンク（Back to Dictionaries）追加
+- インポート手順の簡易ガイド追加
+- 失敗時エラー表示を明確化（現行ロジック維持）
+
+### フロー検証チェックリスト（破綻防止）
+
+#### A. 認証フロー
+1. `/auth/login` 表示
+2. `Sign in with Discord` → `/api/auth/authorize` が Discord へ 302
+3. Discord 承認後 `/api/auth/callback` でセッション確立
+4. `/admin` へ遷移
+5. `/auth/logout` でセッションクリア
+
+#### B. 辞書管理フロー
+1. `/admin/dictionaries` から Import ボタンが見える
+2. `/admin/dictionaries/import` へ遷移
+3. ZIP選択→Preview API呼び出し→結果表示
+4. エラー時に原因メッセージが表示される
+
+#### C. ガード/セキュリティ
+1. 未ログインで `/admin/*` は `/auth/login` へ
+2. `/api/auth/authorize` と `/api/auth/callback` は公開ルート
+3. 非GET `/api/*` `/admin/*` は CSRF 必須（除外パスのみ免除）
+4. HTTP環境で state cookie が返る（`SESSION_COOKIE_SECURE` 判定）
+
+#### D. 運用検証
+1. `astro check` 0/0/0
+2. Kasouで `pnpm build` + `systemctl restart grkd-jisho-web`
+3. 主要エンドポイントのヘッダ確認（302/200の妥当性）
+
+### 役割分担
+
+- **@kuraudo-uidesigner**: UIコンポーネント/レイアウト改善案の実装
+- **本体エージェント**: ルートガード・認証整合・動作検証・Kasou反映
+- **@code-reviewer**: 最終コードレビュー（BLOCKER/HIGH/MED/LOW）
+
+### 完了条件
+
+1. C-9（ログインページ改善）が適用済み
+2. DictionariesページからImportへの導線がUI上で明確
+3. 認証〜辞書インポートまでの主要フローが破綻なく通る
+4. コードレビューで BLOCKER/HIGH=0
+
+---
+
+### C-10 実装ログ（2026-05-08）
+
+**実装（UI担当: @kuraudo-uidesigner 委譲）**
+- `packages/web/src/pages/auth/login.astro`
+  - ヒーロー見出し + サブタイトル
+  - 3ステップガイド
+  - フッター（バージョン/GoRakuDo）
+- `packages/web/src/pages/admin/dictionaries.astro`
+  - ヘッダー + 説明文
+  - `Import Dictionary` ボタン追加（`/admin/dictionaries/import`）
+  - Empty state CTA 追加
+- `packages/web/src/pages/admin/dictionaries/import.astro`
+  - `Back to Dictionaries` 導線追加
+  - 3ステップガイドカード追加
+  - `ImportPreviewForm` は既存ロジックのまま利用
+
+**統合時の修正（本体エージェント）**
+- importページに重複挿入されたガイドブロックを除去
+- 3ファイルとも DESIGN.md token方針（純黒/純白禁止、royal-blue主導）を維持
+
+**検証結果**
+- `packages/web`: `npx astro check` → **0 errors / 0 warnings / 0 hints**
+- Kasou 実機ルート検証:
+  - `/auth/login` → 200
+  - `/api/auth/authorize` → 302 Discord OAuth + state cookie発行
+  - `/admin/dictionaries`（未ログイン）→ 302 `/auth/login`
+  - `/admin/dictionaries/import`（未ログイン）→ 302 `/auth/login`
+
+**残タスク（手動）**
+- ログイン済み状態で `/admin/dictionaries` 画面上の Import ボタンと Empty CTA の目視確認
+- ZIPアップロードのPreview表示（ブラウザ実操作）
+
+---
+
 ### 追加修正: OAuth cookie の `Secure` 固定で HTTP ローカル環境が失敗する問題
 
 **発生日**: 2026-05-08

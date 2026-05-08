@@ -36,7 +36,8 @@ export const GET: APIRoute = async (context) => {
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (err) {
-    console.error("Ops jobs API error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[OpsJobsAPI] Fetch failed: ${reason} → Check ops_jobs query and DB connectivity`);
     return new Response(JSON.stringify({ error: "internal error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
@@ -99,7 +100,8 @@ export const POST: APIRoute = async (context) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("Ops job action error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[OpsJobsAPI] Action failed: ${reason} → Check CSRF token, action payload, and job state transitions`);
     return new Response(JSON.stringify({ error: "internal error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

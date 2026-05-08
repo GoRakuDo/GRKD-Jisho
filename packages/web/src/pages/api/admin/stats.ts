@@ -95,10 +95,12 @@ export const GET: APIRoute = async (context) => {
         recentTraces: recentTraces.map((r) => ({
           ...r,
           id: String(r.id),
+          createdAt: r.createdAt?.toISOString() ?? null,
         })),
         recentErrorList: recentErrorList.map((r) => ({
           ...r,
           id: String(r.id),
+          createdAt: r.createdAt?.toISOString() ?? null,
         })),
       }),
       {
@@ -107,7 +109,8 @@ export const GET: APIRoute = async (context) => {
       },
     );
   } catch (err) {
-    console.error("Dashboard stats error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[StatsAPI] Dashboard stats failed: ${reason} → Check DB tables (lookup_logs, ops_jobs, bot_events) and date query constraints`);
     return new Response(JSON.stringify({ error: "internal error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

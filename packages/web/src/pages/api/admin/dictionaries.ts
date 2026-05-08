@@ -33,7 +33,8 @@ export const GET: APIRoute = async (context) => {
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (err) {
-    console.error("Dictionaries API error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[DictionariesAPI] List fetch failed: ${reason} → Check dictionaries table and DB connectivity`);
     return new Response(JSON.stringify({ error: "internal error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
@@ -96,7 +97,8 @@ export const PUT: APIRoute = async (context) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("Dictionary update error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[DictionariesAPI] Update failed: ${reason} → Check CSRF token, payload fields, and update permissions`);
     return new Response(JSON.stringify({ error: "update failed" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

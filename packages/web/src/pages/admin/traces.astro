@@ -67,7 +67,8 @@ if (session?.isAdmin) {
     }
     recentTraces = recentTraces.slice(0, 20);
   } catch (err) {
-    console.error("Traces SSR error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[Traces] SSR error: ${reason} → Check trace query parameters and DB connectivity`);
   }
 }
 ---

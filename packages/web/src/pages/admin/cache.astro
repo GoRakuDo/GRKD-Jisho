@@ -1,64 +1,117 @@
 ---
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
-import { getCacheStats } from "@grkd-jisho/db";
+import { getCacheStats, searchCacheEntries } from "@grkd-jisho/db";
 
 const session = getSession(Astro);
+const urlParams = new URL(Astro.url.toString()).searchParams;
+const query = urlParams.get("query") ?? "";
 
 let total = 0;
 let manualOverride = 0;
 let deletable = 0;
+let searchResults: Awaited<ReturnType<typeof searchCacheEntries>> = [];
 
 if (session?.isAdmin) {
   try {
-    const stats = await getCacheStats();
-    total = stats.total;
-    manualOverride = stats.manualOverride;
-    deletable = stats.deletable;
+    if (query) {
+      searchResults = await searchCacheEntries(query, 20);
+    } else {
+      const stats = await getCacheStats();
+      total = stats.total;
+      manualOverride = stats.manualOverride;
+      deletable = stats.deletable;
+    }
   } catch (err) {
-    console.error("Cache SSR error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[Cache] SSR error: ${reason} → Check DB connection and cache-admin service availability`);
   }
 }
 ---
 
 <AdminLayout title="Cache" active="cache">
-  <div class="stats-row">
-    <div class="stat-card">
-      <span class="stat-label">Total Entries</span>
-      <span class="stat-value">{total.toLocaleString()}</span>
+  {!query && (
+    <div class="stats-row">
+      <div class="stat-card">
+        <span class="stat-label">Total Entries</span>
+        <span class="stat-value">{total.toLocaleString()}</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Manual Override</span>
+        <span class="stat-value">{manualOverride.toLocaleString()}</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Deletable</span>
+        <span class="stat-value">{deletable.toLocaleString()}</span>
+      </div>
     </div>
-    <div class="stat-card">
-      <span class="stat-label">Manual Override</span>
-      <span class="stat-value">{manualOverride.toLocaleString()}</span>
-    </div>
-    <div class="stat-card">
-      <span class="stat-label">Deletable</span>
-      <span class="stat-value">{deletable.toLocaleString()}</span>
-    </div>
-  </div>
+  )}
 
   <div class="search-card">
-    <h2 class="section-title">Search &amp; Refresh Cache</h2>
+    <h2 class="section-title">{query ? "Search Results" : "Search & Refresh Cache"}</h2>
     <form method="GET" action="/admin/cache" class="search-row">
       <input
         type="text"
         name="query"
         class="search-input"
         placeholder="Search by normalized query..."
+        value={query}
       />
       <button type="submit" class="btn-primary">Search</button>
+      {query && (
+        <a href="/admin/cache" class="btn-secondary">Clear</a>
+      )}
     </form>
   </div>
 
-  <div class="info-card">
-    <h2 class="section-title">Refresh Rules</h2>
-    <ul class="rule-list">
-      <li>Refreshing a cache entry deletes the existing auto-generated response.</li>
-      <li><strong>Manual override</strong> entries are never deleted automatically.</li>
-      <li>After deletion, the next lookup for that query will regenerate the response.</li>
-      <li>Use the API or MCP dry-run tool to preview what will be deleted first.</li>
-    </ul>
-  </div>
+  {query && (
+    <div class="table-container">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Query</th>
+            <th>Manual</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {searchResults.length > 0 ? (
+            searchResults.map((r) => (
+              <tr>
+                <td class="mono">{r.id}</td>
+                <td>{r.query}</td>
+                <td>
+                  {r.isManualOverride ? (
+                    <span class="badge-manual">manual</span>
+                  ) : (
+                    <span class="badge-auto">auto</span>
+                  )}
+                </td>
+                <td class="mono">{r.updatedAt ? new Date(r.updatedAt).toLocaleString("en-US", { timeZone: "Asia/Jakarta" }) : "-"}</td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colspan="4" class="empty-cell">No cache entries found for "{query}".</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )}
+
+  {!query && (
+    <div class="info-card">
+      <h2 class="section-title">Refresh Rules</h2>
+      <ul class="rule-list">
+        <li>Refreshing a cache entry deletes the existing auto-generated response.</li>
+        <li><strong>Manual override</strong> entries are never deleted automatically.</li>
+        <li>After deletion, the next lookup for that query will regenerate the response.</li>
+        <li>Use the API or MCP dry-run tool to preview what will be deleted first.</li>
+      </ul>
+    </div>
+  )}
 </AdminLayout>
 
 <style>
@@ -149,6 +202,23 @@ if (session?.isAdmin) {
     background: var(--color-royal-blue-700);
   }
 
+  .btn-secondary {
+    background: var(--color-porcelain-100);
+    color: var(--color-graphite-800);
+    border: 1px solid var(--color-graphite-300);
+    border-radius: var(--radius-button);
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.1s;
+  }
+
+  .btn-secondary:hover {
+    background: var(--color-porcelain-150);
+  }
+
   .rule-list {
     margin: 0;
     padding: 0 0 0 20px;
@@ -159,5 +229,75 @@ if (session?.isAdmin) {
 
   .rule-list li {
     margin-bottom: 4px;
+  }
+
+  .table-container {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .data-table th {
+    background: var(--color-porcelain-150);
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-graphite-500);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .data-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--color-graphite-650);
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .data-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .data-table tbody tr:hover {
+    background: var(--color-porcelain-150);
+  }
+
+  .mono {
+    font-family: var(--font-grkd-mono);
+    font-size: 12px;
+  }
+
+  .badge-manual {
+    display: inline-block;
+    background: var(--color-royal-blue-100);
+    color: var(--color-royal-blue-700);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .badge-auto {
+    display: inline-block;
+    background: var(--color-porcelain-150);
+    color: var(--color-graphite-650);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .empty-cell {
+    text-align: center;
+    color: var(--color-graphite-500);
+    padding: 32px;
   }
 </style>

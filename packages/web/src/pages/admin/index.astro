@@ -12,50 +12,27 @@ let lookupsToday = 0;
 let cacheHitRatio = "0.0";
 let pendingJobs = 0;
 let recentErrorsCount = 0;
-let recentTracesData: { id: string; traceId: string; eventType: string; level: string; createdAt: Date | null }[] = [];
-let recentErrorList: { id: string; traceId: string; eventType: string; createdAt: Date | null }[] = [];
+let recentTracesData: { id: string; traceId: string; eventType: string; level: string; createdAt: string | null }[] = [];
+let recentErrorList: { id: string; traceId: string; eventType: string; createdAt: string | null }[] = [];
 
 if (session?.isAdmin) {
   try {
     const today = toGMT7Date(new Date());
 
-    const [lookupRow] = await db
-      .select({ count: count(schema.lookupLogs.id) })
-      .from(schema.lookupLogs)
-      .where(gte(schema.lookupLogs.createdAt, sql`${today}::date`));
-    lookupsToday = lookupRow ? Number(lookupRow.count) : 0;
-
-    const [hitRow] = await db
-      .select({ count: count(schema.lookupLogs.id) })
-      .from(schema.lookupLogs)
-      .where(
-        and(
-          eq(schema.lookupLogs.cacheHit, true),
-          gte(schema.lookupLogs.createdAt, sql`${today}::date`),
-        ),
-      );
-    const hitsToday = hitRow ? Number(hitRow.count) : 0;
+    const [lookupRow, hitRow, pendingRow, errRow] = await Promise.all([
+      db.select({ count: count(schema.lookupLogs.id) }).from(schema.lookupLogs).where(gte(schema.lookupLogs.createdAt, sql`${today}::date`)),
+      db.select({ count: count(schema.lookupLogs.id) }).from(schema.lookupLogs).where(and(eq(schema.lookupLogs.cacheHit, true), gte(schema.lookupLogs.createdAt, sql`${today}::date`))),
+      db.select({ count: count(schema.opsJobs.id) }).from(schema.opsJobs).where(eq(schema.opsJobs.status, "pending")),
+      db.select({ count: count(schema.botEvents.id) }).from(schema.botEvents).where(and(eq(schema.botEvents.level, "error"), gte(schema.botEvents.createdAt, sql`now() - interval '24 hours'`))),
+    ]);
+    lookupsToday = lookupRow[0] ? Number(lookupRow[0].count) : 0;
+    const hitsToday = hitRow[0] ? Number(hitRow[0].count) : 0;
+    pendingJobs = pendingRow[0] ? Number(pendingRow[0].count) : 0;
+    recentErrorsCount = errRow[0] ? Number(errRow[0].count) : 0;
 
     cacheHitRatio = lookupsToday > 0
       ? ((hitsToday / lookupsToday) * 100).toFixed(1)
       : "0.0";
-
-    const [pendingRow] = await db
-      .select({ count: count(schema.opsJobs.id) })
-      .from(schema.opsJobs)
-      .where(eq(schema.opsJobs.status, "pending"));
-    pendingJobs = pendingRow ? Number(pendingRow.count) : 0;
-
-    const [errRow] = await db
-      .select({ count: count(schema.botEvents.id) })
-      .from(schema.botEvents)
-      .where(
-        and(
-          eq(schema.botEvents.level, "error"),
-          gte(schema.botEvents.createdAt, sql`now() - interval '24 hours'`),
-        ),
-      );
-    recentErrorsCount = errRow ? Number(errRow.count) : 0;
 
     recentTracesData = (await db
       .select({
@@ -67,7 +44,11 @@ if (session?.isAdmin) {
       })
       .from(schema.botEvents)
       .orderBy(sql`${schema.botEvents.createdAt} desc`)
-      .limit(10)).map((r) => ({ ...r, id: String(r.id) }));
+      .limit(10)).map((r) => ({
+        ...r,
+        id: String(r.id),
+        createdAt: r.createdAt?.toISOString() ?? null,
+      }));
 
     recentErrorList = (await db
       .select({
@@ -79,9 +60,14 @@ if (session?.isAdmin) {
       .from(schema.botEvents)
       .where(eq(schema.botEvents.level, "error"))
       .orderBy(sql`${schema.botEvents.createdAt} desc`)
-      .limit(10)).map((r) => ({ ...r, id: String(r.id) }));
+      .limit(10)).map((r) => ({
+        ...r,
+        id: String(r.id),
+        createdAt: r.createdAt?.toISOString() ?? null,
+      }));
   } catch (err) {
-    console.error("Dashboard SSR data fetch error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[Dashboard] SSR data fetch error: ${reason} → Check DB connection and stats query compatibility`);
   }
 }
 ---
@@ -114,7 +100,7 @@ if (session?.isAdmin) {
                   <td>{t.eventType}</td>
                   <td><span class={`level-badge level-${t.level}`}>{t.level}</span></td>
                   <td class="mono">{t.traceId}</td>
-                  <td class="mono">{t.createdAt?.toLocaleTimeString("en-US", { timeZone: "Asia/Jakarta" }) ?? "-"}</td>
+                  <td class="mono">{t.createdAt ? new Date(t.createdAt).toLocaleTimeString("en-US", { timeZone: "Asia/Jakarta" }) : "-"}</td>
                 </tr>
               ))}
             </tbody>
@@ -141,7 +127,7 @@ if (session?.isAdmin) {
                 <tr>
                   <td class="error-text">{e.eventType}</td>
                   <td class="mono">{e.traceId}</td>
-                  <td class="mono">{e.createdAt?.toLocaleTimeString("en-US", { timeZone: "Asia/Jakarta" }) ?? "-"}</td>
+                  <td class="mono">{e.createdAt ? new Date(e.createdAt).toLocaleTimeString("en-US", { timeZone: "Asia/Jakarta" }) : "-"}</td>
                 </tr>
               ))}
             </tbody>

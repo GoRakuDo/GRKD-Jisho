@@ -106,7 +106,8 @@ export const GET: APIRoute = async (context) => {
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (err) {
-    console.error("Logs API error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[LogsAPI] Request failed: ${reason} → Check periodDays parameter and logs query constraints`);
     return new Response(JSON.stringify({ error: "internal error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

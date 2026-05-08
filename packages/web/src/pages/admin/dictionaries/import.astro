@@ -1,32 +1,148 @@
 ---
 import AdminLayout from "../../../layouts/AdminLayout.astro";
+import { getSession } from "../../../lib/session";
 import ImportPreviewForm from "../../../components/admin/ImportPreviewForm";
+
+const session = getSession(Astro);
+
+if (!session?.isAdmin) {
+  return Astro.redirect("/auth/login?error=admin_required");
+}
 ---
 
 <AdminLayout title="Import Dictionary" active="dictionaries">
-  <div class="page-header">
-    <h1 class="page-title">Import Dictionary</h1>
-    <p class="page-description">Upload a Yomitan-compatible dictionary .zip file to preview and import.</p>
+  <div class="header-container">
+    <a href="/admin/dictionaries" class="back-link">← Back to Dictionaries</a>
+    <div class="page-header">
+      <h1 class="page-title">Import Dictionary</h1>
+      <p class="page-description">Upload a Yomitan-compatible dictionary .zip file to preview and import.</p>
+    </div>
   </div>
+
+  <ol class="guide-card" aria-label="Import guide">
+    <li class="guide-step">
+      <span class="step-number">1</span>
+      <div class="step-content">
+        <p class="step-title">Prepare ZIP</p>
+        <p>Upload a <strong>.zip</strong> Yomitan dictionary file.</p>
+      </div>
+    </li>
+    <li class="guide-step">
+      <span class="step-number">2</span>
+      <div class="step-content">
+        <p class="step-title">Review Metadata</p>
+        <p>Review preview metadata and term counts for accuracy.</p>
+      </div>
+    </li>
+    <li class="guide-step">
+      <span class="step-number">3</span>
+      <div class="step-content">
+        <p class="step-title">Confirm Import</p>
+        <p>Proceed with import after validating title and slug.</p>
+      </div>
+    </li>
+  </ol>
 
   <ImportPreviewForm client:load />
 </AdminLayout>
 
-<style>
-  .page-header {
-    margin-bottom: 20px;
-  }
-
-  .page-title {
-    font-size: 20px;
-    font-weight: 600;
+  <style>
+    .header-container {
+      margin-bottom: 20px;
+    }
+    
+    .back-link {
+      display: inline-block;
+      margin-bottom: 10px;
+      font-size: 13px;
+      color: var(--color-graphite-500);
+      text-decoration: none;
+      transition: color 0.18s ease;
+    }
+    
+  .back-link:hover {
     color: var(--color-graphite-800);
-    margin: 0;
   }
 
-  .page-description {
-    font-size: 13px;
-    color: var(--color-graphite-500);
-    margin: 4px 0 0;
+  .back-link:focus-visible {
+    outline: none;
+    color: var(--color-graphite-800);
+    text-decoration: underline;
   }
-</style>
+    
+    .page-header {
+      margin-bottom: 0;
+    }
+    
+    .page-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--color-graphite-800);
+      margin: 0;
+    }
+    
+    .page-description {
+      font-size: 13px;
+      color: var(--color-graphite-500);
+      margin: 4px 0 0;
+    }
+    
+    .guide-card {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      padding: 14px;
+      background: var(--color-porcelain-100);
+      border: 1px solid var(--color-graphite-180);
+      border-radius: var(--radius-card);
+      margin-bottom: 18px;
+    }
+    
+  .guide-step {
+    list-style: none;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+    
+    .step-number {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--color-royal-blue-100);
+      color: var(--color-royal-blue-700);
+      border: 1px solid var(--color-royal-blue-600);
+    }
+    
+    .step-content {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    
+    .step-title {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-graphite-800);
+    }
+    
+    .guide-step p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--color-graphite-650);
+    }
+    
+    @media (max-width: 900px) {
+      .guide-card {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>

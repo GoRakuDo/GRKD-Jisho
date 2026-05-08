@@ -13,7 +13,8 @@ if (session?.isAdmin && query) {
   try {
     responses = await searchResponse(query, 20);
   } catch (err) {
-    console.error("Responses SSR error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[Responses] SSR error: ${reason} → Check DB connection and response query parameters`);
   }
 }
 ---
@@ -53,7 +54,7 @@ if (session?.isAdmin && query) {
         </thead>
         <tbody>
           {responses.map((r) => (
-            <tr class="clickable-row" data-id={r.id} data-href={`/admin/responses/${r.id}`} onclick="window.location.href=this.dataset.href">
+            <tr class="clickable-row" data-href={`/admin/responses/${r.id}`}>
               <td class="mono">{r.id}</td>
               <td>{r.query}</td>
               <td class="mono">{r.roleKey}</td>
@@ -77,6 +78,16 @@ if (session?.isAdmin && query) {
     </div>
   )}
 </AdminLayout>
+
+<script>
+  document.addEventListener('click', (e) => {
+    const row = (e.target as HTMLElement).closest('.clickable-row');
+    if (row) {
+      const href = row.getAttribute('data-href');
+      if (href) window.location.href = href;
+    }
+  });
+</script>
 
 <style>
   .filter-bar {

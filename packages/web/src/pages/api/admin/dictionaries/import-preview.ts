@@ -149,7 +149,8 @@ export const POST: APIRoute = async (context) => {
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (err) {
-    console.error("Import preview error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[ImportPreviewAPI] Preview failed: ${reason} → Check ZIP file validity, size limits, and parser constraints`);
     return new Response(JSON.stringify({ error: "Preview failed" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

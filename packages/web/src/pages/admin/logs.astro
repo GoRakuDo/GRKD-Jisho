@@ -56,7 +56,8 @@ if (session?.isAdmin) {
       .orderBy(sql`count desc`)
       .limit(20);
   } catch (err) {
-    console.error("Logs SSR error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[Logs] SSR error: ${reason} → Check bot_events data availability and DB connectivity`);
   }
 }
 ---

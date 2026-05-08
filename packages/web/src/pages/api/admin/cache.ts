@@ -52,7 +52,8 @@ export const GET: APIRoute = async (context) => {
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (err) {
-    console.error("Cache API error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[CacheAPI] Fetch failed: ${reason} → Check query filter and DB connectivity`);
     return new Response(JSON.stringify({ error: "internal error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
@@ -128,7 +129,8 @@ export const DELETE: APIRoute = async (context) => {
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (err) {
-    console.error("Cache delete error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[CacheAPI] Delete failed: ${reason} → Check CSRF token, cache IDs, and manual override protection logic`);
     return new Response(JSON.stringify({ error: "delete failed" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

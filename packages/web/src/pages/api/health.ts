@@ -36,7 +36,8 @@ export const GET: APIRoute = async (context) => {
           },
         });
     } catch (err) {
-      console.error("[Health] Failed to upsert web heartbeat:", err);
+      const reason = err instanceof Error ? err.message : String(err);
+      console.error(`[Health] Failed to upsert web heartbeat: ${reason} → Check DATABASE_URL and bot_heartbeats schema/migration status`);
     }
 
     return new Response(

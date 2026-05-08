@@ -64,7 +64,8 @@ if (session?.isAdmin && id) {
       errorMessage = "Response not found.";
     }
   } catch (err) {
-    console.error("Response detail SSR error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[Responses] Detail SSR error: ${reason} → Check response ID format and DB connectivity`);
     errorMessage = "Failed to load response detail.";
   }
 } else if (!session?.isAdmin) {
@@ -211,6 +212,6 @@ if (session?.isAdmin && id) {
   }
 
   .btn-secondary:hover {
-    background: var(--color-porcelain-200);
+    background: var(--color-porcelain-150);
   }
 </style>

@@ -49,7 +49,8 @@ if (session?.isAdmin) {
       resultJson: j.resultJson ?? {},
     }));
   } catch (err) {
-    console.error("Ops jobs SSR error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[OpsJobs] SSR error: ${reason} → Check ops job query conditions and DB connectivity`);
   }
 }
 
@@ -91,7 +92,7 @@ const FILTER_LABELS: Record<string, string> = {
     <div class="filter-tabs">
       {FILTERS.map((f) => (
         <a
-          href={`/admin/ops-jobs${f ? `?filter=${f}` : ""}`}
+          href={`/admin/ops-jobs${f ? `?filter=${f}${selectedJobId ? `&jobId=${selectedJobId}` : ""}` : `${selectedJobId ? `?jobId=${selectedJobId}` : ""}`}`}
           class={`filter-tab ${currentFilter === f ? "active" : ""}`}
         >
           {FILTER_LABELS[f]}
@@ -197,7 +198,7 @@ const FILTER_LABELS: Record<string, string> = {
     font-size: 13px;
     font-weight: 500;
     color: var(--color-graphite-650);
-    border-radius: 8px;
+    border-radius: var(--radius-button);
     text-decoration: none;
     transition: background 0.1s;
   }

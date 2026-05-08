@@ -187,11 +187,11 @@ export default function ImportPreviewForm() {
       {error && (
         <div style={{
           padding: '12px 16px',
-          backgroundColor: 'var(--color-porcelain-50)',
-          border: '1px solid oklch(0.8 0.1 25)',
-          borderLeft: '4px solid oklch(0.6 0.2 25)',
+          backgroundColor: 'var(--color-danger-100)',
+          border: '1px solid var(--color-danger-600)',
+          borderLeft: '4px solid var(--color-danger-600)',
           borderRadius: 'var(--radius-card)',
-          color: 'oklch(0.4 0.15 25)',
+          color: 'var(--color-danger-600)',
           fontSize: '0.875rem',
         }}>
           {error}
