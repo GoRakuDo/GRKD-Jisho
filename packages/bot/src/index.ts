@@ -51,7 +51,8 @@ client.once("ready", () => {
             `[Wipe] ${setting.channelId}: ${deletedCount} messages deleted`,
           );
         } catch (err) {
-          console.error(`[Wipe] Failed channel ${setting.channelId}:`, err);
+          const reason = err instanceof Error ? err.message : String(err);
+          console.error(`[Wipe] Channel ${setting.channelId} failed: ${reason} → Check bot permissions (MANAGE_MESSAGES)`);
         }
       }
     },
@@ -76,7 +77,8 @@ client.once("ready", () => {
           `[LogPurge] Deleted ${result.lookupLogsDeleted} lookup_logs, ${result.botEventsDeleted} bot_events`,
         );
       } catch (err) {
-        console.error("[LogPurge] Failed:", err);
+        const reason = err instanceof Error ? err.message : String(err);
+        console.error(`[LogPurge] Failed: ${reason} → Check DB connection and LOG_RETENTION_DAYS`);
       }
     },
     {

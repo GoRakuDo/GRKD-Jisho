@@ -15,7 +15,8 @@ export async function traceEvent(
       payloadJson: payload ?? {},
     });
   } catch (err) {
-    console.error("[Observability] Failed to record event:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[Observability] Event recording failed: ${reason} → Check DB connection`);
   }
 }
 
@@ -48,6 +49,7 @@ export async function recordHeartbeat(
         },
       });
   } catch (err) {
-    console.error("[Observability] Failed to record heartbeat:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[Observability] Heartbeat recording failed: ${reason} → Check DB connection`);
   }
 }

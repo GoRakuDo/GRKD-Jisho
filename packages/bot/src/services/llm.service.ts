@@ -48,7 +48,7 @@ export async function generate(params: GenerateParams): Promise<string> {
   try {
     return await callGemini(prompt);
   } catch (err) {
-    console.warn("Gemini failed, falling back to OpenRouter:", err);
+    console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY, falling back to OpenRouter`);
     return await callOpenRouter(prompt);
   }
 }

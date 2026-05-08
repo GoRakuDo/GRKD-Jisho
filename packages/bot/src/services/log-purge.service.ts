@@ -38,7 +38,8 @@ export async function purgeOldLogs(
       payloadJson: { ...result, retentionDays },
     });
   } catch (err) {
-    console.error("[LogPurge] Failed to record purge event:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[LogPurge] Failed to record purge event: ${reason} → Check DB connection`);
   }
 
   return result;

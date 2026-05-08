@@ -20,6 +20,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error("Failed to register commands:", err);
+  const reason = err instanceof Error ? err.message : String(err);
+  console.error(`[Register] Command registration failed: ${reason} → Check DISCORD_TOKEN and DISCORD_GUILD_ID`);
   process.exit(1);
 });

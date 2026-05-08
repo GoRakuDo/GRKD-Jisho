@@ -52,7 +52,8 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
       userId: message.author?.id,
       error: String(err),
     });
-    console.error("[messageCreate] Unhandled error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[messageCreate] Unhandled error (trace_id=${traceId}): ${reason} → Check LLM/Dict config or DB`);
     try {
       await message.reply("予期しないエラーが発生しました。");
     } catch {

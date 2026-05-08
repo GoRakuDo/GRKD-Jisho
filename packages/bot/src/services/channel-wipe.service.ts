@@ -60,9 +60,9 @@ export async function wipeChannel(channel: TextChannel): Promise<WipeResult> {
         }
         totalDeleted += toDelete.size;
       } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
         console.error(
-          `[Wipe] trace_id=${traceId} delete batch failed after ${totalDeleted} deleted:`,
-          err,
+          `[Wipe] trace_id=${traceId} batch failed (${totalDeleted} done): ${reason} → Check permissions and 429 rate limits`,
         );
         // discord.js が429を自動リトライするため、ここでは記録のみ
         // どうしても失敗する場合は上位でキャッチされる

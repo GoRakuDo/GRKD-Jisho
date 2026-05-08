@@ -362,6 +362,66 @@ packages/bot/src/index.ts  ← 追記（parseLoginError + 呼び出し修正）
 
 ---
 
+## C-8: 全ログメッセージをユーザーフレンドリーに改善（新規）
+
+### 何をするか
+
+`console.error("prefix:", err)` のように生のスタックトレースを吐いている30箇所のログを、**「問題原因 → ユーザーへのヒント」** の短いメッセージに置き換える。
+
+### 対象
+
+bot パッケージ内の `console.error` / `console.warn` 呼び出し30件:
+
+| ファイル | 箇所 | 変更前のパターン | 変更後 |
+|---|---|---|---|
+| `index.ts` | 2 | `console.error("[Wipe] Failed:", err)` | `[Wipe] Channel ${id}: {error message} → Check bot permissions` |
+| `observability.service.ts` | 2 | `console.error("[Observability] Failed:", err)` | `[Observability] Event recording failed: {error message} → Check DB connection` |
+| `log-purge.service.ts` | 1 | `console.error("[LogPurge] Failed:", err)` | `[LogPurge] Purge failed: {error message} → Check DB connection` |
+| `llm.service.ts` | 1 | `console.warn("Gemini failed:", err)` | `[LLM] Gemini failed: {error message} → Check GEMINI_API_KEY` |
+| `channel-wipe.service.ts` | 2 | `console.error("[Wipe] ...:", err)` | `[Wipe] Channel ${id} bulkDelete failed: {error message} → Check permissions` |
+| `register-commands.ts` | 1 | `console.error("Failed to register:", err)` | `[Register] Command registration failed: {error message} → Check DISCORD_TOKEN` |
+| `messageCreate.ts` | 1 | `console.error("[messageCreate] Unhandled:", err)` | `[messageCreate] Search failed: {error message} → Check LLM/Dict config` |
+| `interactionCreate.ts` | 8 | `console.error("[Interaction] ...:", err)` | `[Interaction] ${type} failed: {error message} → {specific hint}` |
+| `env.ts` | 2 | `console.error("Invalid env:", fieldErrors)` | パターン変更なし（すでに十分明確） |
+| `commands/index.ts` | 1 | `console.warn("Duplicate registration")` | パターン変更なし（すでに十分明確） |
+
+### ルール
+
+```
+すべてのエラーログは以下のフォーマットに統一:
+
+  [Tag] {short description}: {error.message} → {actionable hint}
+
+例外:
+- console.log (情報) は変更しない。運用状態の可視性を保つ
+- env.ts / commands/index.ts はすでに十分明確なのでスキップ
+```
+
+### 対象外
+
+- `console.log` → 情報表示として維持。稼働状態の可視性を保つ
+- `packages/bot/test/` → テストコード。実運用に影響しない
+- MCP / Web パッケージ → 別の機会に
+
+### ファイル構成
+
+```
+packages/bot/src/
+  index.ts                    ← 2箇所修正
+  services/
+    observability.service.ts  ← 2箇所修正
+    log-purge.service.ts      ← 1箇所修正
+    llm.service.ts            ← 1箇所修正
+    channel-wipe.service.ts   ← 2箇所修正
+  scripts/
+    register-commands.ts      ← 1箇所修正
+  events/
+    messageCreate.ts          ← 1箇所修正
+    interactionCreate.ts      ← 8箇所修正
+```
+
+---
+
 ## 実装優先順位
 
 | 優先度 | ID | 内容 | 工数 | 理由 |
@@ -371,13 +431,15 @@ packages/bot/src/index.ts  ← 追記（parseLoginError + 呼び出し修正）
 | P1 | C-3 | `pnpm deploy:check` | 2-3h | デプロイ前に不足がわかる安心感 |
 | P1 | C-2 | `pnpm deploy:pg-config` | 1-2h | sed 不要になる。DRY_RUN 対応で安全 |
 | P2 | C-5 | 既存スクリプト強化 | 0.5h | 上記が全部できてから呼び出し追加 |
-| P2 | C-7 | Bot エラーメッセージ改善 | 0.5h | デプロイ後に「Intent未有効」の生スタックトレースが表示されるのを、人間にわかる案内に改善 |
+| P2 | C-7 | login エラーメッセージ改善 | 0.5h | デプロイ後に「Intent未有効」の生スタックトレースが表示されるのを、人間にわかる案内に改善 |
+| **P0** | **C-8** | **全ログメッセージ改善** | **1-2h** | **全30箇所の `console.error` を「問題原因＋ユーザーヒント」に統一。Kasou運用で顕在化した最大のUX課題** |
 
-**推奨順序**: C-4 → C-1 → C-2 → C-3 → C-5 → C-7
+**推奨順序**: C-4 → C-1 → C-2 → C-3 → C-5 → C-7 → C-8
 
 C-4（env:validate）が一番カンタンで一番早く効果が出る。
 C-1（db:setup）が最大の価値だが、C-4で肩ならししてから取りかかるのが現実的。
-C-7（エラーメッセージ改善）はBotが動き始めてから気づく問題に対応する。Kasouデプロイ時に顕在化した。
+C-7（login エラーメッセージ）はKasouデプロイ時に顕在化した問題を即座に修正。
+C-8（全ログ改善）はC-7のパターンを全ファイルに展開する。30箇所の一括置換だが、各ファイルの読み取りが必要。
 
 ---
 

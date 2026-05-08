@@ -18,7 +18,8 @@ export const interactionCreateHandler = async (
     try {
       await handleButtonInteraction(interaction);
     } catch (err) {
-      console.error(`[Interaction] Button "${interaction.customId}" failed:`, err);
+      const reason = err instanceof Error ? err.message : String(err);
+      console.error(`[Interaction] Button "${interaction.customId}" failed: ${reason} → Check interaction handler`);
       const errorReply = {
         content: "ボタン処理中にエラーが発生しました。",
         ephemeral: true,
@@ -30,7 +31,8 @@ export const interactionCreateHandler = async (
           await interaction.reply(errorReply);
         }
       } catch (replyErr) {
-        console.error("[Interaction] Failed to send button error reply:", replyErr);
+        const r2 = replyErr instanceof Error ? replyErr.message : String(replyErr);
+        console.error(`[Interaction] Button error reply also failed: ${r2} → Cannot recover`);
       }
     }
     return;
@@ -41,7 +43,8 @@ export const interactionCreateHandler = async (
     try {
       await handleModalSubmit(interaction);
     } catch (err) {
-      console.error(`[Interaction] Modal "${interaction.customId}" failed:`, err);
+      const reason = err instanceof Error ? err.message : String(err);
+      console.error(`[Interaction] Modal "${interaction.customId}" failed: ${reason} → Check modal handler`);
       const errorReply = {
         content: "モーダル処理中にエラーが発生しました。",
         ephemeral: true,
@@ -53,7 +56,8 @@ export const interactionCreateHandler = async (
           await interaction.reply(errorReply);
         }
       } catch (replyErr) {
-        console.error("[Interaction] Failed to send modal error reply:", replyErr);
+        const r2 = replyErr instanceof Error ? replyErr.message : String(replyErr);
+        console.error(`[Interaction] Modal error reply also failed: ${r2} → Cannot recover`);
       }
     }
     return;
@@ -82,9 +86,9 @@ export const interactionCreateHandler = async (
   try {
     await cmd.execute(interaction);
   } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
     console.error(
-      `[Interaction] Command "${interaction.commandName}" failed:`,
-      err,
+      `[Interaction] Command "${interaction.commandName}" failed: ${reason} → Check command handler`,
     );
     const errorReply = {
       content: "コマンドの実行中にエラーが発生しました。",
@@ -142,7 +146,8 @@ async function handleButtonInteraction(
         components: [],
       });
     } catch (err) {
-      console.error(`[Button] wipe-now failed for ${channelId}:`, err);
+      const reason = err instanceof Error ? err.message : String(err);
+      console.error(`[Button] wipe-now failed for ${channelId}: ${reason} → Check permissions (MANAGE_MESSAGES)`);
       await interaction.editReply({
         content: `削除に失敗しました。権限を確認してください。`,
         components: [],
@@ -200,7 +205,8 @@ async function handleModalSubmit(
       ephemeral: true,
     });
   } catch (err) {
-    console.error(`[Modal] edit_jisho_${responseId} failed:`, err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[Modal] edit_jisho_${responseId} failed: ${reason} → Check response ID and DB`);
     await interaction.reply({
       content: "更新中にエラーが発生しました。",
       ephemeral: true,
