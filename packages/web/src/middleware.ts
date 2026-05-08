@@ -4,7 +4,7 @@ import { setLocals } from "./lib/locals";
 import { validateCsrfRequest } from "./lib/csrf";
 
 /** Paths that do not require authentication */
-const PUBLIC_PATHS = new Set(["/auth/login", "/auth/callback", "/auth/logout"]);
+const PUBLIC_PATHS = new Set(["/auth/login", "/api/auth/callback", "/auth/logout"]);
 
 /** Paths that are exempt from CSRF check */
 const CSRF_EXEMPT_PATHS = new Set(["/api/health", "/api/auth/authorize"]);

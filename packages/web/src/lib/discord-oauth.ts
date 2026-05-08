@@ -39,7 +39,7 @@ export function buildAuthorizeUrl(state: string): string {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: env.DISCORD_CLIENT_ID,
-    redirect_uri: `${env.WEB_BASE_URL}/auth/callback`,
+    redirect_uri: `${env.WEB_BASE_URL}/api/auth/callback`,
     scope: "identify guilds guilds.members.read",
     state,
   });
@@ -59,7 +59,7 @@ export async function exchangeCode(code: string): Promise<string> {
       client_secret: env.DISCORD_CLIENT_SECRET,
       grant_type: "authorization_code",
       code,
-      redirect_uri: `${env.WEB_BASE_URL}/auth/callback`,
+      redirect_uri: `${env.WEB_BASE_URL}/api/auth/callback`,
     }),
   });
 
