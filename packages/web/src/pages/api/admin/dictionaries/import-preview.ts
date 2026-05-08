@@ -52,10 +52,10 @@ export const POST: APIRoute = async (context) => {
       });
     }
 
-    // 安全制約: サイズ上限 50MB (compressed)
-    const MAX_SIZE = 50 * 1024 * 1024;
+    // 安全制約: サイズ上限 300MB (compressed)
+    const MAX_SIZE = 300 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      return new Response(JSON.stringify({ error: "File too large (max 50MB)" }), {
+      return new Response(JSON.stringify({ error: "File too large (max 300MB)" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
