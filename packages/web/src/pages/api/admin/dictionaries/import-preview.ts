@@ -20,6 +20,8 @@ export const POST: APIRoute = async (context) => {
     });
   }
 
+  // NOTE: This route is exempted from middleware CSRF checks.
+  // Keep this route-level validation as the required CSRF gate.
   if (!validateCsrfRequest(session.discordUserId, context.request)) {
     return new Response(JSON.stringify({ error: "CSRF validation failed" }), {
       status: 403,
