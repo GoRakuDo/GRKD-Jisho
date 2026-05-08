@@ -597,4 +597,25 @@ CLI ツール実装とは別のトラックで進める。
 packages/web/src/pages/auth/login.astro  ← 全面書き換え
 ```
 
+### 関連修正: OAuth callback ルートパス不整合（Kasouデプロイ時に発見）
+
+**発生日**: 2026-05-08
+
+**問題**: Discord Developer Portal の redirect_uri は `/api/auth/callback` だが、
+実際の Astro ファイルは `src/pages/auth/callback.ts` にあったため、URL は `/auth/callback` に
+マッピングされていた。そのため OAuth 認証が成功しても Discord からブラウザへのリダイレクトが
+404 で失敗していた。
+
+**修正内容**:
+
+| 変更 | 内容 |
+|---|---|
+| ファイル移動 | `src/pages/auth/callback.ts` → `src/pages/api/auth/callback.ts` |
+| import パス | `../../lib/...` → `../../../lib/...`（2階層→3階層に修正） |
+| ログフォーマット | `console.error("OAuth:", err)` → `[OAuth] {reason} → Check Discord OAuth2 config`（AGENTS.md §17 準拠） |
+| 型チェック | ✅ astro check 0 errors |
+
+**教訓**: Astro の `src/pages/api/` ディレクトリが `/api/` にマッピングされることを
+文書化し、新しい API ルートは必ず `src/pages/api/` 以下に作成する。
+
 ---
