@@ -17,6 +17,8 @@ const CSRF_EXEMPT_PATHS = new Set([
   "/api/auth/authorize",
   // Defense-in-depth: callback is already public, keep exempt if PUBLIC_PATHS changes later.
   "/api/auth/callback",
+  // Import preview validates CSRF again inside route handler; avoid duplicate middleware check.
+  "/api/admin/dictionaries/import-preview",
 ]);
 
 export const onRequest = defineMiddleware(async (context, next) => {
