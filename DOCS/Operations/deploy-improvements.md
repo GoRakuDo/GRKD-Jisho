@@ -433,8 +433,9 @@ packages/bot/src/
 | P2 | C-5 | 既存スクリプト強化 | 0.5h | 上記が全部できてから呼び出し追加 |
 | P2 | C-7 | login エラーメッセージ改善 | 0.5h | デプロイ後に「Intent未有効」の生スタックトレースが表示されるのを、人間にわかる案内に改善 |
 | **P0** | **C-8** | **全ログメッセージ改善** | **1-2h** | **全30箇所の `console.error` を「問題原因＋ユーザーヒント」に統一。Kasou運用で顕在化した最大のUX課題** |
+| P2 | C-9 | ログインページUI改善 | 1-2h | 現在の「白いカード＋ボタンだけ」のログインページに、サービス名・ガイダンス・バージョン表示を追加する |
 
-**推奨順序**: C-4 → C-1 → C-2 → C-3 → C-5 → C-7 → C-8
+**推奨順序**: C-4 → C-1 → C-2 → C-3 → C-5 → C-7 → C-8 → C-9
 
 C-4（env:validate）が一番カンタンで一番早く効果が出る。
 C-1（db:setup）が最大の価値だが、C-4で肩ならししてから取りかかるのが現実的。
@@ -538,3 +539,62 @@ CLI ツール実装とは別のトラックで進める。
 | `@grkd-jisho/bot` tsc | ✅ 0 errors |
 | `@grkd-jisho/mcp` tsc | ✅ 0 errors |
 | `@grkd-jisho/bot` tests | ✅ 39/39 passed |
+
+---
+
+## C-9: ログインページUI改善
+
+### 現状
+
+`packages/web/src/pages/auth/login.astro` は白背景に灰色カードとロイヤルブルーのボタン1つだけ。
+ブランド感がなく、初めてのユーザーに何をすればいいかのガイダンスがない。
+
+### 改善内容
+
+ログイン画面に以下の要素を追加する：
+
+**① サービスのヒーローセクション**
+- "GRKD-Jisho" の大きなテキストロゴ
+- ロイヤルブルーのアクセントライン
+- タグライン: "Indonesian Japanese Dictionary Bot for Discord"
+
+**② 3ステップのガイダンス**
+1. Sign in with Discord — ボタンをクリック
+2. Grant permissions — 権限を承認
+3. Access the admin panel — 管理画面へ
+
+各ステップに記号アイコン（①・②・③ または ◆）
+
+**③ 既存のDiscord OAuth2ボタン（そのまま）**
+
+**④ エラー表示（既存、そのまま）**
+
+**⑤ フッター領域**
+- バージョン: `v0.1.0`
+- "GoRakuDo" リンク
+
+### デザインルール
+
+| 項目 | 値 |
+|---|---|
+| ボタン色 | `bg-royal-blue-600 hover:bg-royal-blue-700` |
+| カード背景 | `bg-porcelain-100 border-graphite-180` |
+| 見出し | `text-graphite-800 font-grkd-sans` |
+| 本文 | `text-graphite-650 font-grkd-sans` |
+| バージョン | `text-graphite-550 font-grkd-mono text-body-xs` |
+| アクセントライン | `border-royal-blue-600` 水平線 |
+
+詳細は `DESIGN.md` のトークン定義に従う。
+
+### 禁止事項（DESIGN.md準拠）
+- pure black / pure white 不使用
+- 過剰なアニメーション禁止
+- Discord ロゴ画像不使用（テキストのみ）
+
+### 変更ファイル
+
+```
+packages/web/src/pages/auth/login.astro  ← 全面書き換え
+```
+
+---
