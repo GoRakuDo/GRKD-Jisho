@@ -64,7 +64,8 @@ export const GET: APIRoute = async (context) => {
 
     return context.redirect("/admin");
   } catch (err) {
-    console.error("OAuth callback error:", err);
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[OAuth] Callback failed: ${reason} → Check Discord OAuth2 config (CLIENT_ID, CLIENT_SECRET, redirect_uri)`);
     return context.redirect("/auth/login?error=oauth_failed");
   }
 };
