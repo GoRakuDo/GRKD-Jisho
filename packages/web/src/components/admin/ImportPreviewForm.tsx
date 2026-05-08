@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface PreviewData {
   title: string;
@@ -11,13 +11,25 @@ interface PreviewData {
   fileSize: number;
 }
 
+interface ImportResultData {
+  dictionaryId: string;
+  dictionaryName: string;
+  importedEntries: number;
+}
+
 export default function ImportPreviewForm() {
   const [file, setFile] = useState<File | null>(null);
-  const [csrfToken, setCsrfToken] = useState<string>('');
+  const [csrfToken, setCsrfToken] = useState('');
   const [isCsrfReady, setIsCsrfReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewData | null>(null);
+
+  const [dictionaryName, setDictionaryName] = useState('');
+  const [priority, setPriority] = useState(1);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<ImportResultData | null>(null);
 
   useEffect(() => {
     fetch('/api/auth/csrf-token')
@@ -27,8 +39,8 @@ export default function ImportPreviewForm() {
         }
         return res.json();
       })
-      .then(data => {
-        if (data && data.token) {
+      .then((data: { token?: string }) => {
+        if (data.token) {
           setCsrfToken(data.token);
           setIsCsrfReady(true);
           return;
@@ -47,6 +59,8 @@ export default function ImportPreviewForm() {
       setFile(selectedFile);
       setError(null);
       setPreview(null);
+      setImportError(null);
+      setImportResult(null);
     }
   };
 
@@ -83,13 +97,69 @@ export default function ImportPreviewForm() {
         throw new Error(errorData.error || `Error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as PreviewData;
       setPreview(data);
+      setDictionaryName(data.title);
+      setImportError(null);
+      setImportResult(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate preview.';
       setError(message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!csrfToken) {
+      setImportError('Security token is missing or expired. Refresh this page and try again.');
+      return;
+    }
+    if (!file || !preview) {
+      setImportError('Preview data is missing. Generate preview again before importing.');
+      return;
+    }
+    if (!dictionaryName.trim()) {
+      setImportError('Dictionary name is required.');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportError(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('dictionaryName', dictionaryName.trim());
+    formData.append('priority', String(priority));
+
+    try {
+      const response = await fetch('/api/admin/dictionaries/import', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'x-csrf-token': csrfToken,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Import failed (${response.status})`);
+      }
+
+      const payload = (await response.json()) as { success?: boolean; result?: ImportResultData };
+      if (!payload.success || !payload.result) {
+        throw new Error('Import response is missing result payload.');
+      }
+
+      setImportResult(payload.result);
+      setPreview(null);
+      setFile(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to import dictionary.';
+      setImportError(message);
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -112,11 +182,11 @@ export default function ImportPreviewForm() {
     border: 'none',
     fontSize: '0.875rem',
     fontWeight: 500,
-    cursor: isLoading ? 'not-allowed' : 'pointer',
+    cursor: isLoading || isImporting ? 'not-allowed' : 'pointer',
     backgroundColor: 'var(--color-royal-blue-600)',
     color: 'var(--color-porcelain-50)',
     transition: 'background-color 0.2s ease',
-    opacity: isLoading ? 0.7 : 1,
+    opacity: isLoading || isImporting ? 0.7 : 1,
     width: 'fit-content',
   };
 
@@ -166,7 +236,7 @@ export default function ImportPreviewForm() {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   };
 
   return (
@@ -194,7 +264,7 @@ export default function ImportPreviewForm() {
           </label>
         </div>
 
-        <button type="submit" disabled={isLoading || !file || !isCsrfReady} style={buttonStyle}>
+        <button type="submit" disabled={isLoading || isImporting || !file || !isCsrfReady} style={buttonStyle}>
           {isLoading ? 'Generating Preview...' : 'Preview Import'}
         </button>
       </form>
@@ -218,7 +288,7 @@ export default function ImportPreviewForm() {
           <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--color-graphite-900)' }}>
             Preview Results
           </h3>
-          
+
           <div style={statsGridStyle}>
             <div style={statItemStyle}>
               <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-graphite-500)', textTransform: 'uppercase' }}>Title</span>
@@ -252,6 +322,105 @@ export default function ImportPreviewForm() {
               <span style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-graphite-800)' }}>{formatFileSize(preview.fileSize)}</span>
             </div>
           </div>
+
+          {!importResult && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingTop: '16px', borderTop: '1px solid var(--color-graphite-180)' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--color-graphite-900)' }}>
+                Confirm Import
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={fileInputWrapperStyle}>
+                  <label style={fileInputLabelStyle}>Dictionary Name</label>
+                  <input
+                    type="text"
+                    value={dictionaryName}
+                    disabled={isImporting}
+                    onChange={(e) => setDictionaryName(e.target.value)}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 'var(--radius-input)',
+                      border: '1px solid var(--color-graphite-300)',
+                      backgroundColor: 'var(--color-porcelain-50)',
+                      color: 'var(--color-graphite-900)',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
+
+                <div style={fileInputWrapperStyle}>
+                  <label style={fileInputLabelStyle}>Priority (0-9999)</label>
+                  <input
+                    type="number"
+                    value={priority}
+                    min={0}
+                    max={9999}
+                    disabled={isImporting}
+                    onChange={(e) => {
+                      const next = Number.parseInt(e.target.value, 10);
+                      if (Number.isNaN(next)) {
+                        setPriority(0);
+                        return;
+                      }
+                      setPriority(Math.max(0, Math.min(9999, next)));
+                    }}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 'var(--radius-input)',
+                      border: '1px solid var(--color-graphite-300)',
+                      backgroundColor: 'var(--color-porcelain-50)',
+                      color: 'var(--color-graphite-900)',
+                      fontSize: '0.875rem',
+                      outline: 'none',
+                      width: '140px',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                disabled={isImporting || !dictionaryName.trim()}
+                onClick={handleImport}
+                style={buttonStyle}
+              >
+                {isImporting ? 'Importing...' : 'Confirm Import'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {importError && (
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: 'var(--color-danger-100)',
+          border: '1px solid var(--color-danger-600)',
+          borderLeft: '4px solid var(--color-danger-600)',
+          borderRadius: 'var(--radius-card)',
+          color: 'var(--color-danger-600)',
+          fontSize: '0.875rem',
+        }}>
+          {importError}
+        </div>
+      )}
+
+      {importResult && (
+        <div style={{
+          padding: '16px',
+          backgroundColor: 'var(--color-success-100)',
+          border: '1px solid var(--color-success-600)',
+          borderRadius: 'var(--radius-card)',
+          color: 'var(--color-success-600)',
+          fontSize: '0.875rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+        }}>
+          <strong>Import Successful</strong>
+          <span>Dictionary: {importResult.dictionaryName} (ID: {importResult.dictionaryId})</span>
+          <span>Imported Entries: {importResult.importedEntries.toLocaleString()}</span>
         </div>
       )}
     </div>

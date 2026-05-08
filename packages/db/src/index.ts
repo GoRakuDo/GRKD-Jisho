@@ -13,3 +13,4 @@ export * from "./services/admin/trace-viewer";
 export * from "./services/admin/ops-jobs-admin";
 export * from "./services/admin/rate-limit-admin";
 export * from "./services/admin/wipe-admin";
+export * from "./services/admin/yomitan-import";

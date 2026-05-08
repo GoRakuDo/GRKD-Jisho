@@ -31,8 +31,11 @@ export default function ResponseDetailPanel({
       .then(res => res.json())
       .then(data => {
         if (data && data.token) setCsrfToken(data.token);
+        else throw new Error('Invalid CSRF response');
       })
-      .catch(() => {});
+      .catch(() => {
+        setSaveError('Security token initialization failed. Please refresh the page.');
+      });
   }, []);
 
   useEffect(() => {

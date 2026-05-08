@@ -33,10 +33,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // Initialize locals
   setLocals(context, { user: null, isAuthenticated: false });
 
-  if (pathname === "/api/admin/dictionaries/import-preview" && request.method.toUpperCase() === "POST") {
-    console.error("[ImportPreview] Request arrived at middleware: POST /api/admin/dictionaries/import-preview → Checking auth/CSRF gates");
-  }
-
   // Auth routes are public
   if (PUBLIC_PATHS.has(pathname)) {
     return next();
@@ -58,7 +54,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
     // CSRF check for non-GET, non-HEAD requests (write operations)
     if (!CSRF_EXEMPT_PATHS.has(pathname)) {
       const method = request.method.toUpperCase();
-      console.log(`[CSRF] Gate check: ${method} ${pathname} exempt=false`);
       if (!["GET", "HEAD"].includes(method)) {
         const isValid = validateCsrfRequest(session.discordUserId, request);
         if (!isValid) {
@@ -68,9 +63,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
           return new Response("CSRF validation failed", { status: 403 });
         }
       }
-    } else {
-      const method = request.method.toUpperCase();
-      console.log(`[CSRF] Gate bypass: ${method} ${pathname} exempt=true`);
     }
 
     // Refresh authCheckedAt if stale (keep session alive)

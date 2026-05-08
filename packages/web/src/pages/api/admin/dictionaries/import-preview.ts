@@ -12,7 +12,6 @@ interface IndexJson {
 }
 
 export const POST: APIRoute = async (context) => {
-  console.error("[ImportPreviewAPI] Handler entered: POST request received → Starting auth/CSRF validation");
   const session = getSession(context);
   if (!session || !getIsAuthenticated(context)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
@@ -125,7 +124,7 @@ export const POST: APIRoute = async (context) => {
 
     // term_bank 件数の概算
     const termBankFiles = zipEntries
-      .filter((e) => e.entryName.startsWith("term_bank_") && e.entryName.endsWith(".json"))
+      .filter((e) => /^term_bank_(\d+)\.json$/.test(e.entryName))
       .sort((a, b) => a.entryName.localeCompare(b.entryName));
 
     let totalTerms = 0;

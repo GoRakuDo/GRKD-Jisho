@@ -1,4 +1,4 @@
-import { pgTable, bigserial, integer, text, jsonb, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, integer, text, jsonb, timestamp, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { dictionaries } from "./dictionaries";
 
 export const dictionaryEntries = pgTable(
@@ -9,7 +9,7 @@ export const dictionaryEntries = pgTable(
       .notNull()
       .references(() => dictionaries.id),
     term: text("term").notNull(),
-    reading: text("reading"),
+    reading: text("reading").notNull(),
     definitionsJson: jsonb("definitions_json").notNull(),
     tagsJson: jsonb("tags_json").default([]),
     rawJson: jsonb("raw_json").notNull(),
@@ -19,6 +19,7 @@ export const dictionaryEntries = pgTable(
     index("idx_dict_entries_term").on(table.term),
     index("idx_dict_entries_reading").on(table.reading),
     index("idx_dict_entries_dict_id").on(table.dictionaryId),
+    uniqueIndex("uq_dict_entries_dict_term_reading").on(table.dictionaryId, table.term, table.reading),
   ]
 );
 

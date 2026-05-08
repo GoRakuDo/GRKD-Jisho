@@ -14,13 +14,20 @@ export const TopBar: React.FC<TopBarProps> = ({ title }) => {
         </h1>
       </div>
       <div className="flex items-center gap-4">
-        {/* Placeholder for future health chips and user menu */}
+        {/* Placeholder for future health chips */}
         <div className="flex items-center gap-2">
-          {/* Mock health chips could go here */}
+          {/* Health chips */}
         </div>
-        <div className="w-8 h-8 rounded-full bg-porcelain-220 flex items-center justify-center text-graphite-650 text-sm font-medium">
-          {/* User menu placeholder */}
-          U
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-graphite-800 bg-porcelain-220 px-3 py-1 rounded-full font-medium">
+            Account
+          </span>
+          <a 
+            href="/auth/logout" 
+            className="text-sm text-royal-blue-600 hover:text-royal-blue-700 transition-colors"
+          >
+            Logout
+          </a>
         </div>
       </div>
     </header>
