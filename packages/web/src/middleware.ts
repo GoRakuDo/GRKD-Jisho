@@ -4,10 +4,20 @@ import { setLocals } from "./lib/locals";
 import { validateCsrfRequest } from "./lib/csrf";
 
 /** Paths that do not require authentication */
-const PUBLIC_PATHS = new Set(["/auth/login", "/api/auth/callback", "/auth/logout"]);
+const PUBLIC_PATHS = new Set([
+  "/auth/login",
+  "/api/auth/authorize",
+  "/api/auth/callback",
+  "/auth/logout",
+]);
 
 /** Paths that are exempt from CSRF check */
-const CSRF_EXEMPT_PATHS = new Set(["/api/health", "/api/auth/authorize"]);
+const CSRF_EXEMPT_PATHS = new Set([
+  "/api/health",
+  "/api/auth/authorize",
+  // Defense-in-depth: callback is already public, keep exempt if PUBLIC_PATHS changes later.
+  "/api/auth/callback",
+]);
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { url, request } = context;
@@ -22,7 +32,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   // Protect /admin/* and /api/*
-  if (pathname.startsWith("/admin") || pathname.startsWith("/api")) {
+  if (
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/api" ||
+    pathname.startsWith("/api/")
+  ) {
     const session = getSession(context);
 
     if (!session || !session.isAdmin) {

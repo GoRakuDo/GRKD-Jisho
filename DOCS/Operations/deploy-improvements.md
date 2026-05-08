@@ -12,6 +12,28 @@ Kasou（t620, Debian 13.4.0）への初回デプロイで発生した
 > 環境が整う状態を目指す。
 
 ---
+
+### 追加修正: `/api/auth/authorize` が未認証でブロックされる問題
+
+**発生日**: 2026-05-08
+
+**問題**: Windows から `http://192.168.100.46:4321/api/auth/authorize` にアクセスすると機能せず、
+`/auth/login` に 302 リダイレクトされる。
+
+**原因**:
+- `packages/web/src/middleware.ts` の `PUBLIC_PATHS` に `/api/auth/authorize` が未登録
+- その結果、`/api/*` 保護ルールに吸い込まれて未認証時に `/auth/login` へ戻される
+
+**修正**:
+- `PUBLIC_PATHS` に `/api/auth/authorize` を追加
+
+**影響**:
+- ログインページの「Sign in with Discord」ボタン（`/api/auth/authorize`）が正常に OAuth フローを開始できる
+
+**検証**:
+- `packages/web` で `astro check` 実行: **0 errors / 0 warnings / 0 hints**
+
+---
 ### コードレビュー発見: redirect_uri 未更新（3件のBLOCKER）
 
 **発生日**: 2026-05-08 | **原因**: callback.ts を移動したが、OAuth2 ライブラリ内の `redirect_uri` と middleware の `PUBLIC_PATHS` が古いパスのままだった。
