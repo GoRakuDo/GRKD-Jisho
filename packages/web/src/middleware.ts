@@ -28,6 +28,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // Initialize locals
   setLocals(context, { user: null, isAuthenticated: false });
 
+  if (pathname === "/api/admin/dictionaries/import-preview" && request.method.toUpperCase() === "POST") {
+    console.error("[ImportPreview] Request arrived at middleware: POST /api/admin/dictionaries/import-preview → Checking auth/CSRF gates");
+  }
+
   // Auth routes are public
   if (PUBLIC_PATHS.has(pathname)) {
     return next();

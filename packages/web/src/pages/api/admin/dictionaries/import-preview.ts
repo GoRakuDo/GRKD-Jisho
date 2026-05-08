@@ -12,6 +12,7 @@ interface IndexJson {
 }
 
 export const POST: APIRoute = async (context) => {
+  console.error("[ImportPreviewAPI] Handler entered: POST request received → Starting auth/CSRF validation");
   const session = getSession(context);
   if (!session || !getIsAuthenticated(context)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
