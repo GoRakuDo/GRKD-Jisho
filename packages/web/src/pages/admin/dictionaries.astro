@@ -7,11 +7,8 @@ import {
   schema,
 } from "@grkd-jisho/db";
 import { count } from "drizzle-orm";
-import { DictionaryTable } from "../../components/admin/DictionaryTable";
-import { generateCsrfToken } from "../../lib/csrf";
 
 const session = getSession(Astro);
-const csrfToken = session ? generateCsrfToken(session.discordUserId) : '';
 
 interface DictWithCount {
   id: string;
@@ -52,6 +49,83 @@ if (session?.isAdmin) {
 }
 ---
 
+<script>
+// CSRF token injected from SSR
+const SSR_CSRF_TOKEN = /* @__PURE__ */ '${csrfToken}';
+
+document.addEventListener('DOMContentLoaded', () => {
+  async function updateDictionary(dictId: string, updates: { enabled?: boolean; priority?: number }) {
+    const row = document.querySelector(`tr[data-dict-id="${dictId}"]`) as HTMLTableRowElement | null;
+    if (!row) return;
+
+    try {
+      row.style.opacity = '0.5';
+
+      const res = await fetch('/api/admin/dictionaries', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-csrf-token': SSR_CSRF_TOKEN,
+        },
+        body: JSON.stringify({ id: Number(dictId), ...updates }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Update failed (${res.status})`);
+      }
+
+      // Optimistic UI update
+      if (updates.enabled !== undefined) {
+        const badge = row.querySelector<HTMLSpanElement>('.status-badge');
+        if (badge) {
+          const newEnabled = updates.enabled;
+          badge.className = `status-badge ${newEnabled ? 'badge-enabled' : 'badge-disabled'}`;
+          badge.textContent = newEnabled ? 'enabled' : 'disabled';
+          badge.setAttribute('data-enabled', String(newEnabled));
+        }
+      }
+
+      if (updates.priority !== undefined) {
+        const input = row.querySelector<HTMLInputElement>('.priority-input');
+        if (input) {
+          input.value = String(updates.priority);
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Update failed';
+      console.error(`[DictionaryUpdate] ${msg} → Check CSRF token and session validity`);
+      alert(msg);
+    } finally {
+      row.style.opacity = '1';
+    }
+  }
+
+  // Status toggle
+  document.querySelectorAll('.status-badge').forEach((badge) => {
+    badge.addEventListener('click', async () => {
+      const row = badge.closest('tr') as HTMLTableRowElement;
+      const dictId = row?.getAttribute('data-dict-id');
+      const currentEnabled = badge.getAttribute('data-enabled') === 'true';
+      if (!dictId) return;
+      await updateDictionary(dictId, { enabled: !currentEnabled });
+    });
+  });
+
+  // Priority input
+  document.querySelectorAll('.priority-input').forEach((input) => {
+    input.addEventListener('change', async () => {
+      const row = input.closest('tr') as HTMLTableRowElement | null;
+      const dictId = row?.getAttribute('data-dict-id');
+      const priority = parseInt((input as HTMLInputElement).value, 10);
+      if (!dictId || Number.isNaN(priority)) return;
+      await updateDictionary(dictId, { priority });
+    });
+  });
+});
+</script>
+
 <AdminLayout title="Dictionaries" active="dictionaries">
   <div class="page-header">
     <div>
@@ -81,12 +155,35 @@ if (session?.isAdmin) {
             <th>Status</th>
           </tr>
         </thead>
-        <DictionaryTable
-          client:load
-          dictionaries={dictionaries}
-          csrfToken={csrfToken}
-          onUpdate={() => {}}
-        />
+        <tbody>
+          {dictionaries.map((d) => (
+            <tr data-dict-id={d.id}>
+              <td class="priority-cell">
+                <input
+                  type="number"
+                  class="priority-input"
+                  value={d.priority}
+                  min={0}
+                  max={9999}
+                  aria-label={`Priority for ${d.name}`}
+                />
+              </td>
+              <td class="name-cell">{d.name}</td>
+              <td class="mono">{d.slug}</td>
+              <td class="mono">{d.entryCount.toLocaleString()}</td>
+              <td>
+                <span
+                  class={`status-badge ${d.enabled ? 'badge-enabled' : 'badge-disabled'}`}
+                  data-enabled={d.enabled}
+                  style="cursor: pointer;"
+                  title="Click to toggle"
+                >
+                  {d.enabled ? 'enabled' : 'disabled'}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
       </table>
     </div>
   )}
@@ -216,66 +313,31 @@ if (session?.isAdmin) {
     color: var(--color-graphite-800);
   }
 
-  .status-toggle {
+  .status-badge {
     display: inline-block;
     padding: 4px 12px;
     border-radius: 999px;
     font-size: 11px;
     font-weight: 500;
-    border: none;
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-  }
-
-  .status-toggle.enabled {
-    background: var(--color-success-100);
-    color: var(--color-success-600);
-  }
-
-  .status-toggle.enabled:hover {
-    background: var(--color-success-200);
-  }
-
-  .status-toggle.disabled {
-    background: var(--color-porcelain-150);
-    color: var(--color-graphite-650);
-  }
-
-  .status-toggle.disabled:hover {
-    background: var(--color-porcelain-200);
-  }
-
-  .status-toggle:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .save-error {
-    text-align: center;
-    color: var(--color-danger-600);
-    font-size: 12px;
-    padding: 8px 12px;
-    background: var(--color-danger-100);
+    user-select: none;
   }
 
   .badge-enabled {
-    display: inline-block;
     background: var(--color-success-100);
     color: var(--color-success-600);
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 500;
+  }
+
+  .badge-enabled:hover {
+    background: var(--color-success-200);
   }
 
   .badge-disabled {
-    display: inline-block;
     background: var(--color-porcelain-150);
     color: var(--color-graphite-650);
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 500;
+  }
+
+  .badge-disabled:hover {
+    background: var(--color-porcelain-200);
   }
 
   .empty-state {

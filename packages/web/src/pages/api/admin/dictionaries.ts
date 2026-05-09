@@ -92,10 +92,20 @@ export const PUT: APIRoute = async (context) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    // Return updated dictionary for optimistic UI
+    const dicts = await getDictionaryList();
+    const updated = dicts.find((d) => d.id === body.id);
+    const entryCount = updated ? await getDictionaryEntryCount(updated.id) : 0;
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        dictionary: updated
+          ? { id: String(updated.id), enabled: updated.enabled, priority: updated.priority, entryCount }
+          : null,
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[DictionariesAPI] Update failed: ${reason} → Check CSRF token, payload fields, and update permissions`);
