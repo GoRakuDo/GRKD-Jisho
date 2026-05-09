@@ -14,3 +14,4 @@ export * from "./services/admin/ops-jobs-admin";
 export * from "./services/admin/rate-limit-admin";
 export * from "./services/admin/wipe-admin";
 export * from "./services/admin/yomitan-import";
+export * from "./services/admin/prompt-admin";
