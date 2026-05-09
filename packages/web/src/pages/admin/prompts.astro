@@ -117,7 +117,7 @@ if (!session?.isAdmin) {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const id = btn.getAttribute('data-id');
-          const version = versionsCache.find(v => v.id === id);
+          const version = versionsCache.find(v => String(v.id) === String(id));
           if (version) {
             openEditor(version);
           } else {
