@@ -12,37 +12,49 @@ export const PromptEditor: React.FC<PromptEditorProps> = () => {
   const [isActive, setIsActive] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Read selected version from parent modal's data-version attribute.
-  // Astro sets this before making the modal visible, then dispatches
-  // 'editor-modal-opened' so this effect re-reads on every modal open
-  // (not just the first mount), handling both first open and re-opens.
+  // Watch the parent modal's data-version attribute for changes.
+  // MutationObserver fires synchronously when setAttribute('data-version',...)
+  // is called, eliminating race conditions with events or hydration timing.
   useEffect(() => {
-    const handler = () => {
-      const modal = document.getElementById('editor-modal');
-      const raw = modal?.getAttribute('data-version');
+    const modal = document.getElementById('editor-modal');
+    if (!modal) return;
+
+    const readVersion = () => {
+      const raw = modal.getAttribute('data-version');
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
-          // Runtime guard: verify required fields exist
-          if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string' && 'isActive' in parsed) {
-            const v = parsed as PromptVersion;
-            setVersion(v);
-            setContent(v.content ?? '');
-            setIsActive(v.isActive ?? true);
+          if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') {
+            setVersion(parsed as PromptVersion);
+            setContent(parsed.content);
+            setIsActive(parsed.isActive ?? true);
+            return;
           }
         } catch {
-          // Invalid JSON in data-version — leave empty defaults
+          // Invalid JSON — fall through to clear
         }
-      } else {
-        // "Create New Version" — clear form
-        setVersion(undefined);
-        setContent('');
-        setIsActive(true);
       }
+      // No valid data → clear form (initial mount, close, or create new)
+      setVersion(undefined);
+      setContent('');
+      setIsActive(true);
     };
-    window.addEventListener('editor-modal-opened', handler);
-    handler(); // also run on mount (handles first open)
-    return () => window.removeEventListener('editor-modal-opened', handler);
+
+    // Read on mount (handles first open)
+    readVersion();
+
+    // Watch for changes — fires synchronously on setAttribute
+    const observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === 'attributes' && m.attributeName === 'data-version') {
+          readVersion();
+          break;
+        }
+      }
+    });
+    observer.observe(modal, { attributes: true, attributeFilter: ['data-version'] });
+
+    return () => observer.disconnect();
   }, []);
 
   // Fetch CSRF token, save via API, dispatch saved event on success

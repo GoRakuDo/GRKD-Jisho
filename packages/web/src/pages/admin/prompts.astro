@@ -98,9 +98,6 @@ if (!session?.isAdmin) {
       }
 
       modal.classList.remove('hidden');
-
-      // Signal PromptEditor to re-read data-version
-      window.dispatchEvent(new Event('editor-modal-opened'));
     }
 
     function closeEditor() {
