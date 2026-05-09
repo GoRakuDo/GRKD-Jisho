@@ -23,7 +23,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
   onCancel
 }) => {
   const [content, setContent] = useState(version?.content ?? '');
-  const [isActive, setIsActive] = useState(version?.isActive ?? false);
+  const [isActive, setIsActive] = useState(version?.isActive ?? true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch CSRF token and save via API
@@ -31,18 +31,18 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     if (!onSave) return;
     setIsSaving(true);
     try {
-      // Fetch fresh CSRF token
       const csrfRes = await fetch('/api/auth/csrf-token');
       const csrfData = await csrfRes.json();
       const token = csrfData.token;
 
+      // API auto-generates version label (timestamp), no version needed in body
       const res = await fetch('/api/admin/prompts', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'x-csrf-token': token,
         },
-        body: JSON.stringify({ version: version?.version ?? 'custom', content, isActive }),
+        body: JSON.stringify({ content, isActive }),
       });
 
       if (!res.ok) {
@@ -50,7 +50,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
         throw new Error(data.error || `Save failed (${res.status})`);
       }
 
-      await onSave({ content, isActive });
+      const data = await res.json();
+      await onSave(data.prompt);
     } catch (err) {
       console.error('[PromptEditor] API save failed:', err);
       alert('Failed to save prompt version. Please check the logs.');
@@ -63,7 +64,11 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
     <div className="flex flex-col gap-6 p-6 bg-porcelain-100 border border-graphite-180 rounded-panel font-grkd-sans">
       <div className="flex items-center justify-between">
         <h3 className="text-[20px] font-semibold text-graphite-800 tracking-[-0.01em]">
-          Edit Prompt Version <span className="text-royal-blue-600">{version?.version ?? 'New'}</span>
+          {version ? (
+            <>Edit <span className="text-royal-blue-600">{version.version}</span></>
+          ) : (
+            'Create New Prompt Version'
+          )}
         </h3>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-2 cursor-pointer group">

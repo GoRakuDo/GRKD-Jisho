@@ -1,21 +1,21 @@
 /**
  * Prompt versions table
  *
- * Stores editable prompt templates (v1, v2, custom versions).
+ * Stores editable prompt templates.
+ * The "default" version is seeded on fresh install.
+ * User edits create new version with auto-generated timestamp labels
+ * (e.g. "2026-05-09_163045"), keeping full edit history.
  * Only one version can be active at a time.
- * Edit history is tracked in response_edits (prompt_edit type).
  */
 
-import { pgEnum, pgTable, text, timestamp, boolean, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, uuid } from "drizzle-orm/pg-core";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
 
-export const promptVersionEnum = pgEnum("prompt_version", ["v1", "v2", "custom"]);
-
 export const prompts = pgTable("prompts", {
-  /** Unique version identifier */
+  /** Unique record identifier */
   id: uuid("id").primaryKey().defaultRandom(),
-  /** Version label: v1, v2, or custom name */
-  version: promptVersionEnum("version").notNull().unique(),
+  /** Version label: "default", or auto-generated timestamp ("2026-05-09_163045") */
+  version: text("version").notNull().unique(),
   /** Full prompt template content (Markdown/text) */
   content: text("content").notNull(),
   /** Whether this version is currently active */

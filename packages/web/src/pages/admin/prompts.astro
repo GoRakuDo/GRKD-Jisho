@@ -47,38 +47,35 @@ if (!session?.isAdmin) {
       updatedAt: string;
     };
 
-    async function fetchPrompts(): Promise<PromptVersion[]> {
-      const res = await fetch('/api/admin/prompts');
-      const data = await res.json();
-      return data.versions || [];
-    }
+    let versionsCache: PromptVersion[] = [];
 
     async function renderTable() {
-      const versions = await fetchPrompts();
+      const res = await fetch('/api/admin/prompts');
+      const data = await res.json();
+      versionsCache = data.versions || [];
+
       const container = document.getElementById('prompts-container');
       if (!container) return;
-
-      const columns = [
-        { label: 'Version', render: (v: PromptVersion) => `<span class="mono text-graphite-800 font-medium">${v.version}</span>` },
-        { label: 'Last Updated', render: (v: PromptVersion) => `<span class="text-graphite-650 text-[13px]">${new Date(v.updatedAt).toLocaleString()}</span>` },
-        { label: 'Status', render: (v: PromptVersion) => v.isActive ? '<span class="status-badge badge-enabled">Active</span>' : '<span class="status-badge badge-disabled">Inactive</span>' },
-        { label: 'Actions', render: (v: PromptVersion) => `<button class="edit-prompt-btn bg-royal-blue-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-royal-blue-700 transition-colors" data-id="${v.id}">Edit</button>` },
-      ];
 
       let html = `
         <table class="data-table w-full text-left border-collapse">
           <thead>
             <tr class="bg-porcelain-150 border-b border-graphite-180">
-              ${columns.map(col => `<th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">${col.label}</th>`).join('')}
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Version</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Last Updated</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Status</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            ${versions.map(v => `
+            ${versionsCache.map(v => `
               <tr class="border-b border-graphite-180 last:border-0 hover:bg-porcelain-150 transition-colors cursor-pointer min-h-[48px]">
-                <td class="px-4 py-3 text-[14px] text-graphite-900">${columns[0]?.render(v)}</td>
-                <td class="px-4 py-3 text-[14px] text-graphite-900">${columns[1]?.render(v)}</td>
-                <td class="px-4 py-3 text-[14px] text-graphite-900">${columns[2]?.render(v)}</td>
-                <td class="px-4 py-3 text-[14px] text-graphite-900 text-right">${columns[3]?.render(v)}</td>
+                <td class="px-4 py-3 text-[14px]"><span class="mono text-graphite-800 font-medium">${v.version}</span></td>
+                <td class="px-4 py-3 text-[14px] text-graphite-650 text-[13px]">${new Date(v.updatedAt).toLocaleString()}</td>
+                <td class="px-4 py-3 text-[14px]">${v.isActive ? '<span class="status-badge badge-enabled">Active</span>' : '<span class="status-badge badge-disabled">Inactive</span>'}</td>
+                <td class="px-4 py-3 text-[14px] text-right">
+                  <button class="edit-prompt-btn bg-royal-blue-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-royal-blue-700 transition-colors" data-id="${v.id}">Edit</button>
+                </td>
               </tr>
             `).join('')}
           </tbody>
@@ -89,39 +86,32 @@ if (!session?.isAdmin) {
       document.querySelectorAll('.edit-prompt-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
-          openEditor(btn.getAttribute('data-id'));
+          const id = btn.getAttribute('data-id');
+          const version = versionsCache.find(v => v.id === id);
+          openEditor(version);
         });
       });
     }
 
-    async function openEditor(id: string | null) {
+    function openEditor(version: PromptVersion | undefined) {
       const modal = document.getElementById('editor-modal');
       if (!modal) return;
-      
-      try {
-        const res = await fetch(`/api/admin/prompts${id ? `?id=${id}` : ''}`);
-        const data = await res.json();
-        const version = data.prompt;
 
-        window.dispatchEvent(new CustomEvent('prompt-editor-load', { 
-          detail: { version } 
-        }));
-        
-        modal.classList.remove('hidden');
-      } catch (err) {
-        console.error('[PromptsPage] openEditor failed:', err);
-        alert('Failed to load prompt version.');
-      }
+      window.dispatchEvent(new CustomEvent('prompt-editor-load', { 
+        detail: { version } 
+      }));
+
+      modal.classList.remove('hidden');
     }
 
-    async function closeEditor() {
+    function closeEditor() {
       const modal = document.getElementById('editor-modal');
       if (!modal) return;
       modal.classList.add('hidden');
     }
 
-    document.getElementById('create-version-btn')?.addEventListener('click', async () => {
-      openEditor(null);
+    document.getElementById('create-version-btn')?.addEventListener('click', () => {
+      openEditor(undefined);
     });
 
     document.getElementById('editor-modal')?.addEventListener('click', (e) => {
@@ -130,12 +120,12 @@ if (!session?.isAdmin) {
       }
     });
 
-    renderTable();
-    
     window.addEventListener('prompt-editor-saved', () => {
       renderTable();
       closeEditor();
     });
+
+    renderTable();
   </script>
 
   <style>

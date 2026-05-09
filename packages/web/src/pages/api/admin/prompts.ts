@@ -1,9 +1,10 @@
 /**
  * Admin API: Prompt versions management
  *
- * GET    /api/admin/prompts          — List all versions
- * GET    /api/admin/prompts?active   — Get active version only
- * PUT    /api/admin/prompts          — Create/update a version
+ * GET    /api/admin/prompts             — List all versions
+ * GET    /api/admin/prompts?active      — Get active version only
+ * GET    /api/admin/prompts?id=<uuid>   — Get a specific version by id
+ * PUT    /api/admin/prompts             — Save: creates a NEW version with auto-generated timestamp label
  */
 
 import type { APIRoute } from "astro";
@@ -13,7 +14,8 @@ import { validateCsrfRequest } from "../../../lib/csrf";
 import {
   getPromptVersions,
   getActivePrompt,
-  upsertPrompt,
+  getPromptById,
+  createPrompt,
 } from "@grkd-jisho/db";
 
 export const GET: APIRoute = async (context) => {
@@ -27,8 +29,17 @@ export const GET: APIRoute = async (context) => {
 
   const url = new URL(context.request.url);
   const activeOnly = url.searchParams.get("active") === "true";
+  const id = url.searchParams.get("id");
 
   try {
+    if (id) {
+      const prompt = await getPromptById(id);
+      return new Response(
+        JSON.stringify({ prompt: prompt ?? null }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     if (activeOnly) {
       const active = await getActivePrompt();
       return new Response(
@@ -70,29 +81,25 @@ export const PUT: APIRoute = async (context) => {
 
   try {
     const body = await context.request.json();
-    const { version, content, isActive } = body;
+    const { content, isActive } = body;
 
-    if (!version || typeof version !== "string") {
-      return new Response(JSON.stringify({ error: "version is required" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    if (typeof content !== "string") {
+    if (typeof content !== "string" || content.length === 0) {
       return new Response(JSON.stringify({ error: "content is required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const prompt = await upsertPrompt(version, content, isActive ?? false);
+    // Auto-generate version label (e.g. "2026-05-09_163045")
+    // Every Save creates a new version, preserving edit history
+    const prompt = await createPrompt(content, isActive ?? true);
     return new Response(
       JSON.stringify({ prompt }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    console.error(`[PromptsAPI] Update failed: ${reason} → Check prompts table and DB constraints`);
+    console.error(`[PromptsAPI] Save failed: ${reason} → Check prompts table and DB constraints`);
     return new Response(JSON.stringify({ error: "internal error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
