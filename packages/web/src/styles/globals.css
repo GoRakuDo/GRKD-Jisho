@@ -29,6 +29,7 @@
   --color-warning-600: oklch(64% 0.14 78);
   --color-warning-100: oklch(94% 0.055 78);
   --color-danger-600: oklch(55% 0.18 28);
+  --color-danger-800: oklch(38% 0.18 28);
   --color-danger-100: oklch(93% 0.055 28);
   --color-trace-violet-600: oklch(52% 0.15 305);
 

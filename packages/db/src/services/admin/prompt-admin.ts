@@ -2,9 +2,8 @@
  * Prompt administration services
  *
  * CRUD operations for prompt versions with auto-generated timestamp labels.
- * Each Save creates a NEW version (e.g. "2026-05-09_163045"),
- * keeping the full edit history. The seed "default" version is
- * never overwritten.
+ * "Create New Version" creates a new row; editing an existing version
+ * overwrites it (same id). The seed "default" version cannot be deleted.
  */
 
 import { db } from "../../client";
@@ -83,6 +82,47 @@ export async function createPrompt(content: string, isActive: boolean): Promise<
 
   const result = await db.insert(prompts).values(newPrompt).returning();
   return result[0]!;
+}
+
+/**
+ * Overwrite an existing prompt version's content and active state.
+ * History is preserved by the updatedAt timestamp.
+ */
+export async function updatePrompt(
+  id: string,
+  content: string,
+  isActive: boolean,
+): Promise<Prompt> {
+  const existing = await getPromptById(id);
+  if (!existing) {
+    throw new Error(`Prompt not found: ${id}`);
+  }
+
+  if (isActive) {
+    await db.update(prompts).set({ isActive: false });
+  }
+
+  const result = await db
+    .update(prompts)
+    .set({ content, isActive, updatedAt: new Date() })
+    .where(eq(prompts.id, id))
+    .returning();
+  return result[0]!;
+}
+
+/**
+ * Delete a prompt version by id.
+ * The "default" seed version cannot be deleted.
+ */
+export async function deletePrompt(id: string): Promise<void> {
+  const existing = await getPromptById(id);
+  if (!existing) {
+    throw new Error(`Prompt not found: ${id}`);
+  }
+  if (existing.version === "default") {
+    throw new Error("Cannot delete the default prompt version");
+  }
+  await db.delete(prompts).where(eq(prompts.id, id));
 }
 
 /**

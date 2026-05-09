@@ -15,7 +15,6 @@ if (!session?.isAdmin) {
 <meta name="csrf-token" content={csrfToken} />
 
 <AdminLayout title="Prompts" active="prompts">
-  <div id="debug-bar" style="display:none;background:#fff3cd;padding:8px 16px;font-size:12px;font-family:monospace;margin-bottom:12px;border:1px solid #ffc107;border-radius:4px;color:#333;">Loading...</div>
   <div class="page-header">
     <div>
       <h1 class="page-title">Prompt Versions</h1>
@@ -67,82 +66,119 @@ if (!session?.isAdmin) {
     import type { PromptVersion } from '../../lib/prompt-types';
 
     let versionsCache: PromptVersion[] = [];
-    let debugState = 'initialized';
-
-    function showDebug(msg: string) {
-      const bar = document.getElementById('debug-bar');
-      if (bar) bar.textContent = msg;
-    }
+    /** The id of the version currently being edited, or null for Create New Version */
+    let editingId: string | null = null;
 
     // ── Render table ──
     async function renderTable() {
-      debugState = 'fetching';
       try {
         const res = await fetch('/api/admin/prompts');
-        debugState = 'fetched:' + res.status;
         const data = await res.json();
-        debugState = 'parsed:' + (data.versions ? data.versions.length : 'no-versions');
         versionsCache = data.versions || [];
 
-      const container = document.getElementById('prompts-container');
-      if (!container) return;
+        const container = document.getElementById('prompts-container');
+        if (!container) return;
 
-      container.innerHTML = `
-        <table class="data-table w-full text-left border-collapse">
-          <thead>
-            <tr class="bg-porcelain-150 border-b border-graphite-180">
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Version</th>
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Last Updated</th>
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Status</th>
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${versionsCache.map(v => `
-              <tr class="border-b border-graphite-180 last:border-0 hover:bg-porcelain-150 transition-colors cursor-pointer min-h-[48px]">
-                <td class="px-4 py-3 text-[14px]"><span class="mono text-graphite-800 font-medium">${v.version}</span></td>
-                <td class="px-4 py-3 text-[14px] text-graphite-650 text-[13px]">${new Date(v.updatedAt).toLocaleString()}</td>
-                <td class="px-4 py-3 text-[14px]">${v.isActive ? '<span class="status-badge badge-enabled">Active</span>' : '<span class="status-badge badge-disabled">Inactive</span>'}</td>
-                <td class="px-4 py-3 text-[14px] text-right">
-                  <button class="edit-prompt-btn bg-royal-blue-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-royal-blue-700 transition-colors" data-id="${v.id}">Edit</button>
-                </td>
+        container.innerHTML = `
+          <table class="data-table w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-porcelain-150 border-b border-graphite-180">
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Version</th>
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Last Updated</th>
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Status</th>
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap text-right">Actions</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
+            </thead>
+            <tbody>
+              ${versionsCache.map(v => {
+                const isDefault = v.version === 'default';
+                return `
+                  <tr class="border-b border-graphite-180 last:border-0 hover:bg-porcelain-150 transition-colors min-h-[48px]">
+                    <td class="px-4 py-3 text-[14px]"><span class="mono text-graphite-800 font-medium">${v.version}</span></td>
+                    <td class="px-4 py-3 text-[14px] text-graphite-650 text-[13px]">${new Date(v.updatedAt).toLocaleString()}</td>
+                    <td class="px-4 py-3 text-[14px]">${v.isActive ? '<span class="status-badge badge-enabled">Active</span>' : '<span class="status-badge badge-disabled">Inactive</span>'}</td>
+                    <td class="px-4 py-3 text-[14px] text-right flex gap-2 justify-end">
+                      <button class="edit-btn bg-royal-blue-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-royal-blue-700 transition-colors" data-id="${v.id}">Edit</button>
+                      ${!v.isActive ? `<button class="set-active-btn bg-porcelain-200 text-graphite-700 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-porcelain-300 transition-colors border border-graphite-300" data-id="${v.id}">Set Active</button>` : ''}
+                      ${!isDefault ? `<button class="delete-btn bg-danger-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-danger-800 transition-colors" data-id="${v.id}">Delete</button>` : ''}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
 
-      // Bind Edit buttons
-      document.querySelectorAll('.edit-prompt-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const id = btn.getAttribute('data-id');
-          const version = versionsCache.find(v => String(v.id) === String(id));
-          if (version) {
-            openEditor(version);
-          } else {
-            showDebug('Edit click: version not found for id=' + id);
-          }
+        // Bind Edit buttons
+        document.querySelectorAll('.edit-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.getAttribute('data-id');
+            const version = versionsCache.find(v => String(v.id) === String(id));
+            if (version) openEditor(version);
+          });
         });
-      });
-      showDebug('Table rendered: ' + versionsCache.length + ' versions');
-    } catch (err) {
-      showDebug('renderTable error: ' + String(err));
+
+        // Bind Set Active buttons
+        document.querySelectorAll('.set-active-btn').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const id = btn.getAttribute('data-id');
+            try {
+              const csrfRes = await fetch('/api/auth/csrf-token');
+              const { token } = await csrfRes.json();
+              const res = await fetch('/api/admin/prompts?id=' + id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'x-csrf-token': token },
+                body: JSON.stringify({ content: '', isActive: true }),
+              });
+              if (!res.ok) throw new Error('Set Active failed (' + res.status + ')');
+              await renderTable();
+            } catch (err) {
+              console.error('[Prompts] Set Active failed:', err);
+              alert('Failed to set active version.');
+            }
+          });
+        });
+
+        // Bind Delete buttons
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const id = btn.getAttribute('data-id');
+            if (!confirm('Delete this prompt version? This cannot be undone.')) return;
+            try {
+              const csrfRes = await fetch('/api/auth/csrf-token');
+              const { token } = await csrfRes.json();
+              const res = await fetch('/api/admin/prompts?id=' + id, {
+                method: 'DELETE',
+                headers: { 'x-csrf-token': token },
+              });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Delete failed' }));
+                throw new Error(err.error || 'Delete failed (' + res.status + ')');
+              }
+              await renderTable();
+            } catch (err) {
+              console.error('[Prompts] Delete failed:', err);
+              alert(err instanceof Error ? err.message : 'Delete failed.');
+            }
+          });
+        });
+      } catch (err) {
+        console.error('[Prompts] renderTable error:', err);
+      }
     }
-  }
 
     // ── Open / close editor ──
     function openEditor(version: PromptVersion) {
+      editingId = version.id;
       const modal = document.getElementById('editor-modal');
       const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
       const preview = document.getElementById('editor-preview');
       const titleLabel = document.getElementById('editor-version-label');
       const checkbox = document.getElementById('editor-active-checkbox') as HTMLInputElement | null;
-
-      if (!modal || !textarea || !preview || !titleLabel || !checkbox) {
-        showDebug('openEditor: missing elements modal=' + !!modal + ' textarea=' + !!textarea + ' preview=' + !!preview + ' label=' + !!titleLabel + ' checkbox=' + !!checkbox);
-        return;
-      }
+      if (!modal || !textarea || !preview || !titleLabel || !checkbox) return;
 
       titleLabel.textContent = version.version;
       textarea.value = version.content;
@@ -151,13 +187,12 @@ if (!session?.isAdmin) {
 
       modal.classList.remove('hidden');
       textarea.focus();
-      showDebug('Editor opened: ' + version.version + ' (' + version.content.length + ' chars)');
     }
 
     function closeEditor() {
+      editingId = null;
       const modal = document.getElementById('editor-modal');
-      if (!modal) return;
-      modal.classList.add('hidden');
+      if (modal) modal.classList.add('hidden');
     }
 
     // ── Save handler ──
@@ -174,18 +209,24 @@ if (!session?.isAdmin) {
         const csrfRes = await fetch('/api/auth/csrf-token');
         const { token } = await csrfRes.json();
 
+        const body: Record<string, unknown> = {
+          content: textarea.value,
+          isActive: checkbox.checked,
+        };
+        // id present → overwrite; absent → create new version
+        if (editingId) body.id = editingId;
+
         const res = await fetch('/api/admin/prompts', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'x-csrf-token': token },
-          body: JSON.stringify({ content: textarea.value, isActive: checkbox.checked }),
+          body: JSON.stringify(body),
         });
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Save failed' }));
-          throw new Error(err.error || `Save failed (${res.status})`);
+          throw new Error(err.error || 'Save failed (' + res.status + ')');
         }
 
-        // Success — refresh table and close
         await renderTable();
         closeEditor();
       } catch (err) {
@@ -199,6 +240,7 @@ if (!session?.isAdmin) {
 
     // ── Event listeners ──
     document.getElementById('create-version-btn')?.addEventListener('click', () => {
+      editingId = null;
       const modal = document.getElementById('editor-modal');
       const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
       const preview = document.getElementById('editor-preview');
@@ -219,36 +261,24 @@ if (!session?.isAdmin) {
     document.getElementById('editor-save-btn')?.addEventListener('click', handleSave);
 
     document.getElementById('editor-modal')?.addEventListener('click', (e) => {
-      if (e.target === document.getElementById('editor-modal')) {
-        closeEditor();
-      }
+      if (e.target === document.getElementById('editor-modal')) closeEditor();
     });
 
-    // Keyboard shortcut
+    // Keyboard shortcut: Escape to close, Ctrl+Enter to save
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeEditor();
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleSave();
     });
 
-    // Update preview on textarea change
+    // Update preview on textarea input
     document.getElementById('editor-textarea')?.addEventListener('input', () => {
       const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
       const preview = document.getElementById('editor-preview');
-      if (textarea && preview) {
-        preview.textContent = textarea.value;
-      }
+      if (textarea && preview) preview.textContent = textarea.value;
     });
 
     // Initial load
-    const debugBar = document.getElementById('debug-bar');
-    if (debugBar) debugBar.style.display = 'block';
-    renderTable().catch(err => {
-      debugState = 'error:' + String(err);
-      if (debugBar) { debugBar.textContent = 'Script error: ' + String(err); debugBar.style.background = '#f8d7da'; debugBar.style.borderColor = '#f5c6cb'; }
-    });
-    setTimeout(() => {
-      if (debugBar) debugBar.textContent = 'State: ' + debugState + ' | versions: ' + versionsCache.length;
-    }, 3000);
+    renderTable();
   </script>
 
   <style>
