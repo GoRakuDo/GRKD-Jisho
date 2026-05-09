@@ -3,9 +3,9 @@
  *
  * GET    /api/admin/prompts                 — List all versions
  * GET    /api/admin/prompts?active          — Get active version only
- * GET    /api/admin/prompts?id=<uuid>       — Get a specific version by id
+ * GET    /api/admin/prompts?id=<id>         — Get a specific version by id
  * PUT    /api/admin/prompts                 — Save: overwrites existing (with id) or creates new (without id)
- * DELETE /api/admin/prompts?id=<uuid>       — Delete a prompt version (default version is protected)
+ * DELETE /api/admin/prompts?id=<id>         — Delete a prompt version (default version is protected)
  */
 
 import type { APIRoute } from "astro";
@@ -139,14 +139,6 @@ export const DELETE: APIRoute = async (context) => {
 
   if (!id) {
     return new Response(JSON.stringify({ error: "id query parameter is required" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-
-  // Validate UUID format before DB query
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-    return new Response(JSON.stringify({ error: "Invalid id format" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
