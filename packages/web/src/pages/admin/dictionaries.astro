@@ -7,7 +7,7 @@ import {
   schema,
 } from "@grkd-jisho/db";
 import { count } from "drizzle-orm";
-import { DictionaryRow } from "../../components/admin/DictionaryRow";
+import { DictionaryTable } from "../../components/admin/DictionaryTable";
 import { generateCsrfToken } from "../../lib/csrf";
 
 const session = getSession(Astro);
@@ -81,23 +81,12 @@ if (session?.isAdmin) {
             <th>Status</th>
           </tr>
         </thead>
-        <tbody>
-          {dictionaries.map((d) => (
-            <DictionaryRow
-              client:load
-              id={d.id}
-              name={d.name}
-              slug={d.slug}
-              priority={d.priority}
-              enabled={d.enabled}
-              entryCount={d.entryCount}
-              csrfToken={csrfToken}
-              onUpdate={() => {
-                // Client-side re-fetch would go here; for now just save and let page refresh or poll
-              }}
-            />
-          ))}
-        </tbody>
+        <DictionaryTable
+          client:load
+          dictionaries={dictionaries}
+          csrfToken={csrfToken}
+          onUpdate={() => {}}
+        />
       </table>
     </div>
   )}
