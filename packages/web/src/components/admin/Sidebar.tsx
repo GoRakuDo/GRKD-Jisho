@@ -11,6 +11,7 @@ const ITEMS = [
   { label: 'Dictionaries', href: '/admin/dictionaries', slug: 'dictionaries' },
   { label: 'Prompts', href: '/admin/prompts', slug: 'prompts' },
   { label: 'Cache', href: '/admin/cache', slug: 'cache' },
+  { label: 'Role Limits', href: '/admin/role-limits', slug: 'role-limits' },
   { label: 'Logs', href: '/admin/logs', slug: 'logs' },
   { label: 'Traces', href: '/admin/traces', slug: 'traces' },
   { label: 'Ops Jobs', href: '/admin/ops-jobs', slug: 'ops-jobs' },

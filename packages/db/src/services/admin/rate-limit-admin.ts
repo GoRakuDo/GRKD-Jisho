@@ -32,6 +32,12 @@ export async function getRoleLimits() {
     .orderBy(asc(schema.roleRateLimits.dailyLimit));
 }
 
+export async function deleteRoleLimit(roleId: string): Promise<void> {
+  const result = await db
+    .delete(schema.roleRateLimits)
+    .where(eq(schema.roleRateLimits.discordRoleId, roleId));
+}
+
 export async function resetUserUsage(
   userId: string,
   guildId: string,
