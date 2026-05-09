@@ -14,10 +14,6 @@ export const TopBar: React.FC<TopBarProps> = ({ title }) => {
         </h1>
       </div>
       <div className="flex items-center gap-4">
-        {/* Placeholder for future health chips */}
-        <div className="flex items-center gap-2">
-          {/* Health chips */}
-        </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-graphite-800 bg-porcelain-220 px-3 py-1 rounded-full font-medium">
             Account

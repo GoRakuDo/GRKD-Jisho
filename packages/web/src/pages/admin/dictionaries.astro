@@ -7,8 +7,11 @@ import {
   schema,
 } from "@grkd-jisho/db";
 import { count } from "drizzle-orm";
+import { DictionaryRow } from "../../components/admin/DictionaryRow";
+import { generateCsrfToken } from "../../lib/csrf";
 
 const session = getSession(Astro);
+const csrfToken = session ? generateCsrfToken(session.discordUserId) : '';
 
 interface DictWithCount {
   id: string;
@@ -80,19 +83,18 @@ if (session?.isAdmin) {
         </thead>
         <tbody>
           {dictionaries.map((d) => (
-            <tr>
-              <td class="priority-cell">{d.priority}</td>
-              <td class="name-cell">{d.name}</td>
-              <td class="mono">{d.slug}</td>
-              <td class="mono">{d.entryCount.toLocaleString()}</td>
-              <td>
-                {d.enabled ? (
-                  <span class="badge-enabled">enabled</span>
-                ) : (
-                  <span class="badge-disabled">disabled</span>
-                )}
-              </td>
-            </tr>
+            <DictionaryRow
+              id={d.id}
+              name={d.name}
+              slug={d.slug}
+              priority={d.priority}
+              enabled={d.enabled}
+              entryCount={d.entryCount}
+              csrfToken={csrfToken}
+              onUpdate={() => {
+                // Client-side re-fetch would go here; for now just save and let page refresh or poll
+              }}
+            />
           ))}
         </tbody>
       </table>
@@ -197,9 +199,73 @@ if (session?.isAdmin) {
     color: var(--color-graphite-800);
   }
 
+  .priority-input {
+    width: 70px;
+    padding: 4px 8px;
+    border: 1px solid var(--color-graphite-300);
+    border-radius: var(--radius-input);
+    background: var(--color-porcelain-50);
+    color: var(--color-graphite-900);
+    font-size: 13px;
+    text-align: center;
+    outline: none;
+  }
+
+  .priority-input:focus {
+    border-color: var(--color-royal-blue-600);
+    box-shadow: 0 0 0 2px var(--color-royal-blue-100);
+  }
+
+  .priority-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   .name-cell {
     font-weight: 600;
     color: var(--color-graphite-800);
+  }
+
+  .status-toggle {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+
+  .status-toggle.enabled {
+    background: var(--color-success-100);
+    color: var(--color-success-600);
+  }
+
+  .status-toggle.enabled:hover {
+    background: var(--color-success-200);
+  }
+
+  .status-toggle.disabled {
+    background: var(--color-porcelain-150);
+    color: var(--color-graphite-650);
+  }
+
+  .status-toggle.disabled:hover {
+    background: var(--color-porcelain-200);
+  }
+
+  .status-toggle:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .save-error {
+    text-align: center;
+    color: var(--color-danger-600);
+    font-size: 12px;
+    padding: 8px 12px;
+    background: var(--color-danger-100);
   }
 
   .badge-enabled {

@@ -1,4 +1,4 @@
-import { eq, and, sql, count } from "drizzle-orm";
+import { eq, and, sql, count, ilike } from "drizzle-orm";
 import { db } from "../../index";
 import * as schema from "../../schema";
 
@@ -56,6 +56,7 @@ export async function searchCacheEntries(
       updatedAt: schema.responseCache.updatedAt,
     })
     .from(schema.responseCache)
+    .where(ilike(schema.responseCache.normalizedQuery, `%${queryText}%`))
     .limit(limit);
 
   return rows.map((r) => ({ ...r, id: String(r.id) }));

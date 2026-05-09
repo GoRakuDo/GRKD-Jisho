@@ -2,6 +2,7 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { LogsSummary } from "../../components/admin/LogsSummary";
 import { PopularQueriesTable } from "../../components/admin/PopularQueriesTable";
+import { DictionaryHitsUI } from "../../components/admin/DictionaryHitsUI";
 import { getSession } from "../../lib/session";
 import { eq, and, gte, sql, count } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
@@ -13,6 +14,7 @@ let cacheHitRatio = "0.0";
 let errors = 0;
 let warns = 0;
 let popularQueries: { query: string; count: number }[] = [];
+let dictionaryHits: { dictionaryId: number | null; dictionaryName: string | null; hitCount: number }[] = [];
 
 if (session?.isAdmin) {
   try {
@@ -55,6 +57,19 @@ if (session?.isAdmin) {
       .groupBy(schema.lookupLogs.normalizedQuery)
       .orderBy(sql`count desc`)
       .limit(20);
+
+    dictionaryHits = await db
+      .select({
+        dictionaryId: schema.lookupLogs.dictionaryIdUsed,
+        dictionaryName: schema.dictionaries.name,
+        hitCount: count(schema.lookupLogs.id),
+      })
+      .from(schema.lookupLogs)
+      .leftJoin(schema.dictionaries, eq(schema.lookupLogs.dictionaryIdUsed, schema.dictionaries.id))
+      .where(gte(schema.lookupLogs.createdAt, since))
+      .groupBy(schema.lookupLogs.dictionaryIdUsed, schema.dictionaries.name)
+      .orderBy(sql`count desc`)
+      .limit(10) as unknown as { dictionaryId: number | null; dictionaryName: string | null; hitCount: number }[];
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[Logs] SSR error: ${reason} → Check bot_events data availability and DB connectivity`);
@@ -79,7 +94,10 @@ if (session?.isAdmin) {
     </div>
     <div class="panel">
       <h2 class="panel-title">Dictionary Hits (7 days)</h2>
-      <p class="panel-empty">Dictionary hit data available via API.</p>
+      <DictionaryHitsUI
+        client:load
+        hits={dictionaryHits}
+      />
     </div>
   </div>
 </AdminLayout>

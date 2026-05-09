@@ -155,6 +155,9 @@ export default function ImportPreviewForm() {
       setImportResult(payload.result);
       setPreview(null);
       setFile(null);
+      setTimeout(() => {
+        window.location.href = '/admin/dictionaries';
+      }, 2000);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to import dictionary.';
       setImportError(message);
@@ -421,6 +424,14 @@ export default function ImportPreviewForm() {
           <strong>Import Successful</strong>
           <span>Dictionary: {importResult.dictionaryName} (ID: {importResult.dictionaryId})</span>
           <span>Imported Entries: {importResult.importedEntries.toLocaleString()}</span>
+          <a href="/admin/dictionaries" style={{
+            color: 'var(--color-royal-blue-600)',
+            fontWeight: 600,
+            textDecoration: 'none',
+            marginTop: '4px',
+          }}>
+            View Dictionaries →
+          </a>
         </div>
       )}
     </div>
