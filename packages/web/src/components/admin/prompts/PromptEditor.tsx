@@ -1,15 +1,8 @@
 import React, { useState } from 'react';
 import { Button } from '../Button';
 import { CodeBlock } from '../CodeBlock';
+import type { PromptVersion } from '../../../lib/prompt-types';
 import '../../../styles/globals.css';
-
-type PromptVersion = {
-  id: string;
-  version: string;
-  content: string;
-  isActive: boolean;
-  updatedAt: string;
-};
 
 type PromptEditorProps = {
   version?: PromptVersion;

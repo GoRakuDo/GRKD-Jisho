@@ -89,6 +89,12 @@ export const PUT: APIRoute = async (context) => {
         headers: { "Content-Type": "application/json" },
       });
     }
+    if (content.length > 65535) {
+      return new Response(JSON.stringify({ error: "content exceeds maximum length (65535 chars)" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // Auto-generate version label (e.g. "2026-05-09_163045")
     // Every Save creates a new version, preserving edit history

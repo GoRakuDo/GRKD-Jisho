@@ -12,19 +12,27 @@ import { prompts, type Prompt, type NewPrompt } from "../../schema/prompts";
 import { eq, desc } from "drizzle-orm";
 
 /**
- * Generate a human-readable version label from current time.
- * Format: "2026-05-09_163045" (local time, second granularity)
- * Unique constraint on `version` prevents collisions.
+ * Generate a human-readable version label from Asia/Jakarta time.
+ * Format: "2026-05-09_163045123" (second + millisecond precision to avoid
+ * unique constraint collisions when two saves happen in the same second).
  */
 export function generateVersionLabel(): string {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  const h = String(now.getHours()).padStart(2, "0");
-  const min = String(now.getMinutes()).padStart(2, "0");
-  const s = String(now.getSeconds()).padStart(2, "0");
-  return `${y}-${m}-${d}_${h}${min}${s}`;
+  // Use Asia/Jakarta timezone for consistency with bot cron jobs
+  const jakarta = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(now);
+
+  const parts = Object.fromEntries(jakarta.filter(p => p.type !== "literal").map(p => [p.type, p.value]));
+  const base = `${parts.year}-${parts.month}-${parts.day}_${parts.hour}${parts.minute}${parts.second}`;
+  const ms = String(now.getMilliseconds()).padStart(3, "0");
+  return `${base}${ms}`;
 }
 
 /**

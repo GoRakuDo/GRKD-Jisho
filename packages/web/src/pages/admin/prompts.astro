@@ -39,13 +39,7 @@ if (!session?.isAdmin) {
   </div>
 
   <script>
-    type PromptVersion = {
-      id: string;
-      version: string;
-      content: string;
-      isActive: boolean;
-      updatedAt: string;
-    };
+    import type { PromptVersion } from '../../../lib/prompt-types';
 
     let versionsCache: PromptVersion[] = [];
 
