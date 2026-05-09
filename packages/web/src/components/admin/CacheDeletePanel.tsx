@@ -67,7 +67,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
       }
 
       const text = await res.text();
-      const data = (JSON.parse(text || '{}') as { success?: boolean; deleted?: number }) ?? {};
+      const data = (JSON.parse(text) as { success?: boolean; deleted?: number }) ?? {};
       onDeleted(data.deleted ?? selectedIds.size);
       setSelectedIds(new Set());
     } catch (err) {

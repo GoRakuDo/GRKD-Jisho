@@ -150,6 +150,22 @@ export async function updateResponse(
   });
 }
 
+// ── Delete single response ──
+
+export async function deleteResponse(cacheId: string): Promise<number> {
+  if (!/^\d+$/.test(cacheId)) throw new Error("Invalid response ID");
+
+  const numericId = BigInt(cacheId);
+
+  // Only delete if not manually overridden
+  const result = await db
+    .delete(schema.responseCache)
+    .where(and(eq(schema.responseCache.id, numericId), eq(schema.responseCache.isManualOverride, false)))
+    .returning({ id: schema.responseCache.id });
+
+  return result.length;
+}
+
 // ── Delete cache (skip manual override) ──
 
 export async function deleteCacheByQuery(

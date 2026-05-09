@@ -5,6 +5,7 @@ import {
   searchResponse,
   getResponseDetail,
   updateResponse,
+  deleteResponse as deleteDbResponse,
 } from "@grkd-jisho/db";
 import { validateCsrfRequest } from "../../../lib/csrf";
 import { adminAuditEvent } from "@grkd-jisho/db";
@@ -59,7 +60,7 @@ export const GET: APIRoute = async (context) => {
   }
 };
 
-export const PUT: APIRoute = async (context) => {
+export const putResponse: APIRoute = async (context) => {
   const session = getSession(context);
   if (!session || !getIsAuthenticated(context)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
@@ -109,6 +110,61 @@ export const PUT: APIRoute = async (context) => {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[ResponsesAPI] Update failed: ${reason} → Check CSRF token, payload format, and DB update permissions`);
     return new Response(JSON.stringify({ error: "update failed" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+};
+
+export const deleteResponse: APIRoute = async (context) => {
+  const session = getSession(context);
+  if (!session || !getIsAuthenticated(context)) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (!validateCsrfRequest(session.discordUserId, context.request)) {
+    return new Response(JSON.stringify({ error: "CSRF validation failed" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const { url } = context;
+  const id = url.searchParams.get("id");
+
+  if (!id || !/^\d+$/.test(id)) {
+    return new Response(JSON.stringify({ error: "invalid response ID" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    const deleted = await deleteDbResponse(id);
+
+    if (deleted === 0) {
+      return new Response(JSON.stringify({ error: "response not found or is manually overridden" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    await adminAuditEvent("admin.response_deleted", {
+      cacheId: id,
+      editor: session.discordUserId,
+    });
+
+    return new Response(JSON.stringify({ success: true, deleted }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[ResponsesAPI] Delete failed: ${reason} → Check CSRF token, response ID, and DB delete permissions`);
+    return new Response(JSON.stringify({ error: "delete failed" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

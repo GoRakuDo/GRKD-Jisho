@@ -24,6 +24,10 @@ export default function ResponseDetailPanel({
   const [editedText, setEditedText] = useState(initialText);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editReason, setEditReason] = useState('');
   const [csrfToken, setCsrfToken] = useState('');
 
   useEffect(() => {
@@ -53,7 +57,7 @@ export default function ResponseDetailPanel({
           'Content-Type': 'application/json',
           'x-csrf-token': csrfToken,
         },
-        body: JSON.stringify({ id, responseText: editedText }),
+        body: JSON.stringify({ id, responseText: editedText, reason: editReason || undefined }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -62,10 +66,36 @@ export default function ResponseDetailPanel({
       }
       setText(editedText);
       setIsEditing(false);
+      setEditedText(editedText);
+      setEditReason('');
     } catch (error) {
       setSaveError('Network error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/admin/responses?id=${id}`, {
+        method: 'DELETE',
+        headers: {
+          'x-csrf-token': csrfToken,
+        },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setDeleteError(err.error ?? `Delete failed (${res.status})`);
+        return;
+      }
+      window.location.href = '/admin/responses';
+    } catch (error) {
+      setDeleteError('Network error');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -136,6 +166,20 @@ export default function ResponseDetailPanel({
     transition: 'background-color 0.2s ease',
   };
 
+  const fileInputWrapperStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  };
+
+  const fileInputLabelStyle: React.CSSProperties = {
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    color: 'var(--color-graphite-500)',
+  };
+
   return (
     <div style={containerStyle}>
       <div style={headerGridStyle}>
@@ -200,6 +244,25 @@ export default function ResponseDetailPanel({
                 boxSizing: 'border-box',
               }}
             />
+            <div style={fileInputWrapperStyle}>
+              <label style={fileInputLabelStyle}>Reason (optional)</label>
+              <input
+                type="text"
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                placeholder="e.g., Fix terminology, update definition"
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 'var(--radius-input)',
+                  border: '1px solid var(--color-graphite-300)',
+                  backgroundColor: 'var(--color-porcelain-50)',
+                  color: 'var(--color-graphite-900)',
+                  fontSize: '0.875rem',
+                  outline: 'none',
+                  width: '100%',
+                }}
+              />
+            </div>
             {saveError && (
               <div style={{
                 padding: '8px 12px',
@@ -239,20 +302,95 @@ export default function ResponseDetailPanel({
             </div>
           </div>
         ) : (
-          <div
-            style={{
-              padding: '16px',
-              backgroundColor: 'var(--color-porcelain-50)',
-              borderRadius: 'var(--radius-card)',
-              border: '1px solid var(--color-graphite-180)',
-              color: 'var(--color-graphite-700)',
-              fontSize: '0.875rem',
-              lineHeight: 1.6,
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {text}
-          </div>
+          <>
+            <div
+              style={{
+                padding: '16px',
+                backgroundColor: 'var(--color-porcelain-50)',
+                borderRadius: 'var(--radius-card)',
+                border: '1px solid var(--color-graphite-180)',
+                color: 'var(--color-graphite-700)',
+                fontSize: '0.875rem',
+                lineHeight: 1.6,
+                whiteSpace: 'pre-wrap',
+              }}
+            >
+              {text}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  style={{
+                    ...btnBaseStyle,
+                    backgroundColor: 'transparent',
+                    border: '1px solid var(--color-graphite-300)',
+                    color: 'var(--color-graphite-800)',
+                  }}
+                >
+                  Edit Response
+                </button>
+                {!isOverride && (
+                  <>
+                    {showDeleteConfirm ? (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--color-danger-600)' }}>
+                          Delete this response?
+                        </span>
+                        <button
+                          onClick={handleDelete}
+                          disabled={isDeleting}
+                          style={{
+                            ...btnBaseStyle,
+                            backgroundColor: 'var(--color-danger-600)',
+                            color: 'var(--color-porcelain-50)',
+                          }}
+                        >
+                          {isDeleting ? 'Deleting...' : 'Confirm Delete'}
+                        </button>
+                        <button
+                          onClick={() => setShowDeleteConfirm(false)}
+                          style={{
+                            ...btnBaseStyle,
+                            backgroundColor: 'transparent',
+                            color: 'var(--color-graphite-700)',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        disabled={isDeleting}
+                        style={{
+                          ...btnBaseStyle,
+                          backgroundColor: 'transparent',
+                          border: '1px solid var(--color-danger-600)',
+                          color: 'var(--color-danger-600)',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            {deleteError && (
+              <div style={{
+                padding: '8px 12px',
+                backgroundColor: 'var(--color-danger-100)',
+                border: '1px solid var(--color-danger-600)',
+                borderLeft: '4px solid var(--color-danger-600)',
+                borderRadius: 'var(--radius-card)',
+                color: 'var(--color-danger-600)',
+                fontSize: '0.8rem',
+              }}>
+                {deleteError}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
