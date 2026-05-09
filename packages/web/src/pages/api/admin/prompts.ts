@@ -19,6 +19,7 @@ import {
   createPrompt,
   updatePrompt,
   deletePrompt,
+  PromptDomainError,
 } from "@grkd-jisho/db";
 
 export const GET: APIRoute = async (context) => {
@@ -143,6 +144,14 @@ export const DELETE: APIRoute = async (context) => {
     });
   }
 
+  // Validate UUID format before DB query
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return new Response(JSON.stringify({ error: "Invalid id format" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   try {
     await deletePrompt(id);
     return new Response(JSON.stringify({ success: true }), {
@@ -151,7 +160,7 @@ export const DELETE: APIRoute = async (context) => {
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    if (reason.includes("Cannot delete") || reason.includes("not found")) {
+    if (err instanceof PromptDomainError) {
       return new Response(JSON.stringify({ error: reason }), {
         status: 400,
         headers: { "Content-Type": "application/json" },

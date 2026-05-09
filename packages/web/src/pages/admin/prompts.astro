@@ -124,13 +124,15 @@ if (!session?.isAdmin) {
           btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const id = btn.getAttribute('data-id');
+            const version = versionsCache.find(v => String(v.id) === String(id));
+            if (!version) return;
             try {
               const csrfRes = await fetch('/api/auth/csrf-token');
               const { token } = await csrfRes.json();
-              const res = await fetch('/api/admin/prompts?id=' + id, {
+              const res = await fetch('/api/admin/prompts', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'x-csrf-token': token },
-                body: JSON.stringify({ content: '', isActive: true }),
+                body: JSON.stringify({ id, content: version.content, isActive: true }),
               });
               if (!res.ok) throw new Error('Set Active failed (' + res.status + ')');
               await renderTable();

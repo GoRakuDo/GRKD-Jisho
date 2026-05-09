@@ -11,6 +11,16 @@ import { prompts, type Prompt, type NewPrompt } from "../../schema/prompts";
 import { eq, desc } from "drizzle-orm";
 
 /**
+ * Domain error with a machine-readable code for API routing.
+ */
+export class PromptDomainError extends Error {
+  constructor(message: string, public code: "NOT_FOUND" | "PROTECTED_DELETE") {
+    super(message);
+    this.name = "PromptDomainError";
+  }
+}
+
+/**
  * Generate a human-readable version label from Asia/Jakarta time.
  * Format: "2026-05-09_163045123" (second + millisecond precision to avoid
  * unique constraint collisions when two saves happen in the same second).
@@ -76,8 +86,12 @@ export async function createPrompt(content: string, isActive: boolean): Promise<
   };
 
   if (isActive) {
-    // Deactivate all existing versions
-    await db.update(prompts).set({ isActive: false });
+    const result = await db.transaction(async (tx) => {
+      await tx.update(prompts).set({ isActive: false });
+      const rows = await tx.insert(prompts).values(newPrompt).returning();
+      return rows[0]!;
+    });
+    return result;
   }
 
   const result = await db.insert(prompts).values(newPrompt).returning();
@@ -93,21 +107,26 @@ export async function updatePrompt(
   content: string,
   isActive: boolean,
 ): Promise<Prompt> {
-  const existing = await getPromptById(id);
-  if (!existing) {
-    throw new Error(`Prompt not found: ${id}`);
-  }
-
   if (isActive) {
-    await db.update(prompts).set({ isActive: false });
+    return await db.transaction(async (tx) => {
+      await tx.update(prompts).set({ isActive: false });
+      const rows = await tx
+        .update(prompts)
+        .set({ content, isActive, updatedAt: new Date() })
+        .where(eq(prompts.id, id))
+        .returning();
+      if (!rows[0]) throw new PromptDomainError(`Prompt not found: ${id}`, "NOT_FOUND");
+      return rows[0];
+    });
   }
 
-  const result = await db
+  const rows = await db
     .update(prompts)
-    .set({ content, isActive, updatedAt: new Date() })
+    .set({ content, updatedAt: new Date() })
     .where(eq(prompts.id, id))
     .returning();
-  return result[0]!;
+  if (!rows[0]) throw new PromptDomainError(`Prompt not found: ${id}`, "NOT_FOUND");
+  return rows[0];
 }
 
 /**
@@ -117,10 +136,10 @@ export async function updatePrompt(
 export async function deletePrompt(id: string): Promise<void> {
   const existing = await getPromptById(id);
   if (!existing) {
-    throw new Error(`Prompt not found: ${id}`);
+    throw new PromptDomainError(`Prompt not found: ${id}`, "NOT_FOUND");
   }
   if (existing.version === "default") {
-    throw new Error("Cannot delete the default prompt version");
+    throw new PromptDomainError("Cannot delete the default prompt version", "PROTECTED_DELETE");
   }
   await db.delete(prompts).where(eq(prompts.id, id));
 }
@@ -129,8 +148,8 @@ export async function deletePrompt(id: string): Promise<void> {
  * Switch the active prompt version by id
  */
 export async function setActivePromptById(id: string): Promise<void> {
-  // Deactivate all versions
-  await db.update(prompts).set({ isActive: false });
-  // Activate target version
-  await db.update(prompts).set({ isActive: true, updatedAt: new Date() }).where(eq(prompts.id, id));
+  await db.transaction(async (tx) => {
+    await tx.update(prompts).set({ isActive: false });
+    await tx.update(prompts).set({ isActive: true, updatedAt: new Date() }).where(eq(prompts.id, id));
+  });
 }
