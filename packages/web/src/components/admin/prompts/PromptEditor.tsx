@@ -4,7 +4,7 @@ import { CodeBlock } from '../CodeBlock';
 import type { PromptVersion } from '../../../lib/prompt-types';
 import '../../../styles/globals.css';
 
-type PromptEditorProps = Record<string, never>;
+interface PromptEditorProps {}
 
 export const PromptEditor: React.FC<PromptEditorProps> = () => {
   const [version, setVersion] = useState<PromptVersion | undefined>(undefined);
@@ -12,18 +12,37 @@ export const PromptEditor: React.FC<PromptEditorProps> = () => {
   const [isActive, setIsActive] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Listen for prompt-editor-load event from prompts.astro
-  // Astro passes <PromptEditor client:load /> without props,
-  // so the selected version data comes via custom event
+  // Read selected version from parent modal's data-version attribute.
+  // Astro sets this before making the modal visible, then dispatches
+  // 'editor-modal-opened' so this effect re-reads on every modal open
+  // (not just the first mount), handling both first open and re-opens.
   useEffect(() => {
-    const handler = (e: CustomEvent<{ version?: PromptVersion }>) => {
-      const v = e.detail?.version;
-      setVersion(v);
-      setContent(v?.content ?? '');
-      setIsActive(v?.isActive ?? true);
+    const handler = () => {
+      const modal = document.getElementById('editor-modal');
+      const raw = modal?.getAttribute('data-version');
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          // Runtime guard: verify required fields exist
+          if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string' && 'isActive' in parsed) {
+            const v = parsed as PromptVersion;
+            setVersion(v);
+            setContent(v.content ?? '');
+            setIsActive(v.isActive ?? true);
+          }
+        } catch {
+          // Invalid JSON in data-version — leave empty defaults
+        }
+      } else {
+        // "Create New Version" — clear form
+        setVersion(undefined);
+        setContent('');
+        setIsActive(true);
+      }
     };
-    window.addEventListener('prompt-editor-load', handler as EventListener);
-    return () => window.removeEventListener('prompt-editor-load', handler as EventListener);
+    window.addEventListener('editor-modal-opened', handler);
+    handler(); // also run on mount (handles first open)
+    return () => window.removeEventListener('editor-modal-opened', handler);
   }, []);
 
   // Fetch CSRF token, save via API, dispatch saved event on success

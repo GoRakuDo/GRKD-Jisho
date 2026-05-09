@@ -39,7 +39,7 @@ if (!session?.isAdmin) {
   </div>
 
   <script>
-    import type { PromptVersion } from '../../../lib/prompt-types';
+    import type { PromptVersion } from '../../lib/prompt-types';
 
     let versionsCache: PromptVersion[] = [];
 
@@ -91,16 +91,22 @@ if (!session?.isAdmin) {
       const modal = document.getElementById('editor-modal');
       if (!modal) return;
 
-      window.dispatchEvent(new CustomEvent('prompt-editor-load', { 
-        detail: { version } 
-      }));
+      if (version) {
+        modal.setAttribute('data-version', JSON.stringify(version));
+      } else {
+        modal.removeAttribute('data-version');
+      }
 
       modal.classList.remove('hidden');
+
+      // Signal PromptEditor to re-read data-version
+      window.dispatchEvent(new Event('editor-modal-opened'));
     }
 
     function closeEditor() {
       const modal = document.getElementById('editor-modal');
       if (!modal) return;
+      modal.removeAttribute('data-version');
       modal.classList.add('hidden');
     }
 
