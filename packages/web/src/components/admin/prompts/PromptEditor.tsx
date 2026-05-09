@@ -1,27 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../Button';
 import { CodeBlock } from '../CodeBlock';
 import type { PromptVersion } from '../../../lib/prompt-types';
 import '../../../styles/globals.css';
 
-type PromptEditorProps = {
-  version?: PromptVersion;
-  onSave?: (updated: Partial<PromptVersion>) => Promise<void>;
-  onCancel?: () => void;
-};
+type PromptEditorProps = Record<string, never>;
 
-export const PromptEditor: React.FC<PromptEditorProps> = ({ 
-  version, 
-  onSave, 
-  onCancel
-}) => {
-  const [content, setContent] = useState(version?.content ?? '');
-  const [isActive, setIsActive] = useState(version?.isActive ?? true);
+export const PromptEditor: React.FC<PromptEditorProps> = () => {
+  const [version, setVersion] = useState<PromptVersion | undefined>(undefined);
+  const [content, setContent] = useState('');
+  const [isActive, setIsActive] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch CSRF token and save via API
+  // Listen for prompt-editor-load event from prompts.astro
+  // Astro passes <PromptEditor client:load /> without props,
+  // so the selected version data comes via custom event
+  useEffect(() => {
+    const handler = (e: CustomEvent<{ version?: PromptVersion }>) => {
+      const v = e.detail?.version;
+      setVersion(v);
+      setContent(v?.content ?? '');
+      setIsActive(v?.isActive ?? true);
+    };
+    window.addEventListener('prompt-editor-load', handler as EventListener);
+    return () => window.removeEventListener('prompt-editor-load', handler as EventListener);
+  }, []);
+
+  // Fetch CSRF token, save via API, dispatch saved event on success
   const handleApiSave = async () => {
-    if (!onSave) return;
     setIsSaving(true);
     try {
       const csrfRes = await fetch('/api/auth/csrf-token');
@@ -43,8 +49,8 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
         throw new Error(data.error || `Save failed (${res.status})`);
       }
 
-      const data = await res.json();
-      await onSave(data.prompt);
+      // Notify Astro page to refresh table and close modal
+      window.dispatchEvent(new CustomEvent('prompt-editor-saved'));
     } catch (err) {
       console.error('[PromptEditor] API save failed:', err);
       alert('Failed to save prompt version. Please check the logs.');
@@ -101,7 +107,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       </div>
 
       <div className="flex justify-end gap-3 mt-2">
-        <Button variant="secondary" onClick={onCancel}>
+        <Button variant="secondary" onClick={() => window.dispatchEvent(new CustomEvent('prompt-editor-cancel'))}>
           Cancel
         </Button>
         <Button variant="primary" onClick={handleApiSave} disabled={isSaving}>

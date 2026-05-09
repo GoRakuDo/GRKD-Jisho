@@ -119,6 +119,10 @@ if (!session?.isAdmin) {
       closeEditor();
     });
 
+    window.addEventListener('prompt-editor-cancel', () => {
+      closeEditor();
+    });
+
     renderTable();
   </script>
 
