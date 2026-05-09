@@ -1,0 +1,194 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { getSession } from "../../lib/session";
+import { generateCsrfToken } from "../../lib/csrf";
+import { PromptEditor } from "../../components/admin/prompts/PromptEditor";
+import { Button } from "../../components/admin/Button";
+
+const session = getSession(Astro);
+const csrfToken = session ? generateCsrfToken(session.discordUserId) : "";
+
+if (!session?.isAdmin) {
+  return Astro.redirect("/auth/login");
+}
+---
+
+<meta name="csrf-token" content={csrfToken} />
+
+<AdminLayout title="Prompts" active="prompts">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Prompt Versions</h1>
+      <p class="page-description">Manage the LLM instructions that define how dictionary meanings are explained to learners.</p>
+    </div>
+    <Button variant="secondary" id="create-version-btn">
+      Create New Version
+    </Button>
+  </div>
+
+  <div id="prompts-container" class="table-container">
+    <!-- Table will be hydrated by client-side script -->
+  </div>
+
+  <div id="editor-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <PromptEditor 
+        client:load 
+      />
+    </div>
+  </div>
+
+  <script>
+    type PromptVersion = {
+      id: string;
+      version: string;
+      content: string;
+      isActive: boolean;
+      updatedAt: string;
+    };
+
+    async function fetchPrompts(): Promise<PromptVersion[]> {
+      const res = await fetch('/api/admin/prompts');
+      const data = await res.json();
+      return data.versions || [];
+    }
+
+    async function renderTable() {
+      const versions = await fetchPrompts();
+      const container = document.getElementById('prompts-container');
+      if (!container) return;
+
+      const columns = [
+        { label: 'Version', render: (v: PromptVersion) => `<span class="mono text-graphite-800 font-medium">${v.version}</span>` },
+        { label: 'Last Updated', render: (v: PromptVersion) => `<span class="text-graphite-650 text-[13px]">${new Date(v.updatedAt).toLocaleString()}</span>` },
+        { label: 'Status', render: (v: PromptVersion) => v.isActive ? '<span class="status-badge badge-enabled">Active</span>' : '<span class="status-badge badge-disabled">Inactive</span>' },
+        { label: 'Actions', render: (v: PromptVersion) => `<button class="edit-prompt-btn bg-royal-blue-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-royal-blue-700 transition-colors" data-id="${v.id}">Edit</button>` },
+      ];
+
+      let html = `
+        <table class="data-table w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-porcelain-150 border-b border-graphite-180">
+              ${columns.map(col => `<th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">${col.label}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${versions.map(v => `
+              <tr class="border-b border-graphite-180 last:border-0 hover:bg-porcelain-150 transition-colors cursor-pointer min-h-[48px]">
+                <td class="px-4 py-3 text-[14px] text-graphite-900">${columns[0]?.render(v)}</td>
+                <td class="px-4 py-3 text-[14px] text-graphite-900">${columns[1]?.render(v)}</td>
+                <td class="px-4 py-3 text-[14px] text-graphite-900">${columns[2]?.render(v)}</td>
+                <td class="px-4 py-3 text-[14px] text-graphite-900 text-right">${columns[3]?.render(v)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+      container.innerHTML = html;
+
+      document.querySelectorAll('.edit-prompt-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openEditor(btn.getAttribute('data-id'));
+        });
+      });
+    }
+
+    async function openEditor(id: string | null) {
+      const modal = document.getElementById('editor-modal');
+      if (!modal) return;
+      
+      try {
+        const res = await fetch(`/api/admin/prompts${id ? `?id=${id}` : ''}`);
+        const data = await res.json();
+        const version = data.prompt;
+
+        window.dispatchEvent(new CustomEvent('prompt-editor-load', { 
+          detail: { version } 
+        }));
+        
+        modal.classList.remove('hidden');
+      } catch (err) {
+        console.error('[PromptsPage] openEditor failed:', err);
+        alert('Failed to load prompt version.');
+      }
+    }
+
+    async function closeEditor() {
+      const modal = document.getElementById('editor-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+    }
+
+    document.getElementById('create-version-btn')?.addEventListener('click', async () => {
+      openEditor(null);
+    });
+
+    document.getElementById('editor-modal')?.addEventListener('click', (e) => {
+      if (e.target === document.getElementById('editor-modal')) {
+        closeEditor();
+      }
+    });
+
+    renderTable();
+    
+    window.addEventListener('prompt-editor-saved', () => {
+      renderTable();
+      closeEditor();
+    });
+  </script>
+
+  <style>
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .page-title {
+      font-size: 20px;
+      line-height: 1.3;
+      font-weight: 600;
+      color: var(--color-graphite-800);
+      margin: 0;
+    }
+    .page-description {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--color-graphite-500);
+    }
+    .table-container {
+      background: var(--color-porcelain-100);
+      border: 1px solid var(--color-graphite-180);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+    }
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .modal-content {
+      background: var(--color-porcelain-50);
+      border-radius: var(--radius-panel);
+      max-width: 1100px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      padding: 24px;
+      border: 1px solid var(--color-graphite-300);
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</AdminLayout>

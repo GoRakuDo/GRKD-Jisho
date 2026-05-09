@@ -9,6 +9,7 @@ const ITEMS = [
   { label: 'Dashboard', href: '/admin', slug: 'dashboard' },
   { label: 'Responses', href: '/admin/responses', slug: 'responses' },
   { label: 'Dictionaries', href: '/admin/dictionaries', slug: 'dictionaries' },
+  { label: 'Prompts', href: '/admin/prompts', slug: 'prompts' },
   { label: 'Cache', href: '/admin/cache', slug: 'cache' },
   { label: 'Logs', href: '/admin/logs', slug: 'logs' },
   { label: 'Traces', href: '/admin/traces', slug: 'traces' },
