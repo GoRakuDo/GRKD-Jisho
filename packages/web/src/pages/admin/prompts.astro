@@ -15,6 +15,7 @@ if (!session?.isAdmin) {
 <meta name="csrf-token" content={csrfToken} />
 
 <AdminLayout title="Prompts" active="prompts">
+  <div id="debug-bar" style="display:none;background:#fff3cd;padding:8px 16px;font-size:12px;font-family:monospace;margin-bottom:12px;border:1px solid #ffc107;border-radius:4px;color:#333;">Loading...</div>
   <div class="page-header">
     <div>
       <h1 class="page-title">Prompt Versions</h1>
@@ -66,12 +67,22 @@ if (!session?.isAdmin) {
     import type { PromptVersion } from '../../lib/prompt-types';
 
     let versionsCache: PromptVersion[] = [];
+    let debugState = 'initialized';
+
+    function showDebug(msg: string) {
+      const bar = document.getElementById('debug-bar');
+      if (bar) bar.textContent = msg;
+    }
 
     // ── Render table ──
     async function renderTable() {
-      const res = await fetch('/api/admin/prompts');
-      const data = await res.json();
-      versionsCache = data.versions || [];
+      debugState = 'fetching';
+      try {
+        const res = await fetch('/api/admin/prompts');
+        debugState = 'fetched:' + res.status;
+        const data = await res.json();
+        debugState = 'parsed:' + (data.versions ? data.versions.length : 'no-versions');
+        versionsCache = data.versions || [];
 
       const container = document.getElementById('prompts-container');
       if (!container) return;
@@ -107,10 +118,18 @@ if (!session?.isAdmin) {
           e.stopPropagation();
           const id = btn.getAttribute('data-id');
           const version = versionsCache.find(v => v.id === id);
-          if (version) openEditor(version);
+          if (version) {
+            openEditor(version);
+          } else {
+            showDebug('Edit click: version not found for id=' + id);
+          }
         });
       });
+      showDebug('Table rendered: ' + versionsCache.length + ' versions');
+    } catch (err) {
+      showDebug('renderTable error: ' + String(err));
     }
+  }
 
     // ── Open / close editor ──
     function openEditor(version: PromptVersion) {
@@ -120,9 +139,11 @@ if (!session?.isAdmin) {
       const titleLabel = document.getElementById('editor-version-label');
       const checkbox = document.getElementById('editor-active-checkbox') as HTMLInputElement | null;
 
-      if (!modal || !textarea || !preview || !titleLabel || !checkbox) return;
+      if (!modal || !textarea || !preview || !titleLabel || !checkbox) {
+        showDebug('openEditor: missing elements modal=' + !!modal + ' textarea=' + !!textarea + ' preview=' + !!preview + ' label=' + !!titleLabel + ' checkbox=' + !!checkbox);
+        return;
+      }
 
-      // Populate directly
       titleLabel.textContent = version.version;
       textarea.value = version.content;
       preview.textContent = version.content;
@@ -130,6 +151,7 @@ if (!session?.isAdmin) {
 
       modal.classList.remove('hidden');
       textarea.focus();
+      showDebug('Editor opened: ' + version.version + ' (' + version.content.length + ' chars)');
     }
 
     function closeEditor() {
@@ -218,7 +240,15 @@ if (!session?.isAdmin) {
     });
 
     // Initial load
-    renderTable();
+    const debugBar = document.getElementById('debug-bar');
+    if (debugBar) debugBar.style.display = 'block';
+    renderTable().catch(err => {
+      debugState = 'error:' + String(err);
+      if (debugBar) { debugBar.textContent = 'Script error: ' + String(err); debugBar.style.background = '#f8d7da'; debugBar.style.borderColor = '#f5c6cb'; }
+    });
+    setTimeout(() => {
+      if (debugBar) debugBar.textContent = 'State: ' + debugState + ' | versions: ' + versionsCache.length;
+    }, 3000);
   </script>
 
   <style>
