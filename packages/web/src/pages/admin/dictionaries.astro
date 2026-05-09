@@ -7,8 +7,10 @@ import {
   schema,
 } from "@grkd-jisho/db";
 import { count } from "drizzle-orm";
+import { generateCsrfToken } from "../../lib/csrf";
 
 const session = getSession(Astro);
+const csrfToken = session ? generateCsrfToken(session.discordUserId) : "";
 
 interface DictWithCount {
   id: string;
@@ -49,11 +51,12 @@ if (session?.isAdmin) {
 }
 ---
 
-<script>
-// CSRF token injected from SSR
-const SSR_CSRF_TOKEN = /* @__PURE__ */ '${csrfToken}';
+<meta name="csrf-token" content={csrfToken} />
 
+<script>
 document.addEventListener('DOMContentLoaded', () => {
+  const SSR_CSRF_TOKEN = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+
   async function updateDictionary(dictId: string, updates: { enabled?: boolean; priority?: number }) {
     const row = document.querySelector(`tr[data-dict-id="${dictId}"]`) as HTMLTableRowElement | null;
     if (!row) return;
