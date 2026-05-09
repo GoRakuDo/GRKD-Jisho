@@ -2,7 +2,6 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
 import { generateCsrfToken } from "../../lib/csrf";
-import { PromptEditor } from "../../components/admin/prompts/PromptEditor";
 import { Button } from "../../components/admin/Button";
 
 const session = getSession(Astro);
@@ -30,11 +29,36 @@ if (!session?.isAdmin) {
     <!-- Table will be hydrated by client-side script -->
   </div>
 
+  <!-- Editor modal — fully static SSR HTML, managed by vanilla JS -->
   <div id="editor-modal" class="modal-overlay hidden">
     <div class="modal-content">
-      <PromptEditor 
-        client:load 
-      />
+      <div class="editor-panel">
+        <div class="editor-header">
+          <h3 id="editor-title" class="editor-title">Edit <span id="editor-version-label" class="editor-version-label"></span></h3>
+          <div class="editor-actions-top">
+            <label class="editor-active-label">
+              <input id="editor-active-checkbox" type="checkbox" class="editor-checkbox" />
+              <span class="editor-checkbox-text">Set as active version</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="editor-grid">
+          <div class="editor-col">
+            <label class="editor-col-label">Editor</label>
+            <textarea id="editor-textarea" class="editor-textarea" spellcheck="false"></textarea>
+          </div>
+          <div class="editor-col">
+            <label class="editor-col-label">Preview (Read-only)</label>
+            <pre id="editor-preview" class="editor-preview"></pre>
+          </div>
+        </div>
+
+        <div class="editor-footer">
+          <button id="editor-cancel-btn" class="btn-secondary">Cancel</button>
+          <button id="editor-save-btn" class="btn-primary">Save Changes</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -43,6 +67,7 @@ if (!session?.isAdmin) {
 
     let versionsCache: PromptVersion[] = [];
 
+    // ── Render table ──
     async function renderTable() {
       const res = await fetch('/api/admin/prompts');
       const data = await res.json();
@@ -51,7 +76,7 @@ if (!session?.isAdmin) {
       const container = document.getElementById('prompts-container');
       if (!container) return;
 
-      let html = `
+      container.innerHTML = `
         <table class="data-table w-full text-left border-collapse">
           <thead>
             <tr class="bg-porcelain-150 border-b border-graphite-180">
@@ -75,41 +100,101 @@ if (!session?.isAdmin) {
           </tbody>
         </table>
       `;
-      container.innerHTML = html;
 
+      // Bind Edit buttons
       document.querySelectorAll('.edit-prompt-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const id = btn.getAttribute('data-id');
           const version = versionsCache.find(v => v.id === id);
-          openEditor(version);
+          if (version) openEditor(version);
         });
       });
     }
 
-    function openEditor(version: PromptVersion | undefined) {
+    // ── Open / close editor ──
+    function openEditor(version: PromptVersion) {
       const modal = document.getElementById('editor-modal');
-      if (!modal) return;
+      const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
+      const preview = document.getElementById('editor-preview');
+      const titleLabel = document.getElementById('editor-version-label');
+      const checkbox = document.getElementById('editor-active-checkbox') as HTMLInputElement | null;
 
-      if (version) {
-        modal.setAttribute('data-version', JSON.stringify(version));
-      } else {
-        modal.removeAttribute('data-version');
-      }
+      if (!modal || !textarea || !preview || !titleLabel || !checkbox) return;
+
+      // Populate directly
+      titleLabel.textContent = version.version;
+      textarea.value = version.content;
+      preview.textContent = version.content;
+      checkbox.checked = version.isActive;
 
       modal.classList.remove('hidden');
+      textarea.focus();
     }
 
     function closeEditor() {
       const modal = document.getElementById('editor-modal');
       if (!modal) return;
-      modal.removeAttribute('data-version');
       modal.classList.add('hidden');
     }
 
+    // ── Save handler ──
+    async function handleSave() {
+      const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
+      const checkbox = document.getElementById('editor-active-checkbox') as HTMLInputElement | null;
+      const saveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
+      if (!textarea || !checkbox || !saveBtn) return;
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      try {
+        const csrfRes = await fetch('/api/auth/csrf-token');
+        const { token } = await csrfRes.json();
+
+        const res = await fetch('/api/admin/prompts', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-csrf-token': token },
+          body: JSON.stringify({ content: textarea.value, isActive: checkbox.checked }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Save failed' }));
+          throw new Error(err.error || `Save failed (${res.status})`);
+        }
+
+        // Success — refresh table and close
+        await renderTable();
+        closeEditor();
+      } catch (err) {
+        console.error('[Prompts] Save failed:', err);
+        alert('Failed to save prompt version. Please check the logs.');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Changes';
+      }
+    }
+
+    // ── Event listeners ──
     document.getElementById('create-version-btn')?.addEventListener('click', () => {
-      openEditor(undefined);
+      const modal = document.getElementById('editor-modal');
+      const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
+      const preview = document.getElementById('editor-preview');
+      const titleLabel = document.getElementById('editor-version-label');
+      const checkbox = document.getElementById('editor-active-checkbox') as HTMLInputElement | null;
+      if (!modal || !textarea || !preview || !titleLabel || !checkbox) return;
+
+      titleLabel.textContent = '';
+      textarea.value = '';
+      preview.textContent = '';
+      checkbox.checked = true;
+
+      modal.classList.remove('hidden');
+      textarea.focus();
     });
+
+    document.getElementById('editor-cancel-btn')?.addEventListener('click', closeEditor);
+    document.getElementById('editor-save-btn')?.addEventListener('click', handleSave);
 
     document.getElementById('editor-modal')?.addEventListener('click', (e) => {
       if (e.target === document.getElementById('editor-modal')) {
@@ -117,15 +202,22 @@ if (!session?.isAdmin) {
       }
     });
 
-    window.addEventListener('prompt-editor-saved', () => {
-      renderTable();
-      closeEditor();
+    // Keyboard shortcut
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeEditor();
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleSave();
     });
 
-    window.addEventListener('prompt-editor-cancel', () => {
-      closeEditor();
+    // Update preview on textarea change
+    document.getElementById('editor-textarea')?.addEventListener('input', () => {
+      const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
+      const preview = document.getElementById('editor-preview');
+      if (textarea && preview) {
+        preview.textContent = textarea.value;
+      }
     });
 
+    // Initial load
     renderTable();
   </script>
 
@@ -155,6 +247,8 @@ if (!session?.isAdmin) {
       border-radius: var(--radius-card);
       overflow: hidden;
     }
+
+    /* Modal */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -178,8 +272,136 @@ if (!session?.isAdmin) {
       padding: 24px;
       border: 1px solid var(--color-graphite-300);
     }
-    .hidden {
-      display: none;
+    .hidden { display: none !important; }
+
+    /* Editor */
+    .editor-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      background: var(--color-porcelain-100);
+      border: 1px solid var(--color-graphite-180);
+      border-radius: var(--radius-panel);
+      padding: 24px;
     }
+    .editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .editor-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--color-graphite-800);
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+    .editor-version-label {
+      color: var(--color-royal-blue-600);
+    }
+    .editor-active-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .editor-checkbox {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      border: 1px solid var(--color-graphite-300);
+      accent-color: var(--color-royal-blue-600);
+    }
+    .editor-checkbox-text {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--color-graphite-650);
+    }
+    .editor-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+    .editor-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .editor-col-label {
+      font-size: 13px;
+      font-weight: 500;
+      text-transform: uppercase;
+      color: var(--color-graphite-500);
+      letter-spacing: 0.01em;
+    }
+    .editor-textarea {
+      width: 100%;
+      height: 400px;
+      padding: 16px;
+      border-radius: var(--radius-button);
+      background: var(--color-porcelain-50);
+      border: 1px solid var(--color-graphite-300);
+      color: var(--color-graphite-900);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      box-sizing: border-box;
+    }
+    .editor-textarea:focus {
+      border-color: var(--color-royal-blue-600);
+      box-shadow: 0 0 0 2px var(--color-royal-blue-100);
+    }
+    .editor-preview {
+      width: 100%;
+      height: 400px;
+      padding: 16px;
+      border-radius: var(--radius-button);
+      background: var(--color-graphite-900);
+      color: var(--color-porcelain-50);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+      box-sizing: border-box;
+    }
+    .editor-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    /* Buttons */
+    .btn-primary {
+      background: var(--color-royal-blue-600);
+      color: var(--color-porcelain-50);
+      padding: 8px 20px;
+      border-radius: var(--radius-button);
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover { background: var(--color-royal-blue-700); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: var(--color-porcelain-200);
+      color: var(--color-graphite-700);
+      padding: 8px 20px;
+      border-radius: var(--radius-button);
+      font-size: 14px;
+      font-weight: 600;
+      border: 1px solid var(--color-graphite-300);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-secondary:hover { background: var(--color-porcelain-300); }
   </style>
 </AdminLayout>
