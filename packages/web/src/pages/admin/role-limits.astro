@@ -110,10 +110,21 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
   // ── Fetch & Render Table ──
   async function renderTable() {
     try {
-      const res = await fetch("/api/admin/role-limits");
-      const data = await res.json();
-      roleCache = data.roleLimits || [];
-      const defaultLimit = data.defaultLimit ?? 10;
+      const res = await fetch("/api/admin/role-limits", {
+      credentials: "same-origin",
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("[RoleLimits] GET", res.status, res.statusText, errBody);
+      const container2 = getEl("table-container");
+      if (container2) container2.innerHTML = '<p style="color:var(--color-danger-600)">Failed to load (HTTP ' + res.status + '). See console.</p>';
+      return;
+    }
+
+    const data = await res.json();
+    roleCache = data.roleLimits || [];
+    const defaultLimit = data.defaultLimit ?? 10;
 
       const defaultDisplay = getEl("default-limit-display");
       if (defaultDisplay) defaultDisplay.textContent = defaultLimit === -1 ? "Unlimited" : defaultLimit + " /day";
