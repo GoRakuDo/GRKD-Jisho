@@ -9,6 +9,7 @@ const envSchema = z.object({
     .string()
     .min(1)
     .transform((s) => s.split(",").map((id) => id.trim())),
+  DISCORD_DM_OWNER_USER_ID: z.string().min(1),
 
   // Database
   DATABASE_URL: z.string().url(),

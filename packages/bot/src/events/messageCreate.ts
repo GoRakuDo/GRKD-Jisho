@@ -24,10 +24,12 @@ async function finalizeLookup(
     responseCacheId: bigint | null;
     cacheHit: boolean;
     normalizedQueryOverride?: string;
+    guildIdOverride?: string;
   },
 ): Promise<void> {
+  const guildId = params.guildIdOverride ?? message.guildId ?? "";
   await recordLookup({
-    guildId: message.guildId ?? "",
+    guildId,
     channelId: message.channelId,
     messageId: message.id,
     userId: message.author.id,
@@ -38,7 +40,7 @@ async function finalizeLookup(
     responseCacheId: params.responseCacheId,
     cacheHit: params.cacheHit,
   });
-  await incrementUsage({ userId: message.author.id, guildId: message.guildId ?? "" });
+  await incrementUsage({ userId: message.author.id, guildId });
 }
 
 export const messageCreateHandler = async (message: Message): Promise<void> => {
@@ -67,7 +69,11 @@ async function handleMessage(message: Message): Promise<void> {
 
   const botId = message.client.user?.id;
   if (!botId) return;
-  if (!message.mentions.has(botId)) return;
+
+  const isDm = message.guildId === null;
+  const isDmOwner = isDm && message.author.id === env.DISCORD_DM_OWNER_USER_ID;
+  if (isDm && !isDmOwner) return;
+  if (!isDm && !message.mentions.has(botId)) return;
 
   const traceId = `lookup_${randomUUID()}_${message.id}`;
   await traceEvent(traceId, "message.received", "info", {
@@ -77,8 +83,10 @@ async function handleMessage(message: Message): Promise<void> {
   });
 
   const allowedChannels = env.DISCORD_ALLOWED_CHANNELS;
-  if (!allowedChannels.includes(message.channelId)) return;
-  await traceEvent(traceId, "channel.allowed", "info", {});
+  if (!isDm) {
+    if (!allowedChannels.includes(message.channelId)) return;
+    await traceEvent(traceId, "channel.allowed", "info", {});
+  }
 
   const query = message.content.replace(/<@!?\d+>/g, "").trim();
   if (!query) {
@@ -86,6 +94,107 @@ async function handleMessage(message: Message): Promise<void> {
     return;
   }
   await traceEvent(traceId, "query.extracted", "info", { query });
+
+  const guildContextId = message.guildId ?? env.DISCORD_GUILD_ID;
+
+  if (isDmOwner) {
+    const roleKey = await resolveRoleKey([], guildContextId);
+
+    const result = await lookupWord(query);
+    if (!result) {
+      await message.reply(formatNotFound(query));
+      await traceEvent(traceId, "dictionary.miss", "warn", { query });
+      await finalizeLookup(message, traceId, {
+        query,
+        roleIds: [],
+        dictionaryIdUsed: null,
+        responseCacheId: null,
+        cacheHit: false,
+        guildIdOverride: guildContextId,
+      });
+      return;
+    }
+
+    await traceEvent(traceId, "dictionary.hit", "info", {
+      dict: result.dictionary.name,
+      matchedBy: result.matchedBy,
+      normalizedQuery: result.normalizedQuery,
+    });
+
+    const cacheKey = {
+      normalizedQuery: result.normalizedQuery,
+      dictionaryId: result.dictionary.id,
+      entryId: result.entry.id,
+      roleKey,
+      promptVersion: env.PROMPT_VERSION,
+      modelName: "gemini-2.0-flash",
+    };
+
+    const cached = await getCachedResponse(cacheKey);
+    if (cached) {
+      await message.reply(formatReply(cached.responseText));
+      await traceEvent(traceId, "cache.hit", "info", { cacheId: cached.id.toString() });
+      await finalizeLookup(message, traceId, {
+        query,
+        roleIds: [],
+        dictionaryIdUsed: result.dictionary.id,
+        responseCacheId: cached.id,
+        cacheHit: true,
+        normalizedQueryOverride: cacheKey.normalizedQuery,
+        guildIdOverride: guildContextId,
+      });
+      return;
+    }
+
+    await traceEvent(traceId, "cache.miss", "info", {});
+    await traceEvent(traceId, "llm.generate.started", "info", {});
+
+    try {
+      const responseText = await generate({
+        roleKey,
+        query,
+        dictionaryName: result.dictionary.name,
+        definitionJson: JSON.stringify(result.entry.definitionsJson),
+        promptVersion: env.PROMPT_VERSION,
+      });
+      await traceEvent(traceId, "llm.generated", "info", {});
+
+      const saved = await saveResponse({ ...cacheKey, responseText });
+      if (!saved) {
+        await finalizeLookup(message, traceId, {
+          query,
+          roleIds: [],
+          dictionaryIdUsed: result.dictionary.id,
+          responseCacheId: null,
+          cacheHit: false,
+          normalizedQueryOverride: cacheKey.normalizedQuery,
+          guildIdOverride: guildContextId,
+        });
+        await message.reply(formatReply(responseText));
+        await traceEvent(traceId, "reply.sent", "info", {});
+        return;
+      }
+
+      await traceEvent(traceId, "cache.saved", "info", { cacheId: saved.id.toString() });
+      await message.reply(formatReply(responseText));
+      await traceEvent(traceId, "reply.sent", "info", {});
+
+      await finalizeLookup(message, traceId, {
+        query,
+        roleIds: [],
+        dictionaryIdUsed: result.dictionary.id,
+        responseCacheId: saved.id,
+        cacheHit: false,
+        normalizedQueryOverride: cacheKey.normalizedQuery,
+        guildIdOverride: guildContextId,
+      });
+    } catch (err) {
+      await traceEvent(traceId, "llm.error", "error", { error: String(err) });
+      await message.reply(formatError("LLM生成中にエラーが発生しました。"));
+    }
+
+    return;
+  }
 
   const member = message.member;
   if (!member) return;
@@ -119,7 +228,7 @@ async function handleMessage(message: Message): Promise<void> {
   }
   await traceEvent(traceId, "rate_limit.checked", "info", {});
 
-  const roleKey = await resolveRoleKey(roleIds, message.guildId ?? undefined);
+  const roleKey = await resolveRoleKey(roleIds, guildContextId);
 
   const result = await lookupWord(query);
   if (!result) {
@@ -131,6 +240,7 @@ async function handleMessage(message: Message): Promise<void> {
       dictionaryIdUsed: null,
       responseCacheId: null,
       cacheHit: false,
+      guildIdOverride: guildContextId,
     });
     return;
   }
@@ -160,6 +270,7 @@ async function handleMessage(message: Message): Promise<void> {
       responseCacheId: cached.id,
       cacheHit: true,
       normalizedQueryOverride: cacheKey.normalizedQuery,
+      guildIdOverride: guildContextId,
     });
     return;
   }
@@ -186,6 +297,7 @@ async function handleMessage(message: Message): Promise<void> {
         responseCacheId: null,
         cacheHit: false,
         normalizedQueryOverride: cacheKey.normalizedQuery,
+        guildIdOverride: guildContextId,
       });
       await message.reply(formatReply(responseText));
       await traceEvent(traceId, "reply.sent", "info", {});
@@ -203,6 +315,7 @@ async function handleMessage(message: Message): Promise<void> {
       responseCacheId: saved.id,
       cacheHit: false,
       normalizedQueryOverride: cacheKey.normalizedQuery,
+      guildIdOverride: guildContextId,
     });
   } catch (err) {
     await traceEvent(traceId, "llm.error", "error", { error: String(err) });
