@@ -28,7 +28,7 @@ if (!session?.isAdmin) {
   <div class="info-card">
     <div class="section-header">
       <h2 class="section-title">Default Limit</h2>
-      <button id="edit-default-btn" class="btn-ghost" style="font-size:12px;padding:4px 10px;">✎ Edit</button>
+      <button id="edit-default-btn" class="btn-ghost">✎ Edit</button>
     </div>
     <p class="info-text">
       All roles without a custom limit: <strong id="default-limit-display">—</strong> searches/day
@@ -229,7 +229,9 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
     if (!title || !idInput || !labelInput || !limitInput || !modal) return;
 
-    title.textContent = "Edit: " + (role.roleLabel || role.discordRoleId);
+    title.textContent = role.discordRoleId === "__default__"
+      ? "Edit Default Limit"
+      : "Edit: " + (role.roleLabel || role.discordRoleId);
     idInput.value = role.discordRoleId;
     idInput.disabled = true;
     labelInput.value = role.roleLabel ?? "";
