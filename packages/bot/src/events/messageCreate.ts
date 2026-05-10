@@ -120,7 +120,7 @@ async function handleMessage(message: Message): Promise<void> {
   }
   await traceEvent(traceId, "rate_limit.checked", "info", {});
 
-  const roleKey = resolveRoleKey(roleNames);
+  const roleKey = await resolveRoleKey(roleNames, message.guildId ?? undefined);
 
   const result = await lookupWord(query);
   if (!result) {

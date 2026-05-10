@@ -71,8 +71,13 @@
       "when": 1778319800000,
       "tag": "0009_sour_terrax",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778420347864,
+      "tag": "0010_sweet_fenris",
+      "breakpoints": true
     }
-  ]
-}
   ]
 }

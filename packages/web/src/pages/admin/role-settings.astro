@@ -1,0 +1,887 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { getSession } from "../../lib/session";
+import { generateCsrfToken } from "../../lib/csrf";
+import { Button } from "../../components/admin/Button";
+
+const session = getSession(Astro);
+const csrfToken = session ? generateCsrfToken(session.discordUserId) : "";
+
+if (!session?.isAdmin) {
+  return Astro.redirect("/auth/login");
+}
+---
+
+<meta name="csrf-token" content={csrfToken} />
+
+<AdminLayout title="Role Settings" active="role-settings">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Role Settings</h1>
+      <p class="page-description">Configure role bindings, per-role daily search limits, and reset user usage.</p>
+    </div>
+    <Button variant="secondary" id="add-role-btn">
+      + Add Role Limit
+    </Button>
+  </div>
+
+  <div class="info-card">
+    <div class="section-header">
+      <h2 class="section-title">Default Limit</h2>
+      <button id="edit-default-btn" class="btn-ghost">✎ Edit</button>
+    </div>
+    <p class="info-text">
+      All roles without a custom limit: <strong id="default-limit-display">—</strong> searches/day
+    </p>
+    <p class="info-hint">Owner and Administrator roles are always unlimited.</p>
+  </div>
+
+  <div id="table-container" class="table-container">
+    <!-- Hydrated by client script -->
+  </div>
+
+  <div class="info-card info-card-reset" style="margin-top: 20px;">
+    <h2 class="section-title">Reset User Usage</h2>
+    <p class="info-text" style="margin-bottom: 12px;">Reset a user's search count for today (GMT+7).</p>
+    <div class="reset-row">
+      <div class="field-group">
+        <label class="field-label" for="reset-user-id">User ID</label>
+        <input type="text" id="reset-user-id" class="text-input" placeholder="e.g. 123456789012345678" />
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="reset-guild-id">Guild ID</label>
+        <input type="text" id="reset-guild-id" class="text-input" placeholder="e.g. 987654321098765432" />
+      </div>
+      <button id="reset-usage-btn" class="btn-primary">Reset Usage</button>
+    </div>
+    <p id="reset-result" class="reset-result"></p>
+  </div>
+
+  <div id="role-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="editor-panel">
+        <div class="editor-header">
+          <h3 id="role-modal-title" class="editor-title">Add Role Limit</h3>
+          <button id="role-modal-close" class="btn-secondary" style="padding: 6px 14px; font-size: 13px;">✕ Close</button>
+        </div>
+
+        <div class="editor-grid" style="grid-template-columns: 1fr;">
+          <div class="editor-col">
+            <label class="editor-col-label">Discord Role ID *</label>
+            <input type="text" id="role-id-input" class="text-input" placeholder="e.g. 123456789012345678" />
+          </div>
+          <div class="editor-col">
+            <label class="editor-col-label">Role Label (optional)</label>
+            <input type="text" id="role-label-input" class="text-input" placeholder="e.g. Moderator" />
+          </div>
+          <div class="editor-col">
+            <label class="editor-col-label">Daily Limit *</label>
+            <input type="number" id="role-limit-input" class="text-input" placeholder="-1 for unlimited, or 1–99999" min="-1" max="99999" />
+            <span class="field-hint">-1 = unlimited. Owner/Admin are always unlimited regardless of this setting.</span>
+          </div>
+        </div>
+
+        <div class="editor-footer">
+          <button id="role-cancel-btn" class="btn-secondary">Cancel</button>
+          <button id="role-save-btn" class="btn-primary">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Role Bindings -->
+  <div class="section-divider"></div>
+  <div class="page-header" style="margin-top: 32px;">
+    <div>
+      <h2 class="section-title" style="margin: 0;">Role Bindings</h2>
+      <p class="info-text" style="margin: 4px 0 0;">Map Discord role names to system role keys for prompt routing.</p>
+    </div>
+    <Button variant="secondary" id="add-binding-btn">
+      + Add Binding
+    </Button>
+  </div>
+
+  <div id="bindings-container" class="table-container">
+    <!-- Hydrated by client script -->
+  </div>
+
+  <!-- Role Binding Editor Modal -->
+  <div id="binding-modal" class="modal-overlay hidden">
+    <div class="modal-content modal-content-small">
+      <h3 class="editor-title" style="margin-bottom: 16px;">Edit Role Binding</h3>
+      <div class="field-group">
+        <label class="field-label" for="binding-role-name">Discord Role Name</label>
+        <input type="text" id="binding-role-name" class="text-input" placeholder="e.g. 1段, 2段, 3段, 4段" />
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="binding-system-key">System Role Key</label>
+        <select id="binding-system-key" class="text-input">
+          <option value="pemula">pemula</option>
+          <option value="pemula-atas">pemula-atas</option>
+          <option value="menengah">menengah</option>
+          <option value="mahir">mahir</option>
+        </select>
+      </div>
+      <div class="editor-footer">
+        <button id="binding-cancel-btn" class="btn-secondary">Cancel</button>
+        <button id="binding-save-btn" class="btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+// ── Types ──
+type RoleLimit = {
+  discordRoleId: string;
+  roleLabel: string | null;
+  dailyLimit: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// ── State ──
+let roleCache: RoleLimit[] = [];
+let editingDiscordRoleId: string | null = null;
+let currentDefaultLimit: number = 10;
+const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.getAttribute("content") ?? "";
+
+// ── Helpers ──
+function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
+  return document.getElementById(id) as T | null;
+}
+
+  // ── Fetch & Render Table ──
+  async function renderTable() {
+    try {
+      const res = await fetch("/api/admin/role-limits", {
+      credentials: "same-origin",
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error("[RoleLimits] GET", res.status, res.statusText, errBody);
+      const container2 = getEl("table-container");
+      if (container2) container2.innerHTML = '<p style="color:var(--color-danger-600)">Failed to load (HTTP ' + res.status + '). See console.</p>';
+      return;
+    }
+
+    const data = await res.json();
+    roleCache = data.roleLimits || [];
+    currentDefaultLimit = data.defaultLimit ?? 10;
+    const defaultLimit = currentDefaultLimit;
+
+      const defaultDisplay = getEl("default-limit-display");
+      if (defaultDisplay) defaultDisplay.textContent = defaultLimit === -1 ? "Unlimited" : defaultLimit + " /day";
+
+      const container = getEl("table-container");
+      if (!container) return;
+
+      if (roleCache.length === 0) {
+        container.innerHTML = `
+          <table class="data-table w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-porcelain-150 border-b border-graphite-180">
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Role Name</th>
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Role ID</th>
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Daily Limit</th>
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4" class="empty-cell">No custom role limits configured.</td></tr>
+            </tbody>
+          </table>`;
+        return;
+      }
+
+      container.innerHTML = `
+        <table class="data-table w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-porcelain-150 border-b border-graphite-180">
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Role Name</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Role ID</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Daily Limit</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${roleCache.map((r: RoleLimit) => {
+              const isDefault = r.discordRoleId === "__default__";
+              const limitText = r.dailyLimit === -1 ? "Unlimited" : r.dailyLimit + " /day";
+              const roleName = r.roleLabel || r.discordRoleId;
+              const shortId = r.discordRoleId.length > 18
+                ? r.discordRoleId.slice(0, 8) + "…" + r.discordRoleId.slice(-4)
+                : r.discordRoleId;
+              return `
+                <tr class="border-b border-graphite-180 last:border-0 hover:bg-porcelain-150 transition-colors min-h-[48px]">
+                  <td class="px-4 py-3 text-[14px]">
+                    <span class="text-graphite-800 font-medium">${isDefault ? '<span class="status-badge badge-enabled">Default</span>' : roleName}</span>
+                  </td>
+                  <td class="px-4 py-3 text-[13px] text-graphite-500 mono">${shortId}</td>
+                  <td class="px-4 py-3 text-[14px]">${limitText}</td>
+                  <td class="px-4 py-3 text-right flex gap-2 justify-end">
+                    ${isDefault
+                      ? '<span class="text-graphite-400 text-[12px]">Protected</span>'
+                      : `<button class="edit-role-btn bg-royal-blue-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-royal-blue-700 transition-colors" data-role-id="${r.discordRoleId}">Edit</button>
+                      <button class="delete-role-btn bg-danger-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-danger-700 transition-colors" data-role-id="${r.discordRoleId}">Delete</button>`}
+                  </td>
+                </tr>`;
+            }).join("")}
+          </tbody>
+        </table>`;
+
+      // ── Bind Edit buttons ──
+      container.querySelectorAll<HTMLElement>(".edit-role-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const roleId = btn.getAttribute("data-role-id");
+          if (!roleId) return;
+          const role = roleCache.find((r: RoleLimit) => r.discordRoleId === roleId);
+          if (!role) return;
+          openModal(role);
+        });
+      });
+
+      // ── Bind Delete buttons ──
+      container.querySelectorAll<HTMLElement>(".delete-role-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const roleId = btn.getAttribute("data-role-id");
+          if (!roleId) return;
+          if (!confirm("Delete this role limit? This cannot be undone.")) return;
+          handleDelete(roleId);
+        });
+      });
+    } catch (err: unknown) {
+      console.error("[RoleLimits] renderTable error:", err);
+    }
+  }
+
+  // ── Modal Controls ──
+  function openModal(role: RoleLimit) {
+    editingDiscordRoleId = role.discordRoleId;
+    const title = getEl<HTMLHeadingElement>("role-modal-title");
+    const idInput = getEl<HTMLInputElement>("role-id-input");
+    const labelInput = getEl<HTMLInputElement>("role-label-input");
+    const limitInput = getEl<HTMLInputElement>("role-limit-input");
+    const modal = getEl("role-modal");
+
+    if (!title || !idInput || !labelInput || !limitInput || !modal) return;
+
+    title.textContent = role.discordRoleId === "__default__"
+      ? "Edit Default Limit"
+      : "Edit: " + (role.roleLabel || role.discordRoleId);
+    idInput.value = role.discordRoleId;
+    idInput.disabled = true;
+    labelInput.value = role.roleLabel ?? "";
+    limitInput.value = String(role.dailyLimit);
+    modal.classList.remove("hidden");
+    setTimeout(() => limitInput.focus(), 50);
+  }
+
+  function closeModal() {
+    editingDiscordRoleId = null;
+    const modal = getEl("role-modal");
+    const idInput = getEl<HTMLInputElement>("role-id-input");
+    if (modal) modal.classList.add("hidden");
+    if (idInput) idInput.disabled = false;
+  }
+
+  function openAddModal() {
+    editingDiscordRoleId = null;
+    const title = getEl<HTMLHeadingElement>("role-modal-title");
+    const idInput = getEl<HTMLInputElement>("role-id-input");
+    const labelInput = getEl<HTMLInputElement>("role-label-input");
+    const limitInput = getEl<HTMLInputElement>("role-limit-input");
+    const modal = getEl("role-modal");
+
+    if (title) title.textContent = "Add Role Limit";
+    if (idInput) { idInput.value = ""; idInput.disabled = false; }
+    if (labelInput) labelInput.value = "";
+    if (limitInput) limitInput.value = "";
+    if (modal) modal.classList.remove("hidden");
+    setTimeout(() => { if (idInput) idInput.focus(); }, 50);
+  }
+
+  // ── Save (Add or Edit) ──
+  async function handleSave() {
+    const roleIdEl = getEl<HTMLInputElement>("role-id-input");
+    const labelEl = getEl<HTMLInputElement>("role-label-input");
+    const limitEl = getEl<HTMLInputElement>("role-limit-input");
+
+    if (!roleIdEl || !labelEl || !limitEl) return;
+
+    const roleId = roleIdEl.value.trim();
+    const roleLabel = labelEl.value.trim();
+    const rawLimit = limitEl.value.trim();
+
+    if (!roleId) { alert("Discord Role ID is required."); return; }
+    if (rawLimit === "") { alert("Daily Limit is required."); return; }
+
+    const dailyLimit = parseInt(rawLimit, 10);
+    if (!Number.isInteger(dailyLimit) || dailyLimit < -1 || dailyLimit === 0 || dailyLimit > 99999) {
+      alert("Daily Limit must be -1 (unlimited) or between 1 and 99999.");
+      return;
+    }
+
+    if (!csrfToken) { alert("CSRF token not available. Please reload the page."); return; }
+
+    try {
+      const body: Record<string, unknown> = {
+        discordRoleId: roleId,
+        roleLabel: roleLabel || null,
+        dailyLimit,
+      };
+      if (editingDiscordRoleId) body.id = editingDiscordRoleId;
+
+      const res = await fetch("/api/admin/role-limits", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const err: { error?: string } = await res.json().catch(() => ({ error: "Save failed" }));
+        throw new Error(err.error || "Save failed (" + res.status + ")");
+      }
+
+      closeModal();
+      await renderTable();
+    } catch (err: unknown) {
+      console.error("[RoleLimits] Save failed:", err);
+      const msg = err instanceof Error ? err.message : "Failed to save role limit.";
+      alert(msg);
+    }
+  }
+
+  // ── Delete ──
+  async function handleDelete(roleId: string) {
+    if (!csrfToken) { alert("CSRF token not available. Please reload the page."); return; }
+
+    try {
+      const res = await fetch("/api/admin/role-limits?discordRoleId=" + encodeURIComponent(roleId), {
+        method: "DELETE",
+        headers: { "x-csrf-token": csrfToken },
+      });
+
+      if (!res.ok) {
+        const err: { error?: string } = await res.json().catch(() => ({ error: "Delete failed" }));
+        throw new Error(err.error || "Delete failed (" + res.status + ")");
+      }
+
+      await renderTable();
+    } catch (err: unknown) {
+      console.error("[RoleLimits] Delete failed:", err);
+      const msg = err instanceof Error ? err.message : "Failed to delete role limit.";
+      alert(msg);
+    }
+  }
+
+  // ── Reset User Usage ──
+  async function handleResetUsage() {
+    const userIdEl = getEl<HTMLInputElement>("reset-user-id");
+    const guildIdEl = getEl<HTMLInputElement>("reset-guild-id");
+    const resultEl = getEl("reset-result");
+
+    if (!userIdEl || !guildIdEl || !resultEl) return;
+
+    const userId = userIdEl.value.trim();
+    const guildId = guildIdEl.value.trim();
+
+    if (!userId) { resultEl.textContent = "User ID is required."; resultEl.style.color = "var(--color-danger-600)"; return; }
+    if (!guildId) { resultEl.textContent = "Guild ID is required."; resultEl.style.color = "var(--color-danger-600)"; return; }
+    if (!csrfToken) { resultEl.textContent = "CSRF token not available."; resultEl.style.color = "var(--color-danger-600)"; return; }
+
+    try {
+      const res = await fetch("/api/admin/role-limits/reset-usage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-csrf-token": csrfToken },
+        body: JSON.stringify({ userId, guildId }),
+      });
+
+      const body: { success?: boolean; affected?: number; error?: string } = await res.json().catch(() => ({ error: "Unknown error" }));
+
+      if (!res.ok) {
+        resultEl.textContent = "Error: " + (body.error || "Failed to reset usage.");
+        resultEl.style.color = "var(--color-danger-600)";
+        return;
+      }
+
+      resultEl.textContent = "✓ Usage reset for user " + userId + " (rows affected: " + (body.affected ?? 0) + ")";
+      resultEl.style.color = "var(--color-royal-blue-600)";
+    } catch (err: unknown) {
+      console.error("[RoleLimits] Reset failed:", err);
+      resultEl.textContent = "Failed to reset usage. Check console.";
+      resultEl.style.color = "var(--color-danger-600)";
+    }
+  }
+
+  // ── Event Listeners ──
+  const addBtn = getEl("add-role-btn");
+  if (addBtn) addBtn.addEventListener("click", openAddModal);
+
+  const editDefaultBtn = getEl("edit-default-btn");
+  if (editDefaultBtn) {
+    editDefaultBtn.addEventListener("click", () => {
+      openModal({ discordRoleId: "__default__", roleLabel: null, dailyLimit: currentDefaultLimit } as RoleLimit);
+    });
+  }
+
+  const cancelBtn = getEl("role-cancel-btn");
+  if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+
+  const closeBtn = getEl("role-modal-close");
+  if (closeBtn) closeBtn.addEventListener("click", closeModal);
+
+  const saveBtn = getEl("role-save-btn");
+  if (saveBtn) saveBtn.addEventListener("click", handleSave);
+
+  const resetBtn = getEl("reset-usage-btn");
+  if (resetBtn) resetBtn.addEventListener("click", handleResetUsage);
+
+  const modal = getEl("role-modal");
+  if (modal) {
+    modal.addEventListener("click", (e: Event) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
+  document.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Escape") closeModal();
+  });
+
+  // ── Role Bindings ──
+  let bindingsCache: Array<{
+    id: number;
+    guildId: string;
+    discordRoleName: string;
+    systemRoleKey: string;
+  }> = [];
+
+  async function renderBindings() {
+    try {
+      const res = await fetch('/api/admin/role-bindings');
+      const data = await res.json();
+      bindingsCache = data.bindings || [];
+
+      const container = document.getElementById('bindings-container');
+      if (!container) return;
+
+      if (bindingsCache.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No custom bindings configured. Discord role names that match the hardcoded defaults will still work.</p></div>';
+        return;
+      }
+
+      container.innerHTML = `
+        <table class="data-table w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-porcelain-150 border-b border-graphite-180">
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">Discord Role Name</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">System Role Key</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bindingsCache.map((b) => `
+              <tr class="border-b border-graphite-180 last:border-0 hover:bg-porcelain-150 transition-colors">
+                <td class="px-4 py-3 text-[14px] text-graphite-800 font-medium">${b.discordRoleName}</td>
+                <td class="px-4 py-3 text-[14px]"><span class="mono text-graphite-650">${b.systemRoleKey}</span></td>
+                <td class="px-4 py-3 text-[14px] text-right">
+                  <button class="edit-binding-btn btn-ghost" data-id="${b.id}">✎ Edit</button>
+                  <button class="delete-binding-btn btn-danger-sm" data-id="${b.id}">Delete</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+
+      container.querySelectorAll('.edit-binding-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.getAttribute('data-id'));
+          const binding = bindingsCache.find(b => b.id === id);
+          if (!binding) return;
+          const nameInput = document.getElementById('binding-role-name') as HTMLInputElement | null;
+          const keySelect = document.getElementById('binding-system-key') as HTMLSelectElement | null;
+          if (nameInput && keySelect) {
+            nameInput.value = binding.discordRoleName;
+            keySelect.value = binding.systemRoleKey;
+          }
+          document.getElementById('binding-modal')?.classList.remove('hidden');
+        });
+      });
+
+      container.querySelectorAll('.delete-binding-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = Number(btn.getAttribute('data-id'));
+          if (!confirm('Delete this role binding?')) return;
+          try {
+            const csrfRes = await fetch('/api/auth/csrf-token');
+            const { token } = await csrfRes.json();
+            const res = await fetch('/api/admin/role-bindings?id=' + id, {
+              method: 'DELETE',
+              headers: { 'x-csrf-token': token },
+            });
+            if (!res.ok) throw new Error('Delete failed');
+            await renderBindings();
+          } catch (err) {
+            console.error('[RoleBindings] Delete failed:', err);
+            alert('Failed to delete binding.');
+          }
+        });
+      });
+    } catch (err) {
+      console.error('[RoleBindings] render error:', err);
+    }
+  }
+
+  document.getElementById('add-binding-btn')?.addEventListener('click', () => {
+    const nameInput = document.getElementById('binding-role-name') as HTMLInputElement | null;
+    const keySelect = document.getElementById('binding-system-key') as HTMLSelectElement | null;
+    if (nameInput) nameInput.value = '';
+    if (keySelect) keySelect.value = 'pemula';
+    document.getElementById('binding-modal')?.classList.remove('hidden');
+  });
+
+  document.getElementById('binding-cancel-btn')?.addEventListener('click', () => {
+    document.getElementById('binding-modal')?.classList.add('hidden');
+  });
+
+  document.getElementById('binding-save-btn')?.addEventListener('click', async () => {
+    const nameInput = document.getElementById('binding-role-name') as HTMLInputElement | null;
+    const keySelect = document.getElementById('binding-system-key') as HTMLSelectElement | null;
+    if (!nameInput || !keySelect) return;
+
+    const discordRoleName = nameInput.value.trim();
+    const systemRoleKey = keySelect.value;
+    if (!discordRoleName) { alert('Discord role name is required.'); return; }
+
+    try {
+      const csrfRes = await fetch('/api/auth/csrf-token');
+      const { token } = await csrfRes.json();
+      const res = await fetch('/api/admin/role-bindings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': token },
+        body: JSON.stringify({ discordRoleName, systemRoleKey }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      document.getElementById('binding-modal')?.classList.add('hidden');
+      await renderBindings();
+    } catch (err) {
+      console.error('[RoleBindings] Save failed:', err);
+      alert('Failed to save binding.');
+    }
+  });
+
+  // ── Initial Load ──
+  renderTable();
+  renderBindings();
+</script>
+
+<style>
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .page-title {
+    font-size: 20px;
+    line-height: 1.3;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .page-description {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--color-graphite-500);
+  }
+
+  .info-card {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .section-title {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .section-header .section-title { margin-bottom: 0; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-royal-blue-600);
+    padding: 4px 10px;
+    border-radius: var(--radius-button);
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--color-royal-blue-300);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-ghost:hover { background: var(--color-royal-blue-100); }
+  .info-text {
+    margin: 0 0 4px;
+    font-size: 14px;
+    color: var(--color-graphite-650);
+    line-height: 1.5;
+  }
+  .info-hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--color-graphite-450);
+    font-style: italic;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .badge-enabled {
+    background: var(--color-royal-blue-100);
+    color: var(--color-royal-blue-700);
+  }
+
+  .table-container {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+  }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .data-table th {
+    background: var(--color-porcelain-150);
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--color-graphite-500);
+    font-weight: 500;
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+  .data-table td {
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--color-graphite-650);
+    border-bottom: 1px solid var(--color-graphite-100);
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tbody tr:hover { background: var(--color-porcelain-150); }
+  .data-table tbody tr { min-height: 48px; }
+  .mono { font-family: var(--font-grkd-mono); }
+
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .modal-content {
+    background: var(--color-porcelain-50);
+    border-radius: var(--radius-panel);
+    max-width: 640px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 24px;
+    border: 1px solid var(--color-graphite-300);
+  }
+  .hidden { display: none !important; }
+
+  .editor-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    padding: 24px;
+  }
+  .editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .editor-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+    margin: 0;
+  }
+
+  .editor-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .editor-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .editor-col-label {
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: var(--color-graphite-500);
+    letter-spacing: 0.01em;
+  }
+
+  .text-input {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    background: var(--color-porcelain-50);
+    border: 1px solid var(--color-graphite-300);
+    border-radius: var(--radius-input);
+    color: var(--color-graphite-900);
+    font-size: 14px;
+    font-family: var(--font-grkd-sans);
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .text-input:focus {
+    border-color: var(--color-royal-blue-600);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-royal-blue-100);
+  }
+  .text-input:disabled {
+    background: var(--color-porcelain-200);
+    color: var(--color-graphite-450);
+    cursor: not-allowed;
+  }
+
+  .field-hint {
+    font-size: 12px;
+    color: var(--color-graphite-450);
+    line-height: 1.4;
+  }
+  .editor-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  .btn-primary {
+    background: var(--color-royal-blue-600);
+    color: var(--color-porcelain-50);
+    padding: 8px 20px;
+    border-radius: var(--radius-button);
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: var(--color-royal-blue-700); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: var(--color-porcelain-200);
+    color: var(--color-graphite-700);
+    padding: 6px 14px;
+    border-radius: var(--radius-button);
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--color-graphite-300);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-secondary:hover { background: var(--color-porcelain-300); }
+
+  .edit-role-btn, .delete-role-btn {
+    padding: 5px 12px;
+    border-radius: var(--radius-button);
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .edit-role-btn { background: var(--color-royal-blue-600); color: var(--color-porcelain-50); }
+  .edit-role-btn:hover { background: var(--color-royal-blue-700); }
+  .delete-role-btn { background: var(--color-danger-600); color: var(--color-porcelain-50); }
+  .delete-role-btn:hover { background: var(--color-danger-700); }
+
+  .reset-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 200px;
+  }
+  .field-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-graphite-500);
+    letter-spacing: 0.01em;
+  }
+  .reset-result {
+    width: 100%;
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .section-divider {
+    height: 1px;
+    background: var(--color-graphite-180);
+    margin: 24px 0;
+  }
+
+  .modal-content-small {
+    background: var(--color-porcelain-50);
+    border-radius: var(--radius-panel);
+    max-width: 480px;
+    width: 100%;
+    padding: 24px;
+    border: 1px solid var(--color-graphite-300);
+  }
+  .btn-danger-sm {
+    padding: 5px 12px;
+    border-radius: var(--radius-button);
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s;
+    background: var(--color-danger-600);
+    color: var(--color-porcelain-50);
+  }
+  .btn-danger-sm:hover { background: var(--color-danger-700); }
+  .empty-state {
+    padding: 32px;
+    text-align: center;
+    color: var(--color-graphite-450);
+    font-size: 14px;
+  }
+</style>

@@ -11,3 +11,4 @@ export * from "./bot-heartbeats";
 export * from "./ops-jobs";
 export * from "./mcp-audit-logs";
 export * from "./prompts";
+export * from "./role-bindings";

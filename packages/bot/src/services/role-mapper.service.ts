@@ -1,6 +1,10 @@
 import type { RoleKey } from "../types.js";
 
-const ROLE_MAP: Record<string, RoleKey> = {
+/**
+ * Default hardcoded mapping used as fallback when no DB binding exists.
+ * Matches the GoRakuDo server's standard role scheme.
+ */
+const FALLBACK_MAP: Record<string, RoleKey> = {
   "1段": "pemula",
   "2段": "pemula-atas",
   "3段": "menengah",
@@ -9,12 +13,57 @@ const ROLE_MAP: Record<string, RoleKey> = {
 
 const ROLE_ORDER: RoleKey[] = ["pemula", "pemula-atas", "menengah", "mahir"];
 
-export function resolveRoleKey(roleNames: string[]): RoleKey {
+/**
+ * Cached DB bindings keyed by guildId.
+ * Populated lazily on first resolveRoleKey call per guild.
+ */
+const bindingCache = new Map<string, Record<string, RoleKey>>();
+
+/**
+ * Load role bindings from the database for a given guild.
+ * Falls back to the hardcoded map when DB has no binding for a role name.
+ */
+async function loadBindings(guildId: string): Promise<Record<string, RoleKey>> {
+  try {
+    const { getRoleBindings } = await import("@grkd-jisho/db");
+    const bindings = await getRoleBindings(guildId);
+    const map: Record<string, RoleKey> = {};
+
+    for (const b of bindings) {
+      if (ROLE_ORDER.includes(b.systemRoleKey as RoleKey)) {
+        map[b.discordRoleName] = b.systemRoleKey as RoleKey;
+      }
+    }
+
+    // Merge with fallback — DB bindings take priority
+    return { ...FALLBACK_MAP, ...map };
+  } catch {
+    return { ...FALLBACK_MAP };
+  }
+}
+
+/**
+ * Resolve the highest-priority system role key for a set of role names.
+ *
+ * Tries DB bindings first (lazy loaded per guild), falls back to hardcoded map.
+ */
+export async function resolveRoleKey(
+  roleNames: string[],
+  guildId?: string,
+): Promise<RoleKey> {
+  const cacheKey = guildId ?? "__default__";
+
+  if (!bindingCache.has(cacheKey)) {
+    const map = await loadBindings(cacheKey);
+    bindingCache.set(cacheKey, map);
+  }
+
+  const map = bindingCache.get(cacheKey)!;
   let best: RoleKey = "pemula";
   let bestIndex = 0;
 
   for (const roleName of roleNames) {
-    const key = ROLE_MAP[roleName];
+    const key = map[roleName];
     if (key) {
       const idx = ROLE_ORDER.indexOf(key);
       if (idx > bestIndex) {
@@ -25,4 +74,16 @@ export function resolveRoleKey(roleNames: string[]): RoleKey {
   }
 
   return best;
+}
+
+/**
+ * Invalidate the binding cache for a guild.
+ * Called after an admin updates bindings via the WebUI or MCP.
+ */
+export function invalidateBindingCache(guildId?: string): void {
+  if (guildId) {
+    bindingCache.delete(guildId);
+  } else {
+    bindingCache.clear();
+  }
 }
