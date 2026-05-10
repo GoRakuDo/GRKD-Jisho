@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { type Message } from "discord.js";
 import { env } from "../config/env.js";
+import { PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import { lookupWord } from "../services/dictionary.service.js";
 import { resolveRoleKey } from "../services/role-mapper.service.js";
 import { getCachedResponse, saveResponse } from "../services/response-cache.service.js";
@@ -127,7 +128,7 @@ async function handleMessage(message: Message): Promise<void> {
       entryId: result.entry.id,
       roleKey,
       promptVersion: env.PROMPT_VERSION,
-      modelName: "gemini-2.0-flash",
+      modelName: PRIMARY_LLM_MODEL,
     };
 
     const cached = await getCachedResponse(cacheKey);
@@ -256,7 +257,7 @@ async function handleMessage(message: Message): Promise<void> {
     entryId: result.entry.id,
     roleKey,
     promptVersion: env.PROMPT_VERSION,
-    modelName: "gemini-2.0-flash",
+    modelName: PRIMARY_LLM_MODEL,
   };
 
   const cached = await getCachedResponse(cacheKey);

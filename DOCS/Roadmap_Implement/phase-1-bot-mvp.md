@@ -265,7 +265,7 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
     entryId: result.entry.id,
     roleKey,
     promptVersion: env.PROMPT_VERSION,
-    modelName: "gemini-2.0-flash",
+    modelName: "google/gemma-4-31b-it",
   };
 
   const cached = await getCachedResponse(cacheKey);
@@ -592,7 +592,7 @@ export async function generate(params: GenerateParams): Promise<string> {
 
 async function callGemini(prompt: string): Promise<string> {
   const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "google/gemma-4-31b-it" });
   const result = await model.generateContent(prompt);
   const text = result.response.text();
   if (!text) throw new Error("Gemini returned empty response");

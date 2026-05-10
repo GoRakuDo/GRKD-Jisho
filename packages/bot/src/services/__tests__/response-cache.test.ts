@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PRIMARY_LLM_MODEL } from "../../config/llm-model";
 
 // ── 呼び出しカウントで戻り値を切り替えられるDBモック ──
 const { mockDb, mockSchema, setDbResults } = vi.hoisted(() => {
@@ -56,7 +57,7 @@ const baseKey: CacheKey = {
   entryId: BigInt(100),
   roleKey: "pemula",
   promptVersion: "v1",
-  modelName: "gemini-2.0-flash",
+  modelName: PRIMARY_LLM_MODEL,
 };
 
 describe("getCachedResponse", () => {
@@ -73,7 +74,7 @@ describe("getCachedResponse", () => {
       dictionaryEntryId: BigInt(100),
       roleKey: "pemula",
       promptVersion: "v1",
-      modelName: "gemini-2.0-flash",
+      modelName: PRIMARY_LLM_MODEL,
       responseText: "answer",
       isManualOverride: false,
       query: "test",
@@ -100,7 +101,7 @@ describe("getCachedResponse", () => {
       dictionaryEntryId: BigInt(100),
       roleKey: "pemula",
       promptVersion: "v1",
-      modelName: "gemini-2.0-flash",
+      modelName: PRIMARY_LLM_MODEL,
       responseText: "manual answer",
       isManualOverride: true,
       query: "test",
@@ -138,7 +139,7 @@ describe("saveResponse", () => {
       dictionaryEntryId: BigInt(100),
       roleKey: "pemula",
       promptVersion: "v1",
-      modelName: "gemini-2.0-flash",
+      modelName: PRIMARY_LLM_MODEL,
       responseText: "saved",
       isManualOverride: false,
       query: "test",

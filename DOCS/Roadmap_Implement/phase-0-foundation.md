@@ -412,7 +412,7 @@ export const responseCache = pgTable(
       .references(() => dictionaryEntries.id),
     roleKey: text("role_key").notNull(),           // pemula / pemula-atas / menengah / mahir
     promptVersion: text("prompt_version").notNull(), // "v1"
-    modelName: text("model_name").notNull(),         // "gemini-2.0-flash"
+    modelName: text("model_name").notNull(),         // "google/gemma-4-31b-it"
     responseText: text("response_text").notNull(),
     isManualOverride: boolean("is_manual_override").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),

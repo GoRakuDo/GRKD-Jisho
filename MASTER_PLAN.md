@@ -30,7 +30,7 @@ WebUI = 管理・品質改善の拠点
 |-------|-----------|-----------|
 | Bot Runtime | Node.js 20 LTS + tsx | 成熟したエコシステム、migration が最も簡単 |
 | Discord Library | discord.js v14 | 業界標準、Slash Command対応が充実 |
-| Primary LLM | Google Gemini (gemini-2.0-flash) | コスト効率、日本語・インドネシア語の精度 |
+| Primary LLM | Google Gemini (google/gemma-4-31b-it) | コスト効率、日本語・インドネシア語の精度 |
 | Fallback LLM | OpenRouter (Claude / GPT-4o) | Gemini 障害時の自動フォールバック |
 | Database | PostgreSQL 16 | JSONB 対応、全文検索、信頼性 |
 | ORM | Drizzle ORM | TypeSafe、軽量、migration が明確 |
@@ -227,7 +227,7 @@ CREATE TABLE response_cache (
   dictionary_entry_id  BIGINT REFERENCES dictionary_entries(id),
   role_key             TEXT NOT NULL,           -- pemula / pemula-atas / menengah / mahir
   prompt_version       TEXT NOT NULL,           -- "v1", "v2"
-  model_name           TEXT NOT NULL,           -- "gemini-2.0-flash"
+  model_name           TEXT NOT NULL,           -- "google/gemma-4-31b-it"
   response_text        TEXT NOT NULL,
   is_manual_override   BOOLEAN DEFAULT false,   -- 管理者手動編集フラグ
   created_at           TIMESTAMPTZ DEFAULT now(),
