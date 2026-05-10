@@ -26,7 +26,10 @@ if (!session?.isAdmin) {
   </div>
 
   <div class="info-card">
-    <h2 class="section-title">Default Limit</h2>
+    <div class="section-header">
+      <h2 class="section-title">Default Limit</h2>
+      <button id="edit-default-btn" class="btn-ghost" style="font-size:12px;padding:4px 10px;">✎ Edit</button>
+    </div>
     <p class="info-text">
       All roles without a custom limit: <strong id="default-limit-display">—</strong> searches/day
     </p>
@@ -100,6 +103,7 @@ type RoleLimit = {
 // ── State ──
 let roleCache: RoleLimit[] = [];
 let editingDiscordRoleId: string | null = null;
+let currentDefaultLimit: number = 10;
 const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.getAttribute("content") ?? "";
 
 // ── Helpers ──
@@ -124,7 +128,8 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
     const data = await res.json();
     roleCache = data.roleLimits || [];
-    const defaultLimit = data.defaultLimit ?? 10;
+    currentDefaultLimit = data.defaultLimit ?? 10;
+    const defaultLimit = currentDefaultLimit;
 
       const defaultDisplay = getEl("default-limit-display");
       if (defaultDisplay) defaultDisplay.textContent = defaultLimit === -1 ? "Unlimited" : defaultLimit + " /day";
@@ -374,6 +379,13 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
   const addBtn = getEl("add-role-btn");
   if (addBtn) addBtn.addEventListener("click", openAddModal);
 
+  const editDefaultBtn = getEl("edit-default-btn");
+  if (editDefaultBtn) {
+    editDefaultBtn.addEventListener("click", () => {
+      openModal({ discordRoleId: "__default__", roleLabel: null, dailyLimit: currentDefaultLimit } as RoleLimit);
+    });
+  }
+
   const cancelBtn = getEl("role-cancel-btn");
   if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
 
@@ -436,6 +448,25 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
     font-weight: 600;
     color: var(--color-graphite-800);
   }
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .section-header .section-title { margin-bottom: 0; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-royal-blue-600);
+    padding: 4px 10px;
+    border-radius: var(--radius-button);
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--color-royal-blue-300);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-ghost:hover { background: var(--color-royal-blue-100); }
   .info-text {
     margin: 0 0 4px;
     font-size: 14px;

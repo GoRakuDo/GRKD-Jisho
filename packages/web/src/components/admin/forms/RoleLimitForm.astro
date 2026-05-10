@@ -1,0 +1,142 @@
+---
+interface Props {
+  title?: string;
+}
+
+const { title = "Custom Role Limit" } = Astro.props;
+---
+
+<div id="role-limit-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <div class="editor-panel">
+      <div class="editor-header">
+        <h3 id="modal-title" class="editor-title">{title}</h3>
+      </div>
+
+      <div class="editor-grid" style="grid-template-columns: 1fr;">
+        <div class="editor-col">
+          <label class="editor-col-label" for="role-name">Role Name</label>
+          <input id="role-name" type="text" class="editor-textarea" style="height: 40px;" placeholder="e.g. Moderator" />
+        </div>
+        <div class="editor-col">
+          <label class="editor-col-label" for="role-id">Role ID</label>
+          <input id="role-id" type="text" class="editor-textarea" style="height: 40px;" placeholder="e.g. 123456789012345678" />
+        </div>
+        <div class="editor-col">
+          <label class="editor-col-label" for="daily-limit">Daily Limit (-1 for Unlimited)</label>
+          <input id="daily-limit" type="number" class="editor-textarea" style="height: 40px;" placeholder="e.g. 50" />
+        </div>
+      </div>
+
+      <div class="editor-footer">
+        <button id="modal-cancel-btn" class="btn-secondary">Cancel</button>
+        <button id="modal-save-btn" class="btn-primary">Save Limit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Reuse styles from prompts.astro patterns */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .modal-content {
+    background: var(--color-porcelain-50);
+    border-radius: var(--radius-panel);
+    max-width: 500px;
+    width: 100%;
+    padding: 24px;
+    border: 1px solid var(--color-graphite-300);
+  }
+  .hidden { display: none !important; }
+  .editor-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-panel);
+    padding: 24px;
+  }
+  .editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .editor-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .editor-col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .editor-col-label {
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    color: var(--color-graphite-500);
+    letter-spacing: 0.01em;
+  }
+  .editor-textarea {
+    width: 100%;
+    padding: 0 12px;
+    border-radius: var(--radius-button);
+    background: var(--color-porcelain-50);
+    border: 1px solid var(--color-graphite-300);
+    color: var(--color-graphite-900);
+    font-family: var(--font-grkd-sans);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+  }
+  .editor-textarea:focus {
+    border-color: var(--color-royal-blue-600);
+    box-shadow: 0 0 0 2px var(--color-royal-blue-100);
+  }
+  .editor-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+  .btn-primary {
+    background: var(--color-royal-blue-600);
+    color: var(--color-porcelain-50);
+    padding: 8px 20px;
+    border-radius: var(--radius-button);
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: var(--color-royal-blue-700); }
+  .btn-secondary {
+    background: var(--color-porcelain-200);
+    color: var(--color-graphite-700);
+    padding: 8px 20px;
+    border-radius: var(--radius-button);
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid var(--color-graphite-300);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-secondary:hover { background: var(--color-porcelain-300); }
+</style>

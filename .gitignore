@@ -5,3 +5,4 @@ dist/
 *.log
 .codesight/
 bun.lock
+graphify-out
