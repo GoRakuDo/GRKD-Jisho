@@ -9,8 +9,6 @@ import {
   SYSTEM_ROLE_KEYS,
 } from "@grkd-jisho/db";
 
-const GUILD_ID = "global"; // Single-guild mode; multi-guild deferred to Phase 5
-
 /**
  * GET /api/admin/role-bindings
  * Returns all role bindings for the current guild.
@@ -22,7 +20,7 @@ export const GET: APIRoute = async (context) => {
   }
 
   try {
-    const bindings = await getRoleBindings(GUILD_ID);
+    const bindings = await getRoleBindings(session.guildId);
     return new Response(JSON.stringify({ bindings }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -36,7 +34,7 @@ export const GET: APIRoute = async (context) => {
 /**
  * PUT /api/admin/role-bindings
  * Upsert a role binding.
- * Body: { discordRoleName, systemRoleKey }
+ * Body: { discordRoleId, systemRoleKey }
  */
 export const PUT: APIRoute = async (context) => {
   const session = getSession(context);
@@ -51,13 +49,13 @@ export const PUT: APIRoute = async (context) => {
 
   try {
     const body = await context.request.json();
-    const { discordRoleName, systemRoleKey } = body;
+    const { discordRoleId, systemRoleKey } = body;
 
-    if (!discordRoleName || typeof discordRoleName !== "string") {
-      return new Response(JSON.stringify({ error: "discordRoleName is required" }), { status: 400 });
+    if (!discordRoleId || typeof discordRoleId !== "string") {
+      return new Response(JSON.stringify({ error: "discordRoleId is required" }), { status: 400 });
     }
-    if (discordRoleName.length > 100) {
-      return new Response(JSON.stringify({ error: "discordRoleName is too long" }), { status: 400 });
+    if (!/^\d{17,20}$/.test(discordRoleId)) {
+      return new Response(JSON.stringify({ error: "discordRoleId must be a Discord snowflake" }), { status: 400 });
     }
     if (!systemRoleKey || typeof systemRoleKey !== "string") {
       return new Response(JSON.stringify({ error: "systemRoleKey is required" }), { status: 400 });
@@ -66,7 +64,7 @@ export const PUT: APIRoute = async (context) => {
       return new Response(JSON.stringify({ error: "Invalid systemRoleKey" }), { status: 400 });
     }
 
-    const binding = await upsertRoleBinding(GUILD_ID, discordRoleName, systemRoleKey);
+    const binding = await upsertRoleBinding(session.guildId, discordRoleId, systemRoleKey);
     return new Response(JSON.stringify({ binding }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -98,7 +96,7 @@ export const DELETE: APIRoute = async (context) => {
     if (!Number.isInteger(id) || id <= 0) {
       return new Response(JSON.stringify({ error: "Invalid id" }), { status: 400 });
     }
-    const deleted = await deleteRoleBinding(GUILD_ID, id);
+    const deleted = await deleteRoleBinding(session.guildId, id);
     if (!deleted) {
       return new Response(JSON.stringify({ error: "Binding not found" }), { status: 404 });
     }

@@ -1655,3 +1655,12 @@ Step K 最終検証ログ
 - 旧timezone `Asia/Bangkok`: 検査対象文字列としてのみ記載。
 - 旧命名 `@grkd/` / `grkd.`: 検査対象文字列としてのみ記載。
 - MCP Level 3/4 境界: dry-run必須、ops_jobs作成のみ、audit transaction、人間承認を明記。
+
+---
+
+## 20. 追記ログ — Role Bindings を Role ID に統一
+
+- `packages/web/src/pages/api/admin/role-bindings.ts` を `session.guildId` 基準にして、`discordRoleId` だけを受け取る形へ変更した。
+- `packages/bot/src/services/role-mapper.service.ts` と `packages/bot/src/events/messageCreate.ts` を role ID ベースへ切り替えた。
+- `packages/web/src/pages/admin/role-settings.astro` は `Discord Role ID` 入力と表示に変更した。
+- `pnpm astro check` / `pnpm build` / `@code-reviewer` を通過済み。

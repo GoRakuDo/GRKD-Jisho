@@ -93,7 +93,7 @@ if (!session?.isAdmin) {
   <div class="page-header" style="margin-top: 32px;">
     <div>
       <h2 class="section-title" style="margin: 0;">Role Bindings</h2>
-      <p class="info-text" style="margin: 4px 0 0;">Map Discord role names to system role keys for prompt routing.</p>
+      <p class="info-text" style="margin: 4px 0 0;">Map Discord role IDs to system role keys for prompt routing.</p>
     </div>
     <Button variant="secondary" id="add-binding-btn">
       + Add Binding
@@ -109,8 +109,8 @@ if (!session?.isAdmin) {
     <div class="modal-content modal-content-small">
       <h3 class="editor-title" style="margin-bottom: 16px;">Edit Role Binding</h3>
       <div class="field-group">
-        <label class="field-label" for="binding-role-name">Discord Role Name</label>
-        <input type="text" id="binding-role-name" class="text-input" placeholder="e.g. 1段, 2段, 3段, 4段" />
+        <label class="field-label" for="binding-role-id">Discord Role ID</label>
+        <input type="text" id="binding-role-id" class="text-input" placeholder="e.g. 123456789012345678" />
       </div>
       <div class="field-group">
         <label class="field-label" for="binding-system-key">System Role Key</label>
@@ -454,13 +454,18 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
   let bindingsCache: Array<{
     id: number;
     guildId: string;
-    discordRoleName: string;
+    discordRoleId: string;
     systemRoleKey: string;
   }> = [];
 
   async function renderBindings() {
     try {
       const res = await fetch('/api/admin/role-bindings');
+      if (!res.ok) {
+        const message = await res.text();
+        throw new Error(`Failed to load bindings (${res.status}): ${message}`);
+      }
+
       const data = await res.json();
       bindingsCache = data.bindings || [];
 
@@ -468,7 +473,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
       if (!container) return;
 
       if (bindingsCache.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No custom bindings configured. Discord role names that match the hardcoded defaults will still work.</p></div>';
+        container.innerHTML = '<div class="empty-state"><p>No custom bindings configured. Add Discord role IDs to map them to system role keys.</p></div>';
         return;
       }
 
@@ -476,7 +481,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
         <table class="data-table w-full text-left border-collapse">
           <thead>
             <tr class="bg-porcelain-150 border-b border-graphite-180">
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">Discord Role Name</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">Discord Role ID</th>
               <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">System Role Key</th>
               <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium text-right">Actions</th>
             </tr>
@@ -484,7 +489,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
           <tbody>
             ${bindingsCache.map((b) => `
               <tr class="border-b border-graphite-180 last:border-0 hover:bg-porcelain-150 transition-colors">
-                <td class="px-4 py-3 text-[14px] text-graphite-800 font-medium">${b.discordRoleName}</td>
+                <td class="px-4 py-3 text-[14px] text-graphite-800 font-medium mono">${b.discordRoleId}</td>
                 <td class="px-4 py-3 text-[14px]"><span class="mono text-graphite-650">${b.systemRoleKey}</span></td>
                 <td class="px-4 py-3 text-[14px] text-right">
                   <button class="edit-binding-btn btn-ghost" data-id="${b.id}">✎ Edit</button>
@@ -501,12 +506,12 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
           const id = Number(btn.getAttribute('data-id'));
           const binding = bindingsCache.find(b => b.id === id);
           if (!binding) return;
-          const nameInput = document.getElementById('binding-role-name') as HTMLInputElement | null;
-          const keySelect = document.getElementById('binding-system-key') as HTMLSelectElement | null;
-          if (nameInput && keySelect) {
-            nameInput.value = binding.discordRoleName;
+           const nameInput = document.getElementById('binding-role-id') as HTMLInputElement | null;
+           const keySelect = document.getElementById('binding-system-key') as HTMLSelectElement | null;
+           if (nameInput && keySelect) {
+            nameInput.value = binding.discordRoleId;
             keySelect.value = binding.systemRoleKey;
-          }
+           }
           document.getElementById('binding-modal')?.classList.remove('hidden');
         });
       });
@@ -535,7 +540,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
   }
 
   document.getElementById('add-binding-btn')?.addEventListener('click', () => {
-    const nameInput = document.getElementById('binding-role-name') as HTMLInputElement | null;
+    const nameInput = document.getElementById('binding-role-id') as HTMLInputElement | null;
     const keySelect = document.getElementById('binding-system-key') as HTMLSelectElement | null;
     if (nameInput) nameInput.value = '';
     if (keySelect) keySelect.value = 'pemula';
@@ -547,20 +552,20 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
   });
 
   document.getElementById('binding-save-btn')?.addEventListener('click', async () => {
-    const nameInput = document.getElementById('binding-role-name') as HTMLInputElement | null;
+    const nameInput = document.getElementById('binding-role-id') as HTMLInputElement | null;
     const keySelect = document.getElementById('binding-system-key') as HTMLSelectElement | null;
     if (!nameInput || !keySelect) return;
 
-    const discordRoleName = nameInput.value.trim();
+    const discordRoleId = nameInput.value.trim();
     const systemRoleKey = keySelect.value;
-    if (!discordRoleName) { alert('Discord role name is required.'); return; }
+    if (!discordRoleId) { alert('Discord role ID is required.'); return; }
 
     if (!csrfToken) { alert('CSRF token not available.'); return; }
     try {
       const res = await fetch('/api/admin/role-bindings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-        body: JSON.stringify({ discordRoleName, systemRoleKey }),
+        body: JSON.stringify({ discordRoleId, systemRoleKey }),
       });
       if (!res.ok) throw new Error('Save failed');
       document.getElementById('binding-modal')?.classList.add('hidden');

@@ -1,7 +1,7 @@
 /**
  * Role bindings administration services
  *
- * CRUD for Discord role name → system role key mappings per guild.
+ * CRUD for Discord role ID → system role key mappings per guild.
  */
 
 import { db } from "../../client";
@@ -16,23 +16,23 @@ export async function getRoleBindings(guildId: string): Promise<RoleBinding[]> {
     .select()
     .from(roleBindings)
     .where(eq(roleBindings.guildId, guildId))
-    .orderBy(roleBindings.discordRoleName);
+    .orderBy(roleBindings.discordRoleId);
 }
 
 /**
- * Upsert a role binding (create or update by guildId + discordRoleName).
+ * Upsert a role binding (create or update by guildId + discordRoleId).
  * Uses INSERT ON CONFLICT DO UPDATE for atomicity.
  */
 export async function upsertRoleBinding(
   guildId: string,
-  discordRoleName: string,
+  discordRoleId: string,
   systemRoleKey: string,
 ): Promise<RoleBinding> {
   const [result] = await db
     .insert(roleBindings)
-    .values({ guildId, discordRoleName, systemRoleKey })
+    .values({ guildId, discordRoleId, systemRoleKey })
     .onConflictDoUpdate({
-      target: [roleBindings.guildId, roleBindings.discordRoleName],
+      target: [roleBindings.guildId, roleBindings.discordRoleId],
       set: { systemRoleKey, updatedAt: sql`now()` },
     })
     .returning();

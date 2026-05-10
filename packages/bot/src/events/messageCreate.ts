@@ -99,9 +99,8 @@ async function handleMessage(message: Message): Promise<void> {
   const isOwner = message.guild?.ownerId === message.author.id;
   const hasAdmin = safeMember.permissions.has("Administrator");
 
-  // ロールIDを取得して rate-limit へ渡す。ロール名は resolveRoleKey 専用
+  // ロールIDを取得して rate-limit と role mapping の両方へ渡す
   const roleIds = safeMember.roles.cache.map((r) => r.id);
-  const roleNames = safeMember.roles.cache.map((r) => r.name);
 
   const { allowed, limit } = await checkRateLimit({
     userId: message.author.id,
@@ -120,7 +119,7 @@ async function handleMessage(message: Message): Promise<void> {
   }
   await traceEvent(traceId, "rate_limit.checked", "info", {});
 
-  const roleKey = await resolveRoleKey(roleNames, message.guildId ?? undefined);
+  const roleKey = await resolveRoleKey(roleIds, message.guildId ?? undefined);
 
   const result = await lookupWord(query);
   if (!result) {

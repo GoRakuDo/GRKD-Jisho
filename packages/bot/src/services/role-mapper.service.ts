@@ -1,16 +1,5 @@
 import type { RoleKey } from "../types.js";
 
-/**
- * Default hardcoded mapping used as fallback when no DB binding exists.
- * Matches the GoRakuDo server's standard role scheme.
- */
-const FALLBACK_MAP: Record<string, RoleKey> = {
-  "1段": "pemula",
-  "2段": "pemula-atas",
-  "3段": "menengah",
-  "4段": "mahir",
-};
-
 const ROLE_ORDER: RoleKey[] = ["pemula", "pemula-atas", "menengah", "mahir"];
 
 /**
@@ -33,7 +22,7 @@ function isCacheValid(entry: CacheEntry): boolean {
 
 /**
  * Load role bindings from the database for a given guild.
- * Falls back to the hardcoded map when DB has no binding for a role name.
+ * Role ID mappings are guild-specific; if no binding exists, the default role key is used.
  */
 async function loadBindings(guildId: string): Promise<Record<string, RoleKey>> {
   try {
@@ -43,24 +32,23 @@ async function loadBindings(guildId: string): Promise<Record<string, RoleKey>> {
 
     for (const b of bindings) {
       if (ROLE_ORDER.includes(b.systemRoleKey as RoleKey)) {
-        map[b.discordRoleName] = b.systemRoleKey as RoleKey;
+        map[b.discordRoleId] = b.systemRoleKey as RoleKey;
       }
     }
 
-    // Merge with fallback — DB bindings take priority
-    return { ...FALLBACK_MAP, ...map };
+    return map;
   } catch {
-    return { ...FALLBACK_MAP };
+    return {};
   }
 }
 
 /**
- * Resolve the highest-priority system role key for a set of role names.
+ * Resolve the highest-priority system role key for a set of role IDs.
  *
- * Tries DB bindings first (lazy loaded per guild), falls back to hardcoded map.
+ * Tries DB bindings first (lazy loaded per guild), falls back to pemula.
  */
 export async function resolveRoleKey(
-  roleNames: string[],
+  roleIds: string[],
   guildId?: string,
 ): Promise<RoleKey> {
   const cacheKey = guildId ?? "__default__";
@@ -75,8 +63,8 @@ export async function resolveRoleKey(
   let best: RoleKey = "pemula";
   let bestIndex = 0;
 
-  for (const roleName of roleNames) {
-    const key = map[roleName];
+  for (const roleId of roleIds) {
+    const key = map[roleId];
     if (key) {
       const idx = ROLE_ORDER.indexOf(key);
       if (idx > bestIndex) {
