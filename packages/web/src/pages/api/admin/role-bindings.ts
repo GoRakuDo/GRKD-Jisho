@@ -5,9 +5,8 @@ import {
   getRoleBindings,
   upsertRoleBinding,
   deleteRoleBinding,
+  SYSTEM_ROLE_KEYS,
 } from "@grkd-jisho/db";
-
-const SYSTEM_ROLE_KEYS = ["pemula", "pemula-atas", "menengah", "mahir"] as const;
 
 const GUILD_ID = "global"; // Single-guild mode; multi-guild deferred to Phase 5
 
