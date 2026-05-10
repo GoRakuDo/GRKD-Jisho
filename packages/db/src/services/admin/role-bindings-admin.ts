@@ -6,7 +6,7 @@
 
 import { db } from "../../client";
 import { roleBindings, type RoleBinding } from "../../schema/role-bindings";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 /**
  * Get all role bindings for a guild
@@ -41,10 +41,13 @@ export async function upsertRoleBinding(
 }
 
 /**
- * Delete a role binding by id
+ * Delete a role binding by guildId + id.
  * Returns true if a row was deleted, false if id not found.
  */
-export async function deleteRoleBinding(id: number): Promise<boolean> {
-  const [deleted] = await db.delete(roleBindings).where(eq(roleBindings.id, id)).returning();
+export async function deleteRoleBinding(guildId: string, id: number): Promise<boolean> {
+  const [deleted] = await db
+    .delete(roleBindings)
+    .where(and(eq(roleBindings.guildId, guildId), eq(roleBindings.id, id)))
+    .returning();
   return deleted !== undefined;
 }
