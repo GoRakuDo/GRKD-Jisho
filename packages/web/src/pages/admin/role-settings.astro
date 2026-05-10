@@ -515,12 +515,11 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
         btn.addEventListener('click', async () => {
           const id = Number(btn.getAttribute('data-id'));
           if (!confirm('Delete this role binding?')) return;
+          if (!csrfToken) { alert('CSRF token not available.'); return; }
           try {
-            const csrfRes = await fetch('/api/auth/csrf-token');
-            const { token } = await csrfRes.json();
             const res = await fetch('/api/admin/role-bindings?id=' + id, {
               method: 'DELETE',
-              headers: { 'x-csrf-token': token },
+              headers: { 'x-csrf-token': csrfToken },
             });
             if (!res.ok) throw new Error('Delete failed');
             await renderBindings();
@@ -556,12 +555,11 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
     const systemRoleKey = keySelect.value;
     if (!discordRoleName) { alert('Discord role name is required.'); return; }
 
+    if (!csrfToken) { alert('CSRF token not available.'); return; }
     try {
-      const csrfRes = await fetch('/api/auth/csrf-token');
-      const { token } = await csrfRes.json();
       const res = await fetch('/api/admin/role-bindings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-csrf-token': token },
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
         body: JSON.stringify({ discordRoleName, systemRoleKey }),
       });
       if (!res.ok) throw new Error('Save failed');

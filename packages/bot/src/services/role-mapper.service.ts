@@ -14,10 +14,22 @@ const FALLBACK_MAP: Record<string, RoleKey> = {
 const ROLE_ORDER: RoleKey[] = ["pemula", "pemula-atas", "menengah", "mahir"];
 
 /**
- * Cached DB bindings keyed by guildId.
+ * Cached DB bindings keyed by guildId, with 30-minute TTL.
  * Populated lazily on first resolveRoleKey call per guild.
+ * Expired entries are refreshed on the next resolveRoleKey call.
  */
-const bindingCache = new Map<string, Record<string, RoleKey>>();
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
+interface CacheEntry {
+  map: Record<string, RoleKey>;
+  timestamp: number;
+}
+
+const bindingCache = new Map<string, CacheEntry>();
+
+function isCacheValid(entry: CacheEntry): boolean {
+  return Date.now() - entry.timestamp < CACHE_TTL_MS;
+}
 
 /**
  * Load role bindings from the database for a given guild.
@@ -53,12 +65,13 @@ export async function resolveRoleKey(
 ): Promise<RoleKey> {
   const cacheKey = guildId ?? "__default__";
 
-  if (!bindingCache.has(cacheKey)) {
+  const cached = bindingCache.get(cacheKey);
+  if (!cached || !isCacheValid(cached)) {
     const map = await loadBindings(cacheKey);
-    bindingCache.set(cacheKey, map);
+    bindingCache.set(cacheKey, { map, timestamp: Date.now() });
   }
 
-  const map = bindingCache.get(cacheKey)!;
+  const map = bindingCache.get(cacheKey)!.map;
   let best: RoleKey = "pemula";
   let bestIndex = 0;
 

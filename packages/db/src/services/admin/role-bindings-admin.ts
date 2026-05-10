@@ -5,8 +5,8 @@
  */
 
 import { db } from "../../client";
-import { roleBindings, type RoleBinding, type NewRoleBinding } from "../../schema/role-bindings";
-import { eq, and } from "drizzle-orm";
+import { roleBindings, type RoleBinding } from "../../schema/role-bindings";
+import { eq, sql } from "drizzle-orm";
 
 /**
  * Get all role bindings for a guild
@@ -20,39 +20,24 @@ export async function getRoleBindings(guildId: string): Promise<RoleBinding[]> {
 }
 
 /**
- * Upsert a role binding (create or update by guildId + discordRoleName)
+ * Upsert a role binding (create or update by guildId + discordRoleName).
+ * Uses INSERT ON CONFLICT DO UPDATE for atomicity.
  */
 export async function upsertRoleBinding(
   guildId: string,
   discordRoleName: string,
   systemRoleKey: string,
 ): Promise<RoleBinding> {
-  const existing = await db
-    .select()
-    .from(roleBindings)
-    .where(
-      and(
-        eq(roleBindings.guildId, guildId),
-        eq(roleBindings.discordRoleName, discordRoleName),
-      ),
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    const existingRow = existing[0]!;
-    const [updated] = await db
-      .update(roleBindings)
-      .set({ systemRoleKey, updatedAt: new Date() })
-      .where(eq(roleBindings.id, existingRow.id))
-      .returning();
-    if (!updated) throw new Error("Failed to update role binding");
-    return updated;
-  }
-
-  const newBinding: NewRoleBinding = { guildId, discordRoleName, systemRoleKey };
-  const [created] = await db.insert(roleBindings).values(newBinding).returning();
-  if (!created) throw new Error("Failed to create role binding");
-  return created;
+  const [result] = await db
+    .insert(roleBindings)
+    .values({ guildId, discordRoleName, systemRoleKey })
+    .onConflictDoUpdate({
+      target: [roleBindings.guildId, roleBindings.discordRoleName],
+      set: { systemRoleKey, updatedAt: sql`now()` },
+    })
+    .returning();
+  if (!result) throw new Error("Failed to upsert role binding");
+  return result;
 }
 
 /**
