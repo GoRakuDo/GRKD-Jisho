@@ -69,12 +69,31 @@ export async function bulkDeleteCache(ids: string[]): Promise<number> {
 
   if (numericIds.length === 0) return 0;
 
-  const result = await db
-    .delete(schema.responseCache)
-    .where(
-      and(inArray(schema.responseCache.id, numericIds), eq(schema.responseCache.isManualOverride, false)),
-    )
-    .returning({ id: schema.responseCache.id });
+  const result = await db.transaction(async (tx) => {
+    const deletableRows = await tx
+      .select({ id: schema.responseCache.id })
+      .from(schema.responseCache)
+      .where(
+        and(inArray(schema.responseCache.id, numericIds), eq(schema.responseCache.isManualOverride, false)),
+      );
+
+    if (deletableRows.length === 0) return [] as { id: bigint }[];
+
+    const deletableIds = deletableRows.map((row) => row.id);
+
+    await tx
+      .delete(schema.lookupLogs)
+      .where(inArray(schema.lookupLogs.responseCacheId, deletableIds));
+
+    await tx
+      .delete(schema.responseEdits)
+      .where(inArray(schema.responseEdits.responseCacheId, deletableIds));
+
+    return tx
+      .delete(schema.responseCache)
+      .where(inArray(schema.responseCache.id, deletableIds))
+      .returning({ id: schema.responseCache.id });
+  });
 
   return result.length;
 }
