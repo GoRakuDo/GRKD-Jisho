@@ -5,6 +5,7 @@ import type { RoleKey } from "../types.js";
 interface GenerateParams {
   roleKey: RoleKey;
   query: string;
+  reading: string;
   dictionaryName: string;
   definitionJson: string;
   promptVersion: string;
@@ -33,34 +34,71 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 - 不明な場合は「辞書情報が不足しています」と言ってください
 - Discord で読みやすい短い回答にしてください
 - ユーザーロールに合わせて難易度を調整してください
+- 内部の思考、下書き、検討メモ、英語のメタコメントは出力しないでください
+- 最終回答のみを出力し、必ず 「【{{query}}】」 から始めてください
 
+プロンプト版: {{prompt_version}}
 ユーザーロール: {{role_key}}
 検索語: {{query}}
+読み: {{reading}}
 辞書ソース: {{dictionary_name}}
 辞書定義: {{definition_json}}
 
 出力形式:
 【{{query}}】
+読み: {{reading}}
 意味:
 わかりやすい説明:
 ニュアンス:
+関連語:
 `;
 
+function shouldUseInsufficientDataFallback(definitionJson: string): boolean {
+  const compact = definitionJson.replace(/\s+/g, "");
+  return compact.length < 20 && !/example/i.test(definitionJson);
+}
+
+function buildInsufficientDataReply(query: string): string {
+  return `【${query}】\n辞書情報が不足しています。別の単語を調べてみてください。`;
+}
+
+export function extractFinalReply(text: string, query: string): string {
+  const trimmed = text.trim();
+  const explicitStart = trimmed.indexOf(`【${query}】`);
+  if (explicitStart >= 0) {
+    return trimmed.slice(explicitStart).trim();
+  }
+
+  const genericStart = trimmed.indexOf("【");
+  if (genericStart >= 0) {
+    return trimmed.slice(genericStart).trim();
+  }
+
+  return trimmed;
+}
+
 export async function generate(params: GenerateParams): Promise<string> {
+  if (shouldUseInsufficientDataFallback(params.definitionJson)) {
+    return buildInsufficientDataReply(params.query);
+  }
+
   const prompt = PROMPT_TEMPLATE
     .replace("{{role_key}}", params.roleKey)
     .replace("{{query}}", params.query)
+    .replace("{{reading}}", params.reading)
     .replace("{{dictionary_name}}", params.dictionaryName)
     .replace("{{definition_json}}", params.definitionJson);
+  
+  const promptWithVersion = prompt.replace("{{prompt_version}}", params.promptVersion);
 
   try {
     console.log(`[LLM] Gemini started → model=${PRIMARY_LLM_MODEL}`);
-    return await callGemini(prompt);
+    return extractFinalReply(await callGemini(promptWithVersion), params.query);
   } catch (err) {
     console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY or Gemma 4 model access, falling back to OpenRouter`);
     try {
       console.log(`[LLM] OpenRouter started → model=${FALLBACK_LLM_MODEL}`);
-      return await callOpenRouter(prompt);
+      return extractFinalReply(await callOpenRouter(promptWithVersion), params.query);
     } catch (openRouterErr) {
       console.error(`[LLM] OpenRouter failed: ${openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr)} → Check OPENROUTER_API_KEY or OpenRouter model access`);
       throw openRouterErr;

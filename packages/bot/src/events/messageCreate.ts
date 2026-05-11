@@ -169,6 +169,7 @@ async function handleMessage(message: Message): Promise<void> {
       const responseText = await generate({
         roleKey,
         query,
+        reading: result.entry.reading,
         dictionaryName: result.dictionary.name,
         definitionJson: JSON.stringify(result.entry.definitionsJson),
         promptVersion: env.PROMPT_VERSION,
@@ -313,6 +314,7 @@ async function handleMessage(message: Message): Promise<void> {
     const responseText = await generate({
       roleKey,
       query,
+      reading: result.entry.reading,
       dictionaryName: result.dictionary.name,
       definitionJson: JSON.stringify(result.entry.definitionsJson),
       promptVersion: env.PROMPT_VERSION,

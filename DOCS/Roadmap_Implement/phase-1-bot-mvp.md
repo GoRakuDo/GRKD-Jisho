@@ -562,23 +562,31 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 - 不明な場合は「辞書情報が不足しています」と言ってください
 - Discord で読みやすい短い回答にしてください
 - ユーザーロールに合わせて難易度を調整してください
+- 内部の思考、下書き、検討メモ、英語のメタコメントは出力しないでください
+- 最終回答のみを出力し、必ず `【{{query}}】` から始めてください
+
+プロンプト版: {{prompt_version}}
 
 ユーザーロール: {{role_key}}
 検索語: {{query}}
+読み: {{reading}}
 辞書ソース: {{dictionary_name}}
 辞書定義: {{definition_json}}
 
 出力形式:
 【{{query}}】
+読み: {{reading}}
 意味:
 わかりやすい説明:
 ニュアンス:
+関連語:
 `;
 
 export async function generate(params: GenerateParams): Promise<string> {
   const prompt = PROMPT_TEMPLATE
     .replace("{{role_key}}", params.roleKey)
     .replace("{{query}}", params.query)
+    .replace("{{reading}}", params.reading)
     .replace("{{dictionary_name}}", params.dictionaryName)
     .replace("{{definition_json}}", params.definitionJson);
 
