@@ -256,9 +256,27 @@ Use a quiet card with a short title and one sentence. No mascot, no illustration
 
 Top row: 4 compact metric cards — lookups today, cache hit ratio, pending ops jobs, recent errors. Below: two columns with recent traces and system health. Royal blue only highlights the primary metric or active link.
 
-### Responses
+### Auth / Login
 
-Filter bar at top. Table below. Manual overrides are visible but calm. Clicking a row opens detail. Detail page emphasizes the answer text and edit history, not decoration.
+**Purpose:** TOTP setup and verification page.
+
+**Layout:** Two-column split on desktop: left branding panel (guide cards), right auth surface (QR + form). Column ratio is `0.68fr / 1.32fr` — right side gets more space for the QR block and code input.
+
+**Rules:**
+- QR block max-width is **360px**. This is enough for scanning, and prevents the right panel from overflowing the viewport.
+- The right auth surface is a **single card** (no nested panel + card split). QR, manual secret, and form sit in one vertical flow inside it.
+- Guide cards on the left use 2 columns (3rd card spans both).
+- The form must be wide enough so the "Verify & Complete Setup" button text does not wrap to 2 lines. On desktop, use `max-w-[560px]` for the form.
+- The form button should not be taller than needed. Use compact padding (`py-3` not `py-4`).
+- If the combined right panel exceeds the viewport height, shrink QR size and form gaps before changing the layout structure.
+
+**States:**
+- **Unconfigured (setupRequired=true):** Show QR code image, manual secret key, and code input form stacked vertically in the right card.
+- **Configured (verified):** Show only the code input form. No QR section.
+
+**Edge cases:**
+- If the QR is so large it pushes the form below the viewport, reduce QR container width (down to 320px) or reduce padding.
+- Never hide the form behind scroll just to keep a large QR.
 
 ### Dictionaries
 
@@ -295,6 +313,9 @@ Pending approvals are the main focus. Approved/running/succeeded/failed/rejected
 - Make trace IDs, cache IDs, model names, and prompt versions mono.
 - Keep tables dense but readable.
 - Use copy that explains consequences plainly.
+- **Prioritize spacious layouts over packing everything in. No visible compression.**
+- **Keep content within the viewport. If it overflows vertically, shrink elements — don't change layout strategy.**
+- **Adjust sizes carefully (width, padding, margin, font) before changing column structure.**
 
 ### Don't
 
