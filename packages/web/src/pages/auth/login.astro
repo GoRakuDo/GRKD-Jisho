@@ -71,7 +71,7 @@ import "../../styles/globals.css";
               Checking authentication setup…
             </div>
 
-            <div id="authContainer" class="hidden grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+            <div id="authContainer" class="hidden grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)]">
               <div class="flex flex-col justify-between rounded-modal border border-graphite-180 bg-graphite-900 px-6 py-6 text-porcelain-50 shadow-[0_18px_40px_oklch(20%_0.018_255/0.16)] lg:px-7 lg:py-7">
                 <div class="space-y-6">
                   <div class="flex items-center justify-between gap-4">
@@ -130,9 +130,9 @@ import "../../styles/globals.css";
                 </div>
               </div>
 
-              <div class="flex flex-col gap-5 rounded-modal border border-graphite-180 bg-porcelain-50 px-6 py-6 shadow-[0_20px_50px_oklch(20%_0.018_255/0.12)] lg:px-8 lg:py-8">
-                <div id="qrSection" class="hidden rounded-panel border border-graphite-180 bg-porcelain-100 p-4">
-                  <div class="rounded-[18px] border border-graphite-180 bg-porcelain-50 p-4">
+              <div class="flex min-w-0 flex-col gap-5 rounded-modal border border-graphite-180 bg-porcelain-50 px-6 py-6 shadow-[0_20px_50px_oklch(20%_0.018_255/0.12)] lg:px-8 lg:py-8">
+                <div id="qrSection" class="hidden w-full rounded-panel border border-graphite-180 bg-porcelain-100 p-4">
+                  <div class="mx-auto w-full max-w-[360px] rounded-[18px] border border-graphite-180 bg-porcelain-50 p-4">
                     <img id="qrImage" src="" alt="TOTP QR Code" class="aspect-square w-full rounded-[14px] bg-porcelain-50 object-contain p-2" />
                   </div>
                   <p class="mt-4 text-center text-caption text-graphite-500">
