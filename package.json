@@ -8,7 +8,9 @@
     "db:generate": "pnpm --filter db generate",
     "db:migrate": "pnpm --filter db migrate",
     "db:import": "pnpm --filter db import-yomitan",
-    "db:seed": "pnpm --filter db seed-defaults"
+    "db:seed": "pnpm --filter db seed-defaults",
+    "reindex": "pwsh -NoProfile -ExecutionPolicy Bypass -File reindex.ps1",
+    "push:reindex": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/push-with-reindex.ps1"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0"
