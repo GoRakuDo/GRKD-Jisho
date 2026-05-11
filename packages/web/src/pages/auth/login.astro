@@ -15,7 +15,7 @@ import "../../styles/globals.css";
         <h1 class="text-display font-bold text-graphite-800 tracking-tight mb-4">GRKD-Jisho Admin</h1>
         <p class="text-body text-graphite-650 max-w-lg mx-auto">
           The central command for the Indonesian-Japanese dictionary bot.
-          Enter your authenticator code to log in.
+          If setup is missing, this screen will guide you through QR setup first.
         </p>
       </div>
 
@@ -24,9 +24,35 @@ import "../../styles/globals.css";
         Checking authentication setup…
       </div>
 
-      <!-- Login form (hidden initially, shown after status check) -->
-      <div id="loginContainer" class="hidden w-full max-w-md bg-porcelain-100 border border-graphite-180 rounded-panel p-8 shadow-sm">
-        <div class="mb-8">
+      <!-- Auth panel (hidden initially, shown after status check) -->
+      <div id="authContainer" class="hidden w-full max-w-md bg-porcelain-100 border border-graphite-180 rounded-panel p-8 shadow-sm">
+        <div id="setupGuide" class="hidden mb-8">
+          <h2 class="text-heading-sm font-semibold text-graphite-800 mb-4">First-time setup</h2>
+          <ol class="space-y-4 text-body-sm text-graphite-650">
+            <li class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-5 h-5 rounded-full bg-royal-blue-100 text-royal-blue-700 flex items-center justify-center text-xs font-semibold border border-royal-blue-600">1</span>
+              <span>Scan the QR code with your authenticator app</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-5 h-5 rounded-full bg-royal-blue-100 text-royal-blue-700 flex items-center justify-center text-xs font-semibold border border-royal-blue-600">2</span>
+              <span>Enter the 6-digit code shown in the app</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-5 h-5 rounded-full bg-royal-blue-100 text-royal-blue-700 flex items-center justify-center text-xs font-semibold border border-royal-blue-600">3</span>
+              <span>Keep the app installed for future logins</span>
+            </li>
+          </ol>
+        </div>
+
+        <div id="qrSection" class="hidden w-full bg-porcelain-50 border border-graphite-180 rounded-panel p-6 mb-8">
+          <img id="qrImage" src="" alt="TOTP QR Code" class="w-full aspect-square mb-4" />
+          <p class="text-caption text-graphite-500 text-center">
+            Can’t scan? Enter the manual key:
+            <code id="manualSecret" class="font-grkd-mono text-caption text-royal-blue-700 break-all"></code>
+          </p>
+        </div>
+
+        <div id="loginGuide" class="mb-8">
           <h2 class="text-heading-sm font-semibold text-graphite-800 mb-6">Quick Access Guide</h2>
           <ol class="space-y-4 text-body-sm text-graphite-650">
             <li class="flex items-start gap-3">
@@ -44,7 +70,7 @@ import "../../styles/globals.css";
           </ol>
         </div>
 
-        <form id="loginForm">
+          <form id="loginForm">
           <label for="totpCode" class="block text-body-sm font-medium text-graphite-700 mb-2">
             Authenticator Code
           </label>
@@ -58,20 +84,21 @@ import "../../styles/globals.css";
             placeholder="000000"
             class="w-full text-center text-heading-sm font-bold font-grkd-mono tracking-widest bg-porcelain-50 border border-graphite-250 rounded-button px-4 py-3 text-graphite-800 placeholder:text-graphite-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-blue-600 focus-visible:border-royal-blue-600 mb-4"
           />
-          <button
-            type="submit"
-            class="w-full bg-royal-blue-600 text-porcelain-50 border border-royal-blue-700 hover:bg-royal-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-blue-600 focus-visible:ring-offset-2 focus-visible:ring-offset-porcelain-100 rounded-button px-6 py-3 text-body-sm font-semibold transition-colors shadow-sm cursor-pointer"
-          >
-            Log In
+            <button
+            id="submitButton"
+              type="submit"
+              class="w-full bg-royal-blue-600 text-porcelain-50 border border-royal-blue-700 hover:bg-royal-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-blue-600 focus-visible:ring-offset-2 focus-visible:ring-offset-porcelain-100 rounded-button px-6 py-3 text-body-sm font-semibold transition-colors shadow-sm cursor-pointer"
+            >
+              Log In
           </button>
-          <p id="loginError" class="hidden text-danger-600 text-body-sm mt-4 text-center"></p>
-        </form>
+            <p id="loginError" class="hidden text-danger-600 text-body-sm mt-4 text-center"></p>
+          </form>
 
-        <p class="mt-6 text-center text-caption text-graphite-500">
-          Lost access to your authenticator app?
-          <a href="/auth/logout" class="text-royal-blue-600 hover:text-royal-blue-700 underline">Log out</a> and run <code class="font-grkd-mono text-caption">pnpm auth:reset</code> on the server to reconfigure.
-        </p>
-      </div>
+          <p class="mt-6 text-center text-caption text-graphite-500">
+            Lost access to your authenticator app?
+            <a href="/auth/logout" class="text-royal-blue-600 hover:text-royal-blue-700 underline">Log out</a> and run <code class="font-grkd-mono text-caption">pnpm auth:reset</code> on the server to reset setup.
+          </p>
+        </div>
 
       <footer class="mt-16 text-center text-caption text-graphite-500">
         <p class="mb-1">GRKD-Jisho Admin &bull; v0.1.0</p>
@@ -82,24 +109,53 @@ import "../../styles/globals.css";
     <script>
       (async () => {
         const loading = document.getElementById("loading");
-        const loginContainer = document.getElementById("loginContainer");
+        const authContainer = document.getElementById("authContainer");
+        const setupGuide = document.getElementById("setupGuide");
+        const qrSection = document.getElementById("qrSection");
+        const qrImage = document.getElementById("qrImage");
+        const manualSecret = document.getElementById("manualSecret");
+        const loginGuide = document.getElementById("loginGuide");
+        const submitButton = document.getElementById("submitButton");
         const loginForm = document.getElementById("loginForm");
         const loginError = document.getElementById("loginError");
 
-        if (!loading || !loginContainer || !loginForm || !loginError) return;
+        if (!loading || !authContainer || !setupGuide || !qrSection || !qrImage || !manualSecret || !loginGuide || !submitButton || !loginForm || !loginError) return;
+
+        let setupRequired = false;
 
         try {
           const res = await fetch("/api/auth/status");
           const data = await res.json();
 
-          if (data.setupRequired) {
-            window.location.href = "/auth/setup";
-            return;
+          setupRequired = Boolean(data.setupRequired);
+          if (setupRequired) {
+            const setupRes = await fetch("/api/auth/setup");
+            const setupData = await setupRes.json();
+
+            if (setupData.alreadySetup) {
+              setupRequired = false;
+            } else if (setupData.qrDataUrl && setupData.secret) {
+              qrImage.setAttribute("src", setupData.qrDataUrl);
+              manualSecret.textContent = setupData.secret;
+              setupGuide.classList.remove("hidden");
+              qrSection.classList.remove("hidden");
+            } else {
+              throw new Error("Failed to load setup payload");
+            }
           }
 
-          // TOTP is set up — show login form
+          if (!setupRequired) {
+            setupGuide.classList.add("hidden");
+            qrSection.classList.add("hidden");
+            loginGuide.classList.remove("hidden");
+            submitButton.textContent = "Log In";
+          } else {
+            loginGuide.classList.add("hidden");
+            submitButton.textContent = "Verify & Complete Setup";
+          }
+
           loading.classList.add("hidden");
-          loginContainer.classList.remove("hidden");
+          authContainer.classList.remove("hidden");
         } catch (err) {
           loading.innerHTML = 'Failed to connect. <a href="/auth/login" class="text-royal-blue-600 underline">Retry</a>.';
           console.error("[TOTP/Login] Status check failed:", err);

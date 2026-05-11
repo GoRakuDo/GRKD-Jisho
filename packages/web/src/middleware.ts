@@ -8,6 +8,9 @@ const PUBLIC_PATHS = new Set([
   "/auth/login",
   "/auth/setup",
   "/auth/logout",
+  "/api/auth/status",
+  "/api/auth/setup",
+  "/api/auth/verify",
 ]);
 
 /** Paths that are exempt from CSRF check */

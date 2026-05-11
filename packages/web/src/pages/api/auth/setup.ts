@@ -15,7 +15,6 @@ import QRCode from "qrcode";
  */
 export const GET: APIRoute = async () => {
   try {
-    // Check if already set up
     const existing = await db.select().from(adminTotpSecrets).limit(1);
     if (existing.length > 0) {
       return new Response(JSON.stringify({ alreadySetup: true }), {
@@ -39,17 +38,30 @@ export const GET: APIRoute = async () => {
       );
     }
 
-    // Generate QR code as data URL
-    const qrDataUrl = await QRCode.toDataURL(secret.otpauth_url);
+    // Persist the secret. If another request won the race, overwrite with our
+    // generated secret so QR and DB are guaranteed to match.
+    await db
+      .insert(adminTotpSecrets)
+      .values({
+        id: "singleton",
+        secret: secret.base32,
+      })
+      .onConflictDoUpdate({
+        target: adminTotpSecrets.id,
+        set: { secret: secret.base32 },
+      });
 
-    // Save secret to DB
-    await db.insert(adminTotpSecrets).values({
-      id: "singleton",
-      secret: secret.base32,
-    });
+    // Re-read to handle hypothetical edge cases (e.g. concurrent transaction)
+    // and build the QR from the same value returned to the client.
+
+    const rows = await db.select().from(adminTotpSecrets).limit(1);
+    const storedSecret = rows[0]?.secret ?? secret.base32;
+    const qrDataUrl = await QRCode.toDataURL(
+      `otpauth://totp/GRKD-Jisho%20Admin?secret=${encodeURIComponent(storedSecret)}&issuer=GRKD-Jisho`,
+    );
 
     return new Response(
-      JSON.stringify({ qrDataUrl, secret: secret.base32, alreadySetup: false }),
+      JSON.stringify({ qrDataUrl, secret: storedSecret, alreadySetup: false }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },
