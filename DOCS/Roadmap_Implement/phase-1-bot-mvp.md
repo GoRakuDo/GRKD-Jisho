@@ -592,7 +592,7 @@ export async function generate(params: GenerateParams): Promise<string> {
 
 async function callGemini(prompt: string): Promise<string> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+  const timeoutId = setTimeout(() => controller.abort(), 45_000);
 
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${PRIMARY_LLM_MODEL}:generateContent`, {
@@ -606,7 +606,7 @@ async function callGemini(prompt: string): Promise<string> {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           thinkingConfig: {
-            thinkingLevel: "high",
+            thinkingLevel: "HIGH",
           },
         },
       }),
@@ -1319,7 +1319,7 @@ client.once("ready", () => {
   // 30秒ごとにジョブをポーリング
   setInterval(async () => {
     await pollAndExecuteJobs();
-  }, 30_000); // 30秒
+  }, 45_000); // 45秒
 });
 ```
 

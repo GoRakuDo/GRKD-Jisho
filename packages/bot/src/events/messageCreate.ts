@@ -73,10 +73,14 @@ async function handleMessage(message: Message): Promise<void> {
 
   const isDm = message.guildId === null;
   const isDmOwner = isDm && message.author.id === env.DISCORD_DM_OWNER_USER_ID;
-  if (isDm && !isDmOwner) return;
+  if (isDm && !isDmOwner) {
+    console.log(`[Lookup] blocked DM → author=${message.author.id}`);
+    return;
+  }
   if (!isDm && !message.mentions.has(botId)) return;
 
   const traceId = `lookup_${randomUUID()}_${message.id}`;
+  console.log(`[Lookup] trace=${traceId} received → author=${message.author.id} channel=${message.channelId} guild=${message.guildId ?? "DM"}`);
   await traceEvent(traceId, "message.received", "info", {
     guildId: message.guildId,
     channelId: message.channelId,
@@ -85,7 +89,10 @@ async function handleMessage(message: Message): Promise<void> {
 
   const allowedChannels = env.DISCORD_ALLOWED_CHANNELS;
   if (!isDm) {
-    if (!allowedChannels.includes(message.channelId)) return;
+    if (!allowedChannels.includes(message.channelId)) {
+      console.log(`[Lookup] trace=${traceId} ignored channel=${message.channelId}`);
+      return;
+    }
     await traceEvent(traceId, "channel.allowed", "info", {});
   }
 
@@ -94,15 +101,18 @@ async function handleMessage(message: Message): Promise<void> {
     await message.reply("検索語を入力してください。例: `@grkd-jisho 可憐`");
     return;
   }
+  console.log(`[Lookup] trace=${traceId} query="${query}"`);
   await traceEvent(traceId, "query.extracted", "info", { query });
 
   const guildContextId = message.guildId ?? env.DISCORD_GUILD_ID;
 
   if (isDmOwner) {
     const roleKey = await resolveRoleKey([], guildContextId);
+    console.log(`[Lookup] trace=${traceId} DM owner path → roleKey=${roleKey}`);
 
     const result = await lookupWord(query);
     if (!result) {
+      console.log(`[Lookup] trace=${traceId} dictionary miss`);
       await message.reply(formatNotFound(query));
       await traceEvent(traceId, "dictionary.miss", "warn", { query });
       await finalizeLookup(message, traceId, {
@@ -116,6 +126,7 @@ async function handleMessage(message: Message): Promise<void> {
       return;
     }
 
+    console.log(`[Lookup] trace=${traceId} dictionary hit → ${result.dictionary.name}`);
     await traceEvent(traceId, "dictionary.hit", "info", {
       dict: result.dictionary.name,
       matchedBy: result.matchedBy,
@@ -133,6 +144,7 @@ async function handleMessage(message: Message): Promise<void> {
 
     const cached = await getCachedResponse(cacheKey);
     if (cached) {
+      console.log(`[Lookup] trace=${traceId} cache hit → cacheId=${cached.id.toString()}`);
       await message.reply(formatReply(cached.responseText));
       await traceEvent(traceId, "cache.hit", "info", { cacheId: cached.id.toString() });
       await finalizeLookup(message, traceId, {
@@ -147,8 +159,11 @@ async function handleMessage(message: Message): Promise<void> {
       return;
     }
 
+    console.log(`[Lookup] trace=${traceId} cache miss → LLM ${PRIMARY_LLM_MODEL}`);
+
     await traceEvent(traceId, "cache.miss", "info", {});
     await traceEvent(traceId, "llm.generate.started", "info", {});
+    console.log(`[Lookup] trace=${traceId} llm.generate.started`);
 
     try {
       const responseText = await generate({
@@ -158,10 +173,12 @@ async function handleMessage(message: Message): Promise<void> {
         definitionJson: JSON.stringify(result.entry.definitionsJson),
         promptVersion: env.PROMPT_VERSION,
       });
+      console.log(`[Lookup] trace=${traceId} llm.generate.success`);
       await traceEvent(traceId, "llm.generated", "info", {});
 
       const saved = await saveResponse({ ...cacheKey, responseText });
       if (!saved) {
+        console.log(`[Lookup] trace=${traceId} cache save failed/skip`);
         await finalizeLookup(message, traceId, {
           query,
           roleIds: [],
@@ -173,12 +190,15 @@ async function handleMessage(message: Message): Promise<void> {
         });
         await message.reply(formatReply(responseText));
         await traceEvent(traceId, "reply.sent", "info", {});
+        console.log(`[Lookup] trace=${traceId} reply.sent (cache skipped)`);
         return;
       }
 
       await traceEvent(traceId, "cache.saved", "info", { cacheId: saved.id.toString() });
+      console.log(`[Lookup] trace=${traceId} cache saved → cacheId=${saved.id.toString()}`);
       await message.reply(formatReply(responseText));
       await traceEvent(traceId, "reply.sent", "info", {});
+      console.log(`[Lookup] trace=${traceId} reply.sent`);
 
       await finalizeLookup(message, traceId, {
         query,
@@ -189,8 +209,10 @@ async function handleMessage(message: Message): Promise<void> {
         normalizedQueryOverride: cacheKey.normalizedQuery,
         guildIdOverride: guildContextId,
       });
+      console.log(`[Lookup] trace=${traceId} finalizeLookup done`);
     } catch (err) {
       await traceEvent(traceId, "llm.error", "error", { error: String(err) });
+      console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check Gemini/OpenRouter/API key/model access`);
       await message.reply(formatError("LLM生成中にエラーが発生しました。"));
     }
 
@@ -205,6 +227,7 @@ async function handleMessage(message: Message): Promise<void> {
   const safeMember = (member.roles.cache.size < 2 && message.guild)
     ? await message.guild.members.fetch(message.author.id).catch(() => member)
     : member;
+  console.log(`[Lookup] trace=${traceId} guild path → member resolved`);
 
   const isOwner = message.guild?.ownerId === message.author.id;
   const hasAdmin = safeMember.permissions.has("Administrator");
@@ -221,6 +244,7 @@ async function handleMessage(message: Message): Promise<void> {
   });
 
   if (!allowed) {
+    console.log(`[Lookup] trace=${traceId} rate limit blocked → limit=${limit}`);
     await message.reply(
       `本日の検索上限（${limit === Infinity ? "無制限" : `${limit}回`}）に達しました。明日 00:00 GMT+7 にリセットされます。`,
     );
@@ -228,11 +252,14 @@ async function handleMessage(message: Message): Promise<void> {
     return;
   }
   await traceEvent(traceId, "rate_limit.checked", "info", {});
+  console.log(`[Lookup] trace=${traceId} rate limit passed`);
 
   const roleKey = await resolveRoleKey(roleIds, guildContextId);
+  console.log(`[Lookup] trace=${traceId} roleKey resolved → ${roleKey}`);
 
   const result = await lookupWord(query);
   if (!result) {
+    console.log(`[Lookup] trace=${traceId} dictionary miss`);
     await message.reply(formatNotFound(query));
     await traceEvent(traceId, "dictionary.miss", "warn", { query });
     await finalizeLookup(message, traceId, {
@@ -245,6 +272,7 @@ async function handleMessage(message: Message): Promise<void> {
     });
     return;
   }
+  console.log(`[Lookup] trace=${traceId} dictionary hit → ${result.dictionary.name}`);
   await traceEvent(traceId, "dictionary.hit", "info", {
     dict: result.dictionary.name,
     matchedBy: result.matchedBy,
@@ -262,6 +290,7 @@ async function handleMessage(message: Message): Promise<void> {
 
   const cached = await getCachedResponse(cacheKey);
   if (cached) {
+    console.log(`[Lookup] trace=${traceId} cache hit → cacheId=${cached.id.toString()}`);
     await message.reply(formatReply(cached.responseText));
     await traceEvent(traceId, "cache.hit", "info", { cacheId: cached.id.toString() });
     await finalizeLookup(message, traceId, {
@@ -275,9 +304,11 @@ async function handleMessage(message: Message): Promise<void> {
     });
     return;
   }
+  console.log(`[Lookup] trace=${traceId} cache miss → LLM ${PRIMARY_LLM_MODEL}`);
   await traceEvent(traceId, "cache.miss", "info", {});
 
   await traceEvent(traceId, "llm.generate.started", "info", {});
+  console.log(`[Lookup] trace=${traceId} llm.generate.started`);
   try {
     const responseText = await generate({
       roleKey,
@@ -286,11 +317,13 @@ async function handleMessage(message: Message): Promise<void> {
       definitionJson: JSON.stringify(result.entry.definitionsJson),
       promptVersion: env.PROMPT_VERSION,
     });
+    console.log(`[Lookup] trace=${traceId} llm.generate.success`);
     await traceEvent(traceId, "llm.generated", "info", {});
 
     const saved = await saveResponse({ ...cacheKey, responseText });
     if (!saved) {
       // save に失敗しても lookup ログと使用量カウントは残す
+      console.log(`[Lookup] trace=${traceId} cache save failed/skip`);
       await finalizeLookup(message, traceId, {
         query,
         roleIds,
@@ -302,12 +335,15 @@ async function handleMessage(message: Message): Promise<void> {
       });
       await message.reply(formatReply(responseText));
       await traceEvent(traceId, "reply.sent", "info", {});
+      console.log(`[Lookup] trace=${traceId} reply.sent (cache skipped)`);
       return;
     }
     await traceEvent(traceId, "cache.saved", "info", { cacheId: saved.id.toString() });
+    console.log(`[Lookup] trace=${traceId} cache saved → cacheId=${saved.id.toString()}`);
 
     await message.reply(formatReply(responseText));
     await traceEvent(traceId, "reply.sent", "info", {});
+    console.log(`[Lookup] trace=${traceId} reply.sent`);
 
     await finalizeLookup(message, traceId, {
       query,
@@ -318,8 +354,10 @@ async function handleMessage(message: Message): Promise<void> {
       normalizedQueryOverride: cacheKey.normalizedQuery,
       guildIdOverride: guildContextId,
     });
+    console.log(`[Lookup] trace=${traceId} finalizeLookup done`);
   } catch (err) {
     await traceEvent(traceId, "llm.error", "error", { error: String(err) });
+    console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check Gemini/OpenRouter/API key/model access`);
     await message.reply(formatError("LLM生成中にエラーが発生しました。"));
   }
 };

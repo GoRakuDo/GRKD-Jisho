@@ -54,34 +54,44 @@ export async function generate(params: GenerateParams): Promise<string> {
     .replace("{{definition_json}}", params.definitionJson);
 
   try {
+    console.log(`[LLM] Gemini started → model=${PRIMARY_LLM_MODEL}`);
     return await callGemini(prompt);
   } catch (err) {
-    console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY, falling back to OpenRouter`);
-    return await callOpenRouter(prompt);
+    console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY or Gemma 4 model access, falling back to OpenRouter`);
+    try {
+      console.log(`[LLM] OpenRouter started → model=anthropic/claude-3.5-haiku`);
+      return await callOpenRouter(prompt);
+    } catch (openRouterErr) {
+      console.error(`[LLM] OpenRouter failed: ${openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr)} → Check OPENROUTER_API_KEY or OpenRouter model access`);
+      throw openRouterErr;
+    }
   }
 }
 
 async function callGemini(prompt: string): Promise<string> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+  const timeoutId = setTimeout(() => controller.abort(), 45_000);
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${PRIMARY_LLM_MODEL}:generateContent`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": env.GEMINI_API_KEY,
-    },
-    signal: controller.signal,
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        thinkingConfig: {
-          thinkingLevel: "high",
-        },
+    const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${PRIMARY_LLM_MODEL}:generateContent`);
+    url.searchParams.set("key", env.GEMINI_API_KEY);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": env.GEMINI_API_KEY,
       },
-    }),
-  });
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          thinkingConfig: {
+            thinkingLevel: "HIGH",
+          },
+        },
+      }),
+    });
 
     if (!response.ok) {
       throw new Error(`Gemini error: ${response.status} ${await response.text()}`);
@@ -91,10 +101,11 @@ async function callGemini(prompt: string): Promise<string> {
 
     const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
     if (!text) throw new Error("Gemini returned empty response");
+    console.log(`[LLM] Gemini success → model=${PRIMARY_LLM_MODEL}`);
     return text;
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error("Gemini request timed out after 30 seconds");
+      throw new Error("Gemini request timed out after 45 seconds");
     }
     throw err;
   } finally {
@@ -103,27 +114,41 @@ async function callGemini(prompt: string): Promise<string> {
 }
 
 async function callOpenRouter(prompt: string): Promise<string> {
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "anthropic/claude-3.5-haiku",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 500,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45_000);
 
-  if (!response.ok) {
-    throw new Error(`OpenRouter error: ${response.status} ${await response.text()}`);
-  }
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: "anthropic/claude-3.5-haiku",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+      }),
+    });
 
-  const data = await response.json();
-  const text = data?.choices?.[0]?.message?.content;
-  if (typeof text !== "string" || !text) {
-    throw new Error("OpenRouter returned empty response");
+    if (!response.ok) {
+      throw new Error(`OpenRouter error: ${response.status} ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    const text = data?.choices?.[0]?.message?.content;
+    if (typeof text !== "string" || !text) {
+      throw new Error("OpenRouter returned empty response");
+    }
+    console.log(`[LLM] OpenRouter success → model=anthropic/claude-3.5-haiku`);
+    return text;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("OpenRouter request timed out after 45 seconds");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return text;
 }
