@@ -2,10 +2,22 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { MetricCard } from "../../components/admin/MetricCard";
 import { getSession } from "../../lib/session";
+import { generateCsrfToken } from "../../lib/csrf";
 import { eq, and, gte, sql, count } from "drizzle-orm";
-import { db, schema, toGMT7Date } from "@grkd-jisho/db";
+import { db, schema, toGMT7Date, getChannelSettings } from "@grkd-jisho/db";
 
 const session = getSession(Astro);
+const csrfToken = session ? generateCsrfToken(session.discordUserId) : "";
+
+type WipeSetting = {
+  id: number;
+  guildId: string;
+  channelId: string;
+  wipeEnabled: boolean;
+  lastWipeAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
 
 // SSR データフェッチ
 let lookupsToday = 0;
@@ -14,6 +26,26 @@ let pendingJobs = 0;
 let recentErrorsCount = 0;
 let recentTracesData: { id: string; traceId: string; eventType: string; level: string; createdAt: string | null }[] = [];
 let recentErrorList: { id: string; traceId: string; eventType: string; createdAt: string | null }[] = [];
+let wipeSettings: WipeSetting[] = [];
+let wipeEnabledCount = 0;
+let wipeDisabledCount = 0;
+let wipeLastRun: string | null = null;
+
+if (!session?.isAdmin) {
+  return Astro.redirect("/auth/login");
+}
+
+function formatJakartaTimestamp(value: string | null): string {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
 
 if (session?.isAdmin) {
   try {
@@ -65,6 +97,22 @@ if (session?.isAdmin) {
         id: String(r.id),
         createdAt: r.createdAt?.toISOString() ?? null,
       }));
+
+    wipeSettings = (await getChannelSettings(session.guildId)).map((setting) => ({
+      id: setting.id,
+      guildId: setting.guildId,
+      channelId: setting.channelId,
+      wipeEnabled: setting.wipeEnabled,
+      lastWipeAt: setting.lastWipeAt?.toISOString() ?? null,
+      createdAt: setting.createdAt?.toISOString() ?? null,
+      updatedAt: setting.updatedAt?.toISOString() ?? null,
+    }));
+    wipeEnabledCount = wipeSettings.filter((setting) => setting.wipeEnabled).length;
+    wipeDisabledCount = wipeSettings.length - wipeEnabledCount;
+    wipeLastRun = wipeSettings
+      .filter((setting) => setting.lastWipeAt)
+      .sort((a, b) => new Date(b.lastWipeAt ?? 0).getTime() - new Date(a.lastWipeAt ?? 0).getTime())[0]
+      ?.lastWipeAt ?? null;
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[Dashboard] SSR data fetch error: ${reason} → Check DB connection and stats query compatibility`);
@@ -78,6 +126,110 @@ if (session?.isAdmin) {
     <MetricCard client:load label="Cache Hit Ratio" value={`${cacheHitRatio}%`} />
     <MetricCard client:load label="Pending Ops Jobs" value={pendingJobs} />
     <MetricCard client:load label="Recent Errors (24h)" value={recentErrorsCount} />
+  </section>
+
+  <section class="wipe-cockpit" data-csrf-token={csrfToken}>
+    <div class="wipe-hero">
+      <div class="wipe-copy">
+        <p class="wipe-eyebrow">Nightly wipe cockpit</p>
+        <h2 class="wipe-title">Auto-clean toggle matrix</h2>
+        <p class="wipe-description">
+          Only channels switched ON are wiped at 00:00 GMT+7. Pinned messages stay. Paste a channel ID, arm it, and the bot handles the rest.
+        </p>
+
+        <div class="wipe-stats">
+          <div class="wipe-stat">
+            <span>Armed</span>
+            <strong>{wipeEnabledCount}</strong>
+          </div>
+          <div class="wipe-stat">
+            <span>Standby</span>
+            <strong>{wipeDisabledCount}</strong>
+          </div>
+          <div class="wipe-stat">
+            <span>Last wipe</span>
+            <strong>{formatJakartaTimestamp(wipeLastRun)}</strong>
+          </div>
+        </div>
+      </div>
+
+      <form id="wipe-add-form" class="wipe-add-panel">
+        <div class="wipe-add-head">
+          <div>
+            <p class="wipe-add-kicker">Add channel</p>
+            <h3 class="wipe-add-title">Arm a new target</h3>
+          </div>
+          <button type="button" id="wipe-start-toggle" class="wipe-seed-toggle is-on" aria-pressed="true">
+            Start ON
+          </button>
+        </div>
+
+        <label class="wipe-field-label" for="wipe-channel-id-input">Channel ID</label>
+        <input
+          id="wipe-channel-id-input"
+          class="wipe-input"
+          type="text"
+          inputmode="numeric"
+          placeholder="e.g. 123456789012345678"
+        />
+
+        <p class="wipe-field-hint">
+          Paste the Discord channel snowflake. You can toggle it later with the switch in the list.
+        </p>
+
+        <button type="submit" class="wipe-save-btn">Add channel</button>
+      </form>
+    </div>
+
+    {wipeSettings.length > 0 ? (
+      <div class="wipe-grid">
+        {wipeSettings.map((setting) => {
+          const shortId = setting.channelId.length > 18
+            ? `${setting.channelId.slice(0, 6)}…${setting.channelId.slice(-4)}`
+            : setting.channelId;
+
+          return (
+            <article class="wipe-card" data-channel-id={setting.channelId} data-enabled={setting.wipeEnabled}>
+              <div class="wipe-card-top">
+                <div>
+                  <span class="wipe-card-chip">Channel</span>
+                  <h3 class="wipe-card-title">{shortId}</h3>
+                </div>
+
+                <button
+                  type="button"
+                  class={`wipe-toggle ${setting.wipeEnabled ? "is-on" : "is-off"}`}
+                  data-channel-id={setting.channelId}
+                  data-enabled={setting.wipeEnabled ? "true" : "false"}
+                  aria-pressed={setting.wipeEnabled ? "true" : "false"}
+                  title="Toggle nightly wipe"
+                >
+                  <span class="wipe-toggle-track">
+                    <span class="wipe-toggle-thumb"></span>
+                  </span>
+                  <span class="wipe-toggle-label">{setting.wipeEnabled ? "ON" : "OFF"}</span>
+                </button>
+              </div>
+
+              <p class="wipe-card-meta">
+                Last wipe: <span class="mono">{formatJakartaTimestamp(setting.lastWipeAt)}</span>
+              </p>
+              <p class="wipe-card-hint">
+                Pinned messages stay. The nightly job will clear only the last 24 hours of chatter here.
+              </p>
+            </article>
+          );
+        })}
+      </div>
+    ) : (
+      <div class="wipe-empty">
+        <div class="wipe-empty-sigil">⌁</div>
+        <h3>No channels armed yet</h3>
+        <p>
+          Add one channel ID above and flip it ON to let the midnight wipe run. It stays calm until you arm it.
+        </p>
+      </div>
+    )}
   </section>
 
   <section class="dashboard-panels">
@@ -140,6 +292,91 @@ if (session?.isAdmin) {
   </section>
 </AdminLayout>
 
+<script>
+  const csrfToken = document.querySelector(".wipe-cockpit")?.getAttribute("data-csrf-token") ?? "";
+  const startToggle = document.getElementById("wipe-start-toggle") as HTMLButtonElement | null;
+  const addForm = document.getElementById("wipe-add-form") as HTMLFormElement | null;
+  const channelInput = document.getElementById("wipe-channel-id-input") as HTMLInputElement | null;
+  let seedEnabled = true;
+
+  function refreshSeedToggle(): void {
+    if (!startToggle) return;
+    startToggle.classList.toggle("is-on", seedEnabled);
+    startToggle.classList.toggle("is-off", !seedEnabled);
+    startToggle.setAttribute("aria-pressed", seedEnabled ? "true" : "false");
+    startToggle.textContent = seedEnabled ? "Start ON" : "Start OFF";
+  }
+
+  async function saveWipeSetting(channelId: string, wipeEnabled: boolean): Promise<void> {
+    if (!csrfToken) {
+      alert("CSRF token not available. Please reload the page.");
+      return;
+    }
+
+    const res = await fetch("/api/admin/wipe-settings", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": csrfToken,
+      },
+      body: JSON.stringify({ channelId, wipeEnabled }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Save failed" }));
+      throw new Error(err.error || `Save failed (${res.status})`);
+    }
+
+    window.location.reload();
+  }
+
+  startToggle?.addEventListener("click", () => {
+    seedEnabled = !seedEnabled;
+    refreshSeedToggle();
+  });
+
+  addForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const channelId = channelInput?.value.trim() ?? "";
+
+    if (!/^\d{17,20}$/.test(channelId)) {
+      alert("Discord channel ID must be a 17–20 digit snowflake.");
+      return;
+    }
+
+    try {
+      await saveWipeSetting(channelId, seedEnabled);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save wipe setting.";
+      console.error(`[WipeSettings] Add failed: ${message} → Check CSRF token and channel ID`);
+      alert(message);
+    }
+  });
+
+  document.querySelectorAll<HTMLButtonElement>(".wipe-toggle").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const channelId = button.dataset.channelId ?? "";
+      const currentEnabled = button.dataset.enabled === "true";
+
+      if (!channelId) return;
+
+      try {
+        button.disabled = true;
+        await saveWipeSetting(channelId, !currentEnabled);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to toggle wipe setting.";
+        console.error(`[WipeSettings] Toggle failed: ${message} → Check CSRF token and DB constraints`);
+        alert(message);
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+
+  refreshSeedToggle();
+</script>
+
 <style>
   .metrics {
     display: grid;
@@ -152,6 +389,383 @@ if (session?.isAdmin) {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 20px;
+  }
+
+  .wipe-cockpit {
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .wipe-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+    gap: 16px;
+    align-items: start;
+  }
+
+  .wipe-copy,
+  .wipe-add-panel,
+  .wipe-card,
+  .wipe-empty {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-panel);
+    box-shadow: 0 10px 30px rgba(76, 94, 128, 0.04);
+  }
+
+  .wipe-copy {
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .wipe-copy::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 6px;
+    background: linear-gradient(180deg, var(--color-royal-blue-600), var(--color-royal-blue-100));
+  }
+
+  .wipe-eyebrow {
+    margin: 0 0 10px;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-royal-blue-600);
+    font-weight: 700;
+  }
+
+  .wipe-title {
+    margin: 0;
+    font-size: 22px;
+    color: var(--color-graphite-800);
+    line-height: 1.25;
+  }
+
+  .wipe-description {
+    margin: 10px 0 0;
+    color: var(--color-graphite-650);
+    font-size: 14px;
+    line-height: 1.65;
+    max-width: 72ch;
+  }
+
+  .wipe-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 18px;
+  }
+
+  .wipe-stat {
+    background: var(--color-porcelain-50);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: 14px;
+    padding: 14px 16px;
+  }
+
+  .wipe-stat span {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-graphite-500);
+    margin-bottom: 4px;
+  }
+
+  .wipe-stat strong {
+    font-size: 18px;
+    color: var(--color-graphite-800);
+  }
+
+  .wipe-add-panel {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .wipe-add-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .wipe-add-kicker {
+    margin: 0 0 2px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--color-graphite-500);
+  }
+
+  .wipe-add-title {
+    margin: 0;
+    font-size: 18px;
+    color: var(--color-graphite-800);
+  }
+
+  .wipe-seed-toggle {
+    border: 1px solid var(--color-graphite-300);
+    background: var(--color-porcelain-50);
+    color: var(--color-graphite-700);
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .wipe-seed-toggle.is-on {
+    background: var(--color-royal-blue-100);
+    border-color: var(--color-royal-blue-600);
+    color: var(--color-royal-blue-700);
+  }
+
+  .wipe-seed-toggle.is-off {
+    background: var(--color-danger-100);
+    border-color: var(--color-danger-600);
+    color: var(--color-danger-600);
+  }
+
+  .wipe-field-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-graphite-500);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .wipe-input {
+    width: 100%;
+    height: 44px;
+    border-radius: var(--radius-input);
+    border: 1px solid var(--color-graphite-300);
+    background: var(--color-porcelain-50);
+    padding: 0 12px;
+    color: var(--color-graphite-900);
+    font-size: 14px;
+    font-family: var(--font-grkd-mono);
+    box-sizing: border-box;
+  }
+
+  .wipe-input:focus {
+    outline: 3px solid var(--color-royal-blue-100);
+    outline-offset: 0;
+    border-color: var(--color-royal-blue-600);
+  }
+
+  .wipe-field-hint {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-graphite-500);
+  }
+
+  .wipe-save-btn {
+    align-self: flex-start;
+    border: 1px solid var(--color-royal-blue-700);
+    background: var(--color-royal-blue-600);
+    color: var(--color-porcelain-50);
+    border-radius: var(--radius-button);
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.18s ease;
+  }
+
+  .wipe-save-btn:hover {
+    background: var(--color-royal-blue-700);
+  }
+
+  .wipe-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+  }
+
+  .wipe-card {
+    padding: 18px;
+  }
+
+  .wipe-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .wipe-card-chip {
+    display: inline-flex;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--color-royal-blue-100);
+    color: var(--color-royal-blue-700);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .wipe-card-title {
+    margin: 8px 0 0;
+    font-size: 18px;
+    color: var(--color-graphite-800);
+    font-family: var(--font-grkd-mono);
+    word-break: break-all;
+  }
+
+  .wipe-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--color-graphite-300);
+    background: var(--color-porcelain-50);
+    border-radius: 999px;
+    padding: 5px 10px 5px 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-graphite-700);
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+
+  .wipe-toggle.is-on {
+    background: var(--color-royal-blue-600);
+    border-color: var(--color-royal-blue-700);
+    color: var(--color-porcelain-50);
+  }
+
+  .wipe-toggle.is-off {
+    background: var(--color-porcelain-100);
+    border-color: var(--color-graphite-300);
+    color: var(--color-graphite-700);
+  }
+
+  .wipe-toggle:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  .wipe-toggle-track {
+    width: 34px;
+    height: 20px;
+    border-radius: 999px;
+    background: var(--color-graphite-300);
+    display: inline-flex;
+    align-items: center;
+    padding: 2px;
+    box-sizing: border-box;
+  }
+
+  .wipe-toggle.is-on .wipe-toggle-track {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .wipe-toggle-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--color-porcelain-50);
+    transform: translateX(0);
+    transition: transform 0.18s ease;
+  }
+
+  .wipe-toggle.is-on .wipe-toggle-thumb {
+    transform: translateX(14px);
+  }
+
+  .wipe-toggle-label {
+    min-width: 30px;
+    text-align: center;
+  }
+
+  .wipe-card-meta {
+    margin: 14px 0 8px;
+    font-size: 13px;
+    color: var(--color-graphite-650);
+  }
+
+  .wipe-card-hint {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--color-graphite-500);
+  }
+
+  .wipe-empty {
+    padding: 28px;
+    text-align: center;
+    display: grid;
+    place-items: center;
+    gap: 10px;
+  }
+
+  .wipe-empty-sigil {
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+    display: grid;
+    place-items: center;
+    background: var(--color-royal-blue-100);
+    color: var(--color-royal-blue-700);
+    font-size: 24px;
+    font-weight: 700;
+  }
+
+  .wipe-empty h3 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--color-graphite-800);
+  }
+
+  .wipe-empty p {
+    margin: 0;
+    max-width: 60ch;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--color-graphite-650);
+  }
+
+  .mono {
+    font-family: var(--font-grkd-mono);
+    font-size: 12px;
+  }
+
+  @media (max-width: 1120px) {
+    .wipe-hero {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .wipe-copy,
+    .wipe-add-panel,
+    .wipe-card,
+    .wipe-empty {
+      border-radius: 18px;
+    }
+
+    .wipe-stats {
+      grid-template-columns: 1fr;
+    }
+
+    .wipe-card-top,
+    .wipe-add-head {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .wipe-toggle {
+      width: 100%;
+      justify-content: space-between;
+    }
   }
 
   .panel {

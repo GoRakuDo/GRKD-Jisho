@@ -7,6 +7,7 @@ export async function setWipeEnabled(
   channelId: string,
   enabled: boolean,
 ): Promise<void> {
+  // Discord channel IDs are globally unique, so channelId is the natural upsert key.
   await db
     .insert(schema.channelSettings)
     .values({

@@ -5,7 +5,7 @@ const envSchema = z.object({
   DISCORD_GUILD_ID: z.string().min(1),
   SESSION_SECRET: z.string().min(32),
   SESSION_COOKIE_SECURE: z.enum(["true", "false"]).optional(),
-  WEB_BASE_URL: z.string().url(),
+  WEB_BASE_URL: z.url(),
   PORT: z.coerce.number().default(4321),
   HOST: z.string().default("0.0.0.0"),
 });
