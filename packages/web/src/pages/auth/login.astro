@@ -9,98 +9,172 @@ import "../../styles/globals.css";
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Login — GRKD-Jisho Admin</title>
   </head>
-  <body class="bg-porcelain-50 min-h-dvh flex flex-col items-center justify-center font-grkd-sans">
-    <main class="w-full max-w-2xl px-6 flex flex-col items-center">
-      <div class="mb-12 text-center">
-        <h1 class="text-display font-bold text-graphite-800 tracking-tight mb-4">GRKD-Jisho Admin</h1>
-        <p class="text-body text-graphite-650 max-w-lg mx-auto">
-          The central command for the Indonesian-Japanese dictionary bot.
-          If setup is missing, this screen will guide you through QR setup first.
-        </p>
-      </div>
+  <body class="min-h-dvh bg-porcelain-50 font-grkd-sans text-graphite-900">
+    <main class="relative min-h-dvh overflow-hidden px-4 py-4 sm:px-6 lg:px-8">
+      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,oklch(92%_0.08_262/0.32),transparent_28%),radial-gradient(circle_at_86%_80%,oklch(94.5%_0.04_95/0.45),transparent_28%),linear-gradient(180deg,oklch(97%_0.012_95),oklch(95%_0.01_95))]" />
 
-      <!-- Loading indicator (shown while checking setup status) -->
-      <div id="loading" class="text-body-sm text-graphite-500 mb-6">
-        Checking authentication setup…
-      </div>
+      <section class="relative mx-auto flex min-h-[calc(100dvh-2rem)] max-w-7xl items-center">
+        <div class="grid w-full overflow-hidden rounded-modal border border-graphite-180 bg-[oklch(97%_0.012_95/0.82)] shadow-[0_30px_80px_oklch(20%_0.018_255/0.16)] backdrop-blur-sm lg:min-h-[760px] lg:grid-cols-[0.92fr_1.08fr]">
+          <aside class="relative flex flex-col justify-between gap-10 overflow-hidden bg-[linear-gradient(160deg,oklch(43%_0.19_262),oklch(38%_0.18_251))] px-8 py-8 text-porcelain-50 sm:px-10 sm:py-10 lg:px-12 lg:py-12">
+            <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,oklch(96%_0.025_262/0.18),transparent_28%),radial-gradient(circle_at_82%_82%,oklch(94%_0.06_95/0.12),transparent_26%)]" />
 
-      <!-- Auth panel (hidden initially, shown after status check) -->
-      <div id="authContainer" class="hidden w-full max-w-md bg-porcelain-100 border border-graphite-180 rounded-panel p-8 shadow-sm">
-        <div id="setupGuide" class="hidden mb-8">
-          <h2 class="text-heading-sm font-semibold text-graphite-800 mb-4">First-time setup</h2>
-          <ol class="space-y-4 text-body-sm text-graphite-650">
-            <li class="flex items-start gap-3">
-              <span class="flex-shrink-0 w-5 h-5 rounded-full bg-royal-blue-100 text-royal-blue-700 flex items-center justify-center text-xs font-semibold border border-royal-blue-600">1</span>
-              <span>Scan the QR code with your authenticator app</span>
-            </li>
-            <li class="flex items-start gap-3">
-              <span class="flex-shrink-0 w-5 h-5 rounded-full bg-royal-blue-100 text-royal-blue-700 flex items-center justify-center text-xs font-semibold border border-royal-blue-600">2</span>
-              <span>Enter the 6-digit code shown in the app</span>
-            </li>
-            <li class="flex items-start gap-3">
-              <span class="flex-shrink-0 w-5 h-5 rounded-full bg-royal-blue-100 text-royal-blue-700 flex items-center justify-center text-xs font-semibold border border-royal-blue-600">3</span>
-              <span>Keep the app installed for future logins</span>
-            </li>
-          </ol>
+            <div class="relative space-y-8">
+              <div class="flex items-center gap-3 text-caption uppercase tracking-[0.34em] text-porcelain-50/75">
+                <span class="h-2.5 w-2.5 rounded-full bg-royal-blue-100 shadow-[0_0_0_6px_oklch(96%_0.025_262/0.1)]" />
+                Secure admin access
+              </div>
+
+              <div class="space-y-5">
+                <p class="text-body-sm uppercase tracking-[0.28em] text-porcelain-50/70">GRKD-Jisho Admin</p>
+                <h1 class="max-w-md text-[clamp(2.4rem,5vw,4.75rem)] leading-[0.94] font-bold tracking-[-0.05em] text-porcelain-50">
+                  Calm entry.
+                  <span class="block text-royal-blue-100">Fast access.</span>
+                </h1>
+                <p class="max-w-md text-body text-porcelain-50/78">
+                  The command surface for the Indonesian-Japanese dictionary bot.
+                  If setup is missing, this screen shows the QR onboarding lane.
+                </p>
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                <article class="rounded-panel border border-porcelain-50/14 bg-porcelain-50/8 p-4 backdrop-blur-sm">
+                  <p class="text-caption uppercase tracking-[0.26em] text-porcelain-50/60">Step 01</p>
+                  <p class="mt-2 text-body-sm text-porcelain-50/88">Register the device once with a QR scan.</p>
+                </article>
+                <article class="rounded-panel border border-porcelain-50/14 bg-porcelain-50/8 p-4 backdrop-blur-sm">
+                  <p class="text-caption uppercase tracking-[0.26em] text-porcelain-50/60">Step 02</p>
+                  <p class="mt-2 text-body-sm text-porcelain-50/88">Use the current six-digit code from your app.</p>
+                </article>
+                <article class="rounded-panel border border-porcelain-50/14 bg-porcelain-50/8 p-4 backdrop-blur-sm">
+                  <p class="text-caption uppercase tracking-[0.26em] text-porcelain-50/60">Step 03</p>
+                  <p class="mt-2 text-body-sm text-porcelain-50/88">Reset from SSH only when you want a fresh secret.</p>
+                </article>
+              </div>
+            </div>
+
+            <div class="relative flex flex-col gap-4 rounded-panel border border-porcelain-50/12 bg-porcelain-50/8 p-5 backdrop-blur-sm">
+              <div class="flex items-center justify-between gap-4">
+                <span class="text-caption uppercase tracking-[0.3em] text-porcelain-50/60">Access mode</span>
+                <span class="rounded-full border border-royal-blue-100/35 bg-royal-blue-100/12 px-3 py-1 text-caption font-semibold text-royal-blue-50">
+                  TOTP secured
+                </span>
+              </div>
+              <p class="max-w-sm text-body-sm text-porcelain-50/80">
+                Built for one human, one server, and a short path back into the dashboard.
+              </p>
+            </div>
+          </aside>
+
+          <section class="relative flex min-h-[560px] flex-col justify-center gap-6 px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+            <div id="loading" class="flex items-center gap-3 text-body-sm text-graphite-500">
+              <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-royal-blue-600" />
+              Checking authentication setup…
+            </div>
+
+            <div id="authContainer" class="hidden grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+              <div class="flex flex-col justify-between rounded-modal border border-graphite-180 bg-graphite-900 px-6 py-6 text-porcelain-50 shadow-[0_18px_40px_oklch(20%_0.018_255/0.16)] lg:px-7 lg:py-7">
+                <div class="space-y-6">
+                  <div class="flex items-center justify-between gap-4">
+                    <div>
+                      <p class="text-caption uppercase tracking-[0.3em] text-porcelain-50/65">Authentication lane</p>
+                      <h2 id="modeTitle" class="mt-2 text-heading-md font-semibold tracking-tight">Returning admin</h2>
+                    </div>
+                    <span id="modeBadge" class="rounded-full border border-royal-blue-100/25 bg-royal-blue-100/12 px-3 py-1 text-caption font-semibold text-royal-blue-50">
+                      Ready
+                    </span>
+                  </div>
+
+                  <p id="modeCopy" class="max-w-sm text-body-sm text-porcelain-50/78">
+                    Use the authenticator code on the right to sign in.
+                  </p>
+
+                  <div id="setupGuide" class="hidden space-y-3">
+                    <p class="text-body-sm font-semibold text-porcelain-50">First-time setup</p>
+                    <ol class="space-y-3 text-body-sm text-porcelain-50/80">
+                      <li class="flex items-start gap-3">
+                        <span class="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full border border-royal-blue-100/30 bg-royal-blue-100/12 text-xs font-semibold text-royal-blue-50">1</span>
+                        <span>Scan the QR code with your authenticator app.</span>
+                      </li>
+                      <li class="flex items-start gap-3">
+                        <span class="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full border border-royal-blue-100/30 bg-royal-blue-100/12 text-xs font-semibold text-royal-blue-50">2</span>
+                        <span>Enter the six-digit code to finish setup.</span>
+                      </li>
+                      <li class="flex items-start gap-3">
+                        <span class="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full border border-royal-blue-100/30 bg-royal-blue-100/12 text-xs font-semibold text-royal-blue-50">3</span>
+                        <span>Keep the app installed for future logins.</span>
+                      </li>
+                    </ol>
+                  </div>
+
+                  <div id="loginGuide" class="space-y-3">
+                    <p class="text-body-sm font-semibold text-porcelain-50">Quick access</p>
+                    <ol class="space-y-3 text-body-sm text-porcelain-50/80">
+                      <li class="flex items-start gap-3">
+                        <span class="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full border border-royal-blue-100/30 bg-royal-blue-100/12 text-xs font-semibold text-royal-blue-50">1</span>
+                        <span>Open your authenticator app.</span>
+                      </li>
+                      <li class="flex items-start gap-3">
+                        <span class="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full border border-royal-blue-100/30 bg-royal-blue-100/12 text-xs font-semibold text-royal-blue-50">2</span>
+                        <span>Use the six-digit code for <strong>GRKD-Jisho Admin</strong>.</span>
+                      </li>
+                      <li class="flex items-start gap-3">
+                        <span class="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full border border-royal-blue-100/30 bg-royal-blue-100/12 text-xs font-semibold text-royal-blue-50">3</span>
+                        <span>You’re straight into the dashboard.</span>
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div class="mt-6 border-t border-porcelain-50/12 pt-4 text-caption text-porcelain-50/62">
+                  Lost the app? Run <code class="font-grkd-mono text-royal-blue-100">pnpm auth:reset</code> on the server.
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-5 rounded-modal border border-graphite-180 bg-porcelain-50 px-6 py-6 shadow-[0_20px_50px_oklch(20%_0.018_255/0.12)] lg:px-8 lg:py-8">
+                <div id="qrSection" class="hidden rounded-panel border border-graphite-180 bg-porcelain-100 p-4">
+                  <div class="rounded-[18px] border border-graphite-180 bg-porcelain-50 p-4">
+                    <img id="qrImage" src="" alt="TOTP QR Code" class="aspect-square w-full rounded-[14px] bg-porcelain-50 object-contain p-2" />
+                  </div>
+                  <p class="mt-4 text-center text-caption text-graphite-500">
+                    Can’t scan? Copy the manual key below into your authenticator app.
+                  </p>
+                  <code id="manualSecret" class="mt-3 block rounded-panel border border-royal-blue-100 bg-royal-blue-50 px-3 py-3 text-center font-grkd-mono text-caption leading-6 text-royal-blue-700 break-all select-all"></code>
+                </div>
+
+                <form id="loginForm" class="space-y-4">
+                  <div>
+                    <label for="totpCode" class="block text-body-sm font-semibold text-graphite-800 mb-2">
+                      Authenticator Code
+                    </label>
+                    <input
+                      id="totpCode"
+                      type="text"
+                      inputmode="numeric"
+                      pattern="[0-9]{6}"
+                      maxlength="6"
+                      autocomplete="one-time-code"
+                      placeholder="000000"
+                      class="w-full rounded-button border border-graphite-250 bg-porcelain-50 px-4 py-4 text-center font-grkd-mono text-heading-sm font-bold tracking-[0.45em] text-graphite-900 placeholder:text-graphite-400 focus-visible:border-royal-blue-600 focus-visible:ring-2 focus-visible:ring-royal-blue-100"
+                    />
+                  </div>
+
+                  <button
+                    id="submitButton"
+                    type="submit"
+                    class="w-full rounded-button border border-royal-blue-700 bg-royal-blue-600 px-6 py-4 text-body-sm font-semibold text-porcelain-50 shadow-sm transition-colors hover:bg-royal-blue-700 focus-visible:ring-2 focus-visible:ring-royal-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Log In
+                  </button>
+
+                  <p id="loginError" class="hidden text-center text-body-sm text-danger-600"></p>
+                </form>
+              </div>
+            </div>
+          </section>
         </div>
+      </section>
 
-        <div id="qrSection" class="hidden w-full bg-porcelain-50 border border-graphite-180 rounded-panel p-6 mb-8">
-          <img id="qrImage" src="" alt="TOTP QR Code" class="w-full aspect-square mb-4" />
-          <p class="text-caption text-graphite-500 text-center">
-            Can’t scan? Enter the manual key:
-            <code id="manualSecret" class="font-grkd-mono text-caption text-royal-blue-700 break-all"></code>
-          </p>
-        </div>
-
-        <div id="loginGuide" class="mb-8">
-          <h2 class="text-heading-sm font-semibold text-graphite-800 mb-6">Quick Access Guide</h2>
-          <ol class="space-y-4 text-body-sm text-graphite-650">
-            <li class="flex items-start gap-3">
-              <span class="flex-shrink-0 w-5 h-5 rounded-full bg-royal-blue-100 text-royal-blue-700 flex items-center justify-center text-xs font-semibold border border-royal-blue-600">1</span>
-              <span>Open your authenticator app</span>
-            </li>
-            <li class="flex items-start gap-3">
-              <span class="flex-shrink-0 w-5 h-5 rounded-full bg-royal-blue-100 text-royal-blue-700 flex items-center justify-center text-xs font-semibold border border-royal-blue-600">2</span>
-              <span>Enter the 6-digit code for <strong>GRKD-Jisho Admin</strong></span>
-            </li>
-            <li class="flex items-start gap-3">
-              <span class="flex-shrink-0 w-5 h-5 rounded-full bg-royal-blue-100 text-royal-blue-700 flex items-center justify-center text-xs font-semibold border border-royal-blue-600">3</span>
-              <span>Manage dictionaries and settings</span>
-            </li>
-          </ol>
-        </div>
-
-          <form id="loginForm">
-          <label for="totpCode" class="block text-body-sm font-medium text-graphite-700 mb-2">
-            Authenticator Code
-          </label>
-          <input
-            id="totpCode"
-            type="text"
-            inputmode="numeric"
-            pattern="[0-9]{6}"
-            maxlength="6"
-            autocomplete="one-time-code"
-            placeholder="000000"
-            class="w-full text-center text-heading-sm font-bold font-grkd-mono tracking-widest bg-porcelain-50 border border-graphite-250 rounded-button px-4 py-3 text-graphite-800 placeholder:text-graphite-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-blue-600 focus-visible:border-royal-blue-600 mb-4"
-          />
-            <button
-            id="submitButton"
-              type="submit"
-              class="w-full bg-royal-blue-600 text-porcelain-50 border border-royal-blue-700 hover:bg-royal-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-blue-600 focus-visible:ring-offset-2 focus-visible:ring-offset-porcelain-100 rounded-button px-6 py-3 text-body-sm font-semibold transition-colors shadow-sm cursor-pointer"
-            >
-              Log In
-          </button>
-            <p id="loginError" class="hidden text-danger-600 text-body-sm mt-4 text-center"></p>
-          </form>
-
-          <p class="mt-6 text-center text-caption text-graphite-500">
-            Lost access to your authenticator app?
-            <a href="/auth/logout" class="text-royal-blue-600 hover:text-royal-blue-700 underline">Log out</a> and run <code class="font-grkd-mono text-caption">pnpm auth:reset</code> on the server to reset setup.
-          </p>
-        </div>
-
-      <footer class="mt-16 text-center text-caption text-graphite-500">
+      <footer class="relative mx-auto mt-6 max-w-7xl px-2 text-center text-caption text-graphite-500 sm:mt-8">
         <p class="mb-1">GRKD-Jisho Admin &bull; v0.1.0</p>
         <p class="opacity-60">Powered by GoRakuDo</p>
       </footer>
@@ -118,27 +192,37 @@ import "../../styles/globals.css";
         const submitButton = document.getElementById("submitButton");
         const loginForm = document.getElementById("loginForm");
         const loginError = document.getElementById("loginError");
+        const modeTitle = document.getElementById("modeTitle");
+        const modeBadge = document.getElementById("modeBadge");
+        const modeCopy = document.getElementById("modeCopy");
 
-        if (!loading || !authContainer || !setupGuide || !qrSection || !qrImage || !manualSecret || !loginGuide || !submitButton || !loginForm || !loginError) return;
+        if (!loading || !authContainer || !setupGuide || !qrSection || !qrImage || !manualSecret || !loginGuide || !submitButton || !loginForm || !loginError || !modeTitle || !modeBadge || !modeCopy) return;
 
         let setupRequired = false;
+        let setupDataPayload = null;
 
         try {
-          const res = await fetch("/api/auth/status");
-          const data = await res.json();
+          const [statusRes, setupRes] = await Promise.all([
+            fetch("/api/auth/status"),
+            fetch("/api/auth/setup"),
+          ]);
+
+          const data = await statusRes.json();
+          setupDataPayload = await setupRes.json();
 
           setupRequired = Boolean(data.setupRequired);
           if (setupRequired) {
-            const setupRes = await fetch("/api/auth/setup");
-            const setupData = await setupRes.json();
-
-            if (setupData.alreadySetup) {
+            if (setupDataPayload.alreadySetup) {
               setupRequired = false;
-            } else if (setupData.qrDataUrl && setupData.secret) {
-              qrImage.setAttribute("src", setupData.qrDataUrl);
-              manualSecret.textContent = setupData.secret;
+            } else if (setupDataPayload.qrDataUrl && setupDataPayload.secret) {
+              qrImage.setAttribute("src", setupDataPayload.qrDataUrl);
+              manualSecret.textContent = setupDataPayload.secret;
               setupGuide.classList.remove("hidden");
+              loginGuide.classList.add("hidden");
               qrSection.classList.remove("hidden");
+              modeTitle.textContent = "First-time setup";
+              modeBadge.textContent = "Configure once";
+              modeCopy.textContent = "Scan the code, confirm the 6-digit token, and the admin login becomes ready for next time.";
             } else {
               throw new Error("Failed to load setup payload");
             }
@@ -149,8 +233,10 @@ import "../../styles/globals.css";
             qrSection.classList.add("hidden");
             loginGuide.classList.remove("hidden");
             submitButton.textContent = "Log In";
+            modeTitle.textContent = "Returning admin";
+            modeBadge.textContent = "Ready";
+            modeCopy.textContent = "Open your authenticator app and enter the current 6-digit code to enter the dashboard.";
           } else {
-            loginGuide.classList.add("hidden");
             submitButton.textContent = "Verify & Complete Setup";
           }
 
@@ -162,7 +248,6 @@ import "../../styles/globals.css";
           return;
         }
 
-        // Handle form submission
         loginForm.addEventListener("submit", async (e) => {
           e.preventDefault();
 
@@ -171,6 +256,9 @@ import "../../styles/globals.css";
           const code = codeInput.value.trim();
 
           loginError.classList.add("hidden");
+          const previousLabel = submitButton.textContent || "Log In";
+          submitButton.setAttribute("disabled", "true");
+          submitButton.textContent = previousLabel === "Verify & Complete Setup" ? "Verifying…" : "Signing in…";
 
           try {
             const res = await fetch("/api/auth/verify", {
@@ -196,6 +284,9 @@ import "../../styles/globals.css";
             loginError.textContent = "Connection error. Is the server running?";
             loginError.classList.remove("hidden");
             console.error("[TOTP/Login] Verify failed:", err);
+          } finally {
+            submitButton.removeAttribute("disabled");
+            submitButton.textContent = setupRequired ? "Verify & Complete Setup" : "Log In";
           }
         });
       })();
