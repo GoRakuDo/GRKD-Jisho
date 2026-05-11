@@ -1,9 +1,21 @@
 import { EmbedBuilder } from "discord.js";
 
+const DISCORD_EMBED_DESCRIPTION_LIMIT = 3900;
+const DISCORD_EMBED_TRUNCATED_SUFFIX = "\n\n…（長文のため途中で切れました。全文はキャッシュ詳細を確認してください。）";
+
+function clampDiscordEmbedDescription(text: string): string {
+  if (text.length <= DISCORD_EMBED_DESCRIPTION_LIMIT) {
+    return text;
+  }
+
+  const trimmed = text.slice(0, DISCORD_EMBED_DESCRIPTION_LIMIT).trimEnd();
+  return `${trimmed}${DISCORD_EMBED_TRUNCATED_SUFFIX}`;
+}
+
 export function formatReply(text: string) {
   const embed = new EmbedBuilder()
     .setColor(0x00b7c3)
-    .setDescription(text)
+    .setDescription(clampDiscordEmbedDescription(text))
     .setTimestamp();
 
   return { embeds: [embed] };
