@@ -5,7 +5,8 @@ export const responseEdits = pgTable("response_edits", {
   id: bigserial("id", { mode: "bigint" }).primaryKey(),
   responseCacheId: bigint("response_cache_id", { mode: "bigint" })
     .notNull()
-    .references(() => responseCache.id),
+    // Cache delete relies on FK cascade; keep in sync with packages/db/drizzle/0013_cache_cascade_delete.sql.
+    .references(() => responseCache.id, { onDelete: "cascade" }),
   editorDiscordId: text("editor_discord_id").notNull(),
   beforeText: text("before_text").notNull(),
   afterText: text("after_text").notNull(),

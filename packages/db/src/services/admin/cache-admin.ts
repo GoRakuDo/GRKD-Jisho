@@ -81,14 +81,6 @@ export async function bulkDeleteCache(ids: string[]): Promise<number> {
 
     const deletableIds = deletableRows.map((row) => row.id);
 
-    await tx
-      .delete(schema.lookupLogs)
-      .where(inArray(schema.lookupLogs.responseCacheId, deletableIds));
-
-    await tx
-      .delete(schema.responseEdits)
-      .where(inArray(schema.responseEdits.responseCacheId, deletableIds));
-
     return tx
       .delete(schema.responseCache)
       .where(inArray(schema.responseCache.id, deletableIds))

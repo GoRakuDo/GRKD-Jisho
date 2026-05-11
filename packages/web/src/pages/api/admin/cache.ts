@@ -158,7 +158,7 @@ export const DELETE: APIRoute = async (context) => {
     logStep("bulk-delete", "ok", `Deleted ${deleted} entries`);
 
     logStep("audit.log", "ok", "Writing admin audit event");
-    await adminAuditEvent("admin.cache_refreshed", {
+    await adminAuditEvent("admin.cache_deleted", {
       requestedIds: body.ids.length,
       skippedManual: body.ids.length - deletableIds.length,
       deletedCount: deleted,
