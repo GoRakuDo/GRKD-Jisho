@@ -265,7 +265,7 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
     entryId: result.entry.id,
     roleKey,
     promptVersion: env.PROMPT_VERSION,
-    modelName: "google/gemma-4-31b-it",
+    modelName: PRIMARY_LLM_MODEL,
   };
 
   const cached = await getCachedResponse(cacheKey);
@@ -591,12 +591,36 @@ export async function generate(params: GenerateParams): Promise<string> {
 }
 
 async function callGemini(prompt: string): Promise<string> {
-  const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "google/gemma-4-31b-it" });
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  if (!text) throw new Error("Gemini returned empty response");
-  return text;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${PRIMARY_LLM_MODEL}:generateContent`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": env.GEMINI_API_KEY,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          thinkingConfig: {
+            thinkingLevel: "high",
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) throw new Error(`Gemini error: ${response.status}`);
+
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
+    if (!text) throw new Error("Gemini returned empty response");
+    return text;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function callOpenRouter(prompt: string): Promise<string> {
