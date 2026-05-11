@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { db } from "@grkd-jisho/db";
 import { adminTotpSecrets } from "@grkd-jisho/db";
+import { eq } from "drizzle-orm";
 import speakeasy from "speakeasy";
 import { SESSION_MAX_AGE_MS, setSession } from "../../../lib/session";
 import { getEnv } from "../../../env";
@@ -52,6 +53,13 @@ export const POST: APIRoute = async (context) => {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
+    }
+
+    if (rows[0]?.verifiedAt === null) {
+      await db
+        .update(adminTotpSecrets)
+        .set({ verifiedAt: new Date() })
+        .where(eq(adminTotpSecrets.id, rows[0]!.id));
     }
 
     // Issue session

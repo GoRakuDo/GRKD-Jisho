@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 import { db } from "@grkd-jisho/db";
 import { adminTotpSecrets } from "@grkd-jisho/db";
+import { sql } from "drizzle-orm";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 
@@ -8,60 +9,69 @@ import QRCode from "qrcode";
  * GET /api/auth/setup
  *
  * Generate a TOTP secret and return a QR code data URL.
- * Only works when no secret exists yet (first-time setup).
+ * If a secret exists but is not verified yet, return the existing QR.
  *
  * Response (200): { qrDataUrl: string, secret: string, alreadySetup: boolean }
  * Response (200, already setup): { alreadySetup: true }
  */
 export const GET: APIRoute = async () => {
   try {
-    const existing = await db.select().from(adminTotpSecrets).limit(1);
-    if (existing.length > 0) {
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(42424242)`);
+
+      const existing = await tx.select().from(adminTotpSecrets).limit(1);
+      if (existing.length > 0) {
+        const row = existing[0]!;
+        if (row.verifiedAt !== null) {
+          return { alreadySetup: true as const };
+        }
+
+        const qrDataUrl = await QRCode.toDataURL(
+          `otpauth://totp/GRKD-Jisho%20Admin?secret=${encodeURIComponent(row.secret)}&issuer=GRKD-Jisho`,
+        );
+
+        return {
+          alreadySetup: false as const,
+          secret: row.secret,
+          qrDataUrl,
+        };
+      }
+
+      // Generate new TOTP secret for the first setup.
+      const secret = speakeasy.generateSecret({
+        name: "GRKD-Jisho Admin",
+      });
+
+      if (!secret.otpauth_url || !secret.base32) {
+        throw new Error("Failed to generate TOTP secret");
+      }
+
+      await tx.insert(adminTotpSecrets).values({
+        id: "singleton",
+        secret: secret.base32,
+        verifiedAt: null,
+      });
+
+      const qrDataUrl = await QRCode.toDataURL(
+        `otpauth://totp/GRKD-Jisho%20Admin?secret=${encodeURIComponent(secret.base32)}&issuer=GRKD-Jisho`,
+      );
+
+      return {
+        alreadySetup: false as const,
+        secret: secret.base32,
+        qrDataUrl,
+      };
+    });
+
+    if (result.alreadySetup) {
       return new Response(JSON.stringify({ alreadySetup: true }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    // Generate new TOTP secret
-    const secret = speakeasy.generateSecret({
-      name: "GRKD-Jisho Admin",
-    });
-
-    if (!secret.otpauth_url || !secret.base32) {
-      return new Response(
-        JSON.stringify({ error: "Failed to generate TOTP secret" }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Persist the secret. If another request won the race, overwrite with our
-    // generated secret so QR and DB are guaranteed to match.
-    await db
-      .insert(adminTotpSecrets)
-      .values({
-        id: "singleton",
-        secret: secret.base32,
-      })
-      .onConflictDoUpdate({
-        target: adminTotpSecrets.id,
-        set: { secret: secret.base32 },
-      });
-
-    // Re-read to handle hypothetical edge cases (e.g. concurrent transaction)
-    // and build the QR from the same value returned to the client.
-
-    const rows = await db.select().from(adminTotpSecrets).limit(1);
-    const storedSecret = rows[0]?.secret ?? secret.base32;
-    const qrDataUrl = await QRCode.toDataURL(
-      `otpauth://totp/GRKD-Jisho%20Admin?secret=${encodeURIComponent(storedSecret)}&issuer=GRKD-Jisho`,
-    );
-
     return new Response(
-      JSON.stringify({ qrDataUrl, secret: storedSecret, alreadySetup: false }),
+      JSON.stringify({ qrDataUrl: result.qrDataUrl, secret: result.secret, alreadySetup: false }),
       {
         status: 200,
         headers: { "Content-Type": "application/json" },

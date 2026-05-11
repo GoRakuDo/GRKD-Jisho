@@ -199,19 +199,16 @@ import "../../styles/globals.css";
         if (!loading || !authContainer || !setupGuide || !qrSection || !qrImage || !manualSecret || !loginGuide || !submitButton || !loginForm || !loginError || !modeTitle || !modeBadge || !modeCopy) return;
 
         let setupRequired = false;
-        let setupDataPayload = null;
 
         try {
-          const [statusRes, setupRes] = await Promise.all([
-            fetch("/api/auth/status"),
-            fetch("/api/auth/setup"),
-          ]);
-
+          const statusRes = await fetch("/api/auth/status");
           const data = await statusRes.json();
-          setupDataPayload = await setupRes.json();
 
           setupRequired = Boolean(data.setupRequired);
           if (setupRequired) {
+            const setupRes = await fetch("/api/auth/setup");
+            const setupDataPayload = await setupRes.json();
+
             if (setupDataPayload.alreadySetup) {
               setupRequired = false;
             } else if (setupDataPayload.qrDataUrl && setupDataPayload.secret) {
