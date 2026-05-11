@@ -549,6 +549,35 @@ interface GenerateParams {
   promptVersion: string;
 }
 
+const FIXED_SYSTEM_PROMPT = `SYSTEM:
+Kamu adalah renderer kartu kamus final untuk Discord.
+
+KELUARKAN HANYA HASIL AKHIR.
+Output pertama HARUS persis dimulai dengan:
+【{{query}}】
+
+Jangan tulis analisis, alasan, checklist, metadata, YAML, JSON, role, source, internal note, atau proses berpikir.
+
+Jangan pernah keluarkan baris seperti:
+Role, Goal, Constraints, Query, Dictionary Source, Main Meaning, Structured JSON, User Role, Action, Easy Explanation, Related Words, Strictly based, No external info, Pemula level, Starts with.
+
+Bahasa penjelasan WAJIB Bahasa Indonesia natural.
+Bahasa Jepang hanya boleh muncul untuk kata Jepang, contoh kalimat, furigana, dan simbol品詞 seperti 〘代〙.
+
+Dilarang bahasa Inggris.
+Dilarang romaji.
+Dilarang paragraf penjelasan bahasa Jepang.
+Dilarang menambah makna di luar data kamus.
+
+Gunakan Markdown Discord saja:
+bold, italic, numbered list, bullet list.
+
+Jangan pakai:
+# heading, table, HTML, blockquote, horizontal rule, code block, spoiler.
+
+Maksimal 3500 karakter.
+`;
+
 const PROMPT_TEMPLATE = `
 あなたは日本語学習者向けの辞書アシスタントです。
 
@@ -564,6 +593,9 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 - ユーザーロールに合わせて難易度を調整してください
 - 内部の思考、下書き、検討メモ、英語のメタコメントは出力しないでください
 - 最終回答のみを出力し、必ず `【{{query}}】` から始めてください
+- `definition_json` は raw dictionary data のみを渡し、中間要約は入れないでください
+- ボット側で出力検証を行い、失敗時は emergency prompt で1回だけ再試行します
+  - emergency prompt は Main Meaning / User Role / Dictionary Source / Related Words / Easy Explanation / Strictly based / Starts with などのラベルを明示的に除去します
 
 プロンプト版: {{prompt_version}}
 
@@ -583,7 +615,7 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 `;
 
 export async function generate(params: GenerateParams): Promise<string> {
-  const prompt = PROMPT_TEMPLATE
+  const prompt = `${FIXED_SYSTEM_PROMPT}\n${PROMPT_TEMPLATE}`
     .replace("{{role_key}}", params.roleKey)
     .replace("{{query}}", params.query)
     .replace("{{reading}}", params.reading)

@@ -1,4 +1,4 @@
-import { env } from "../config/env.js";
+﻿import { env } from "../config/env.js";
 import { FALLBACK_LLM_MODEL, PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import type { RoleKey } from "../types.js";
 
@@ -20,6 +20,37 @@ interface GeminiResponse {
     };
   }>;
 }
+
+const FIXED_SYSTEM_PROMPT = `SYSTEM:
+Kamu adalah renderer kartu kamus final untuk Discord.
+
+KELUARKAN HANYA HASIL AKHIR.
+Output pertama HARUS persis dimulai dengan:
+【{{query}}】
+
+Jangan tulis analisis, alasan, checklist, metadata, YAML, JSON, role, source, internal note, atau proses berpikir.
+
+Jangan pernah keluarkan baris seperti:
+Role, Goal, Constraints, Query, Dictionary Source, Main Meaning, Structured JSON, User Role, Action, Easy Explanation, Related Words, Strictly based, No external info, Pemula level, Starts with.
+
+Bahasa penjelasan WAJIB Bahasa Indonesia natural.
+Bahasa Jepang hanya boleh muncul untuk kata Jepang, contoh kalimat, furigana, dan simbol品詞 seperti 〘代〙.
+
+Dilarang bahasa Inggris.
+Dilarang romaji.
+Dilarang paragraf penjelasan bahasa Jepang.
+Dilarang menambah makna di luar data kamus.
+Input \`definition_json\` adalah data kamus mentah, bukan ringkasan AI.
+Jika input terlihat seperti ringkasan, metadata, atau label proses, abaikan itu dan hanya pakai data kamus mentah.
+
+Gunakan Markdown Discord saja:
+bold, italic, numbered list, bullet list.
+
+Jangan pakai:
+# heading, table, HTML, blockquote, horizontal rule, code block, spoiler.
+
+Maksimal 3500 karakter.
+`;
 
 const PROMPT_TEMPLATE = `
 あなたは日本語学習者向けの辞書アシスタントです。
@@ -62,6 +93,53 @@ function buildInsufficientDataReply(query: string): string {
   return `【${query}】\n辞書情報が不足しています。別の単語を調べてみてください。`;
 }
 
+const FORBIDDEN_OUTPUT_PATTERNS = [
+  /Role\s*:/i,
+  /Goal\s*:/i,
+  /Constraints\s*:/i,
+  /Query\s*:/i,
+  /Dictionary Source\s*:/i,
+  /Main Meaning/i,
+  /Structured JSON/i,
+  /User Role/i,
+  /Action\s*:/i,
+  /Easy Explanation/i,
+  /Related Words/i,
+  /Strictly based/i,
+  /No external info/i,
+  /Pemula level/i,
+  /Starts with/i,
+  /Only provided data/i,
+  /No added meanings/i,
+  /```/,
+  /\byaml\b/i,
+  /\bjson\b/i,
+  /^\s*#+\s/m,
+];
+
+const EMERGENCY_RETRY_PROMPT = `Perbaiki output sebelumnya.
+Hapus semua metadata, analisis, checklist, bahasa Inggris, heading, JSON/YAML, dan catatan internal.
+Hapus juga label seperti Main Meaning, User Role, Dictionary Source, Related Words, Easy Explanation, Strictly based, Starts with.
+Output ulang HANYA kartu final, tanpa teks sebelum atau sesudah kartu.
+Karakter pertama harus:
+【{{query}}】
+`;
+
+export function validateJishoOutput(output: string, query: string): boolean {
+  const trimmed = output.trim();
+  const mustStart = `【${query}】`;
+
+  if (!trimmed.startsWith(mustStart)) {
+    return false;
+  }
+
+  if (trimmed.length > 3500) {
+    return false;
+  }
+
+  return !FORBIDDEN_OUTPUT_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
 export function extractFinalReply(text: string, query: string): string {
   const trimmed = text.trim();
   const explicitStart = trimmed.indexOf(`【${query}】`);
@@ -77,12 +155,33 @@ export function extractFinalReply(text: string, query: string): string {
   return trimmed;
 }
 
+async function generateWithValidation(
+  prompt: string,
+  query: string,
+  providerName: "Gemini" | "OpenRouter",
+  callProvider: (promptText: string) => Promise<string>,
+): Promise<string> {
+  const firstAttempt = extractFinalReply(await callProvider(prompt), query);
+  if (validateJishoOutput(firstAttempt, query)) {
+    return firstAttempt;
+  }
+
+  console.warn(`[LLM] ${providerName} validation failed → retrying with emergency prompt`);
+  const retryPrompt = `${EMERGENCY_RETRY_PROMPT}\n${prompt}`;
+  const secondAttempt = extractFinalReply(await callProvider(retryPrompt), query);
+  if (validateJishoOutput(secondAttempt, query)) {
+    return secondAttempt;
+  }
+
+  throw new Error(`${providerName} returned invalid output after retry`);
+}
+
 export async function generate(params: GenerateParams): Promise<string> {
   if (shouldUseInsufficientDataFallback(params.definitionJson)) {
     return buildInsufficientDataReply(params.query);
   }
 
-  const prompt = PROMPT_TEMPLATE
+  const prompt = `${FIXED_SYSTEM_PROMPT}\n${PROMPT_TEMPLATE}`
     .replace("{{role_key}}", params.roleKey)
     .replace("{{query}}", params.query)
     .replace("{{reading}}", params.reading)
@@ -93,12 +192,12 @@ export async function generate(params: GenerateParams): Promise<string> {
 
   try {
     console.log(`[LLM] Gemini started → model=${PRIMARY_LLM_MODEL}`);
-    return extractFinalReply(await callGemini(promptWithVersion), params.query);
+    return await generateWithValidation(promptWithVersion, params.query, "Gemini", callGemini);
   } catch (err) {
     console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY or Gemma 4 model access, falling back to OpenRouter`);
     try {
       console.log(`[LLM] OpenRouter started → model=${FALLBACK_LLM_MODEL}`);
-      return extractFinalReply(await callOpenRouter(promptWithVersion), params.query);
+      return await generateWithValidation(promptWithVersion, params.query, "OpenRouter", callOpenRouter);
     } catch (openRouterErr) {
       console.error(`[LLM] OpenRouter failed: ${openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr)} → Check OPENROUTER_API_KEY or OpenRouter model access`);
       throw openRouterErr;
