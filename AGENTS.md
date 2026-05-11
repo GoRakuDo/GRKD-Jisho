@@ -544,4 +544,9 @@ console.log（情報表示）:
 
 4. **例外: 起動時のログ（Bot logged in 等）や情報ログは対象外**
 
+5. **多段フローの処理は stage 単位で必ず残す**
+   - 例: `received -> validate -> filter -> delete -> audit -> reply`
+   - 各 stage は `trace_id` と一緒に記録し、最後に落ちた箇所を即座に特定できる状態にする
+   - WebUI に全部出さなくてよい。人間が見やすいのは DB / console / 追跡ログ側でいい
+
 このルールは、Kasouデプロイ時に「生スタックトレースを見ても何を直せばいいかわからない」という問題を解決するために導入された。

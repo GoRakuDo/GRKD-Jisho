@@ -1,5 +1,5 @@
 import { env } from "../config/env.js";
-import { PRIMARY_LLM_MODEL } from "../config/llm-model.js";
+import { FALLBACK_LLM_MODEL, PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import type { RoleKey } from "../types.js";
 
 interface GenerateParams {
@@ -59,7 +59,7 @@ export async function generate(params: GenerateParams): Promise<string> {
   } catch (err) {
     console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY or Gemma 4 model access, falling back to OpenRouter`);
     try {
-      console.log(`[LLM] OpenRouter started → model=anthropic/claude-3.5-haiku`);
+      console.log(`[LLM] OpenRouter started → model=${FALLBACK_LLM_MODEL}`);
       return await callOpenRouter(prompt);
     } catch (openRouterErr) {
       console.error(`[LLM] OpenRouter failed: ${openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr)} → Check OPENROUTER_API_KEY or OpenRouter model access`);
@@ -126,9 +126,11 @@ async function callOpenRouter(prompt: string): Promise<string> {
       },
       signal: controller.signal,
       body: JSON.stringify({
-        model: "anthropic/claude-3.5-haiku",
+        model: FALLBACK_LLM_MODEL,
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 500,
+        reasoning: {
+          effort: "high",
+        },
       }),
     });
 
@@ -141,7 +143,7 @@ async function callOpenRouter(prompt: string): Promise<string> {
     if (typeof text !== "string" || !text) {
       throw new Error("OpenRouter returned empty response");
     }
-    console.log(`[LLM] OpenRouter success → model=anthropic/claude-3.5-haiku`);
+    console.log(`[LLM] OpenRouter success → model=${FALLBACK_LLM_MODEL}`);
     return text;
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {

@@ -631,9 +631,11 @@ async function callOpenRouter(prompt: string): Promise<string> {
       Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "anthropic/claude-3.5-haiku",
+      model: "openrouter/free",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 500,
+      reasoning: {
+        effort: "high",
+      },
     }),
   });
 
@@ -648,8 +650,7 @@ async function callOpenRouter(prompt: string): Promise<string> {
 }
 ```
 
-> **依存追加:** `@google/generative-ai` を `packages/bot` にインストールする。  
-> `pnpm --filter bot add @google/generative-ai`
+> **依存追加:** なし。OpenRouter は `fetch` 直叩きで使う。
 
 ---
 
