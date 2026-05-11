@@ -22,6 +22,15 @@ interface GeminiResponse {
   }>;
 }
 
+const ANSWER_SECTION_CONTRACT = `REASONING:
+- Tulis catatan penalaran singkat untuk model saja.
+- Jangan campurkan reasoning ke jawaban akhir.
+
+ANSWER:
+- Tulis kartu final saja.
+- Baris pertama harus dimulai persis dengan 【{{query}}】
+- Bagian ini yang akan dipakai bot.`;
+
 function shouldUseInsufficientDataFallback(definitionJson: string): boolean {
   const compact = definitionJson.replace(/\s+/g, "");
   return compact.length < 20 && !/example/i.test(definitionJson);
@@ -29,6 +38,10 @@ function shouldUseInsufficientDataFallback(definitionJson: string): boolean {
 
 function buildInsufficientDataReply(query: string): string {
   return `【${query}】\n辞書情報が不足しています。別の単語を調べてみてください。`;
+}
+
+export function buildPromptTemplate(promptTemplate: string): string {
+  return `${promptTemplate.trim()}\n\n${ANSWER_SECTION_CONTRACT}`;
 }
 
 function renderPromptTemplate(promptTemplate: string, params: GenerateParams): string {
@@ -41,8 +54,19 @@ function renderPromptTemplate(promptTemplate: string, params: GenerateParams): s
     .replaceAll("{{prompt_version}}", params.promptVersion);
 }
 
-export function extractFinalReply(text: string, query: string): string {
+function extractAnswerSection(text: string): string {
   const trimmed = text.trim();
+  const answerMarker = trimmed.match(/(?:^|\n)ANSWER\s*:\s*/i);
+
+  if (!answerMarker || answerMarker.index === undefined) {
+    return trimmed;
+  }
+
+  return trimmed.slice(answerMarker.index + answerMarker[0].length).trim();
+}
+
+export function extractFinalReply(text: string, query: string): string {
+  const trimmed = extractAnswerSection(text);
   const explicitStart = trimmed.indexOf(`【${query}】`);
   if (explicitStart >= 0) {
     return trimmed.slice(explicitStart).trim();

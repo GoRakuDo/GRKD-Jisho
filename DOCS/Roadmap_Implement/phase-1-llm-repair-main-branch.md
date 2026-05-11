@@ -66,3 +66,6 @@ main ブランチでは、次の 2 点を分けて直す。
 - `llm.service.ts` は bot から渡された prompt 本文を `replaceAll()` で展開するだけにして、固定テンプレート直書きをやめた。
 - `PROMPT_VERSION` の見せ方を startup log から外し、DB の active row が prompt source であることを明示した。
 - cache は `prompt.version` だけでなく `prompt.content` の hash も含めるので、同じ version を上書き保存しても最新内容が必ず再生成される。
+- active prompt の本文には bot 側で `REASONING:` / `ANSWER:` の出力契約を付け足し、`extractFinalReply()` は `ANSWER` だけを拾って reasoning を捨てるようにした。
+- これで reasoning 漏れがあっても、cache 保存と Discord 送信は ANSWER 本文だけになる。
+- `ANSWER` マーカーが無い古い返答でも、`extractFinalReply()` の fallback が落ちないことを unit test で固定した。

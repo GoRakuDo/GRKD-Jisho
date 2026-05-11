@@ -7,7 +7,7 @@ vi.mock("../../config/env", () => ({
   },
 }));
 
-import { extractFinalReply, generate } from "../llm.service";
+import { buildPromptTemplate, extractFinalReply, generate } from "../llm.service";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -15,10 +15,13 @@ afterEach(() => {
 });
 
 describe("extractFinalReply", () => {
-  it("reasoning preamble を落として final answer だけ返す", () => {
+  it("ANSWER セクションを優先して reasoning を落とす", () => {
     const text = `
+REASONING:
 Drafting internal notes...
 Wait, let's double-check.
+
+ANSWER:
 
 【これ】
 意味:
@@ -27,6 +30,7 @@ Wait, let's double-check.
     const result = extractFinalReply(text, "これ");
 
     expect(result.startsWith("【これ】")).toBe(true);
+    expect(result).not.toContain("REASONING");
     expect(result).not.toContain("Drafting internal notes");
     expect(result).not.toContain("double-check");
   });
@@ -39,6 +43,26 @@ some notes
 ...`;
 
     expect(extractFinalReply(text, "これ")).toBe("【それ】\n意味:\n...");
+  });
+
+  it("ANSWER セクションがなくても全文をそのまま返す", () => {
+    const text = `
+REASONING:
+internal notes only`;
+
+    expect(extractFinalReply(text, "これ")).toBe("REASONING:\ninternal notes only");
+  });
+});
+
+describe("buildPromptTemplate", () => {
+  it("active prompt に Reasoning / Answer contract を付与する", () => {
+    const prompt = buildPromptTemplate("SYSTEM\nBASE PROMPT");
+
+    expect(prompt).toContain("SYSTEM");
+    expect(prompt).toContain("BASE PROMPT");
+    expect(prompt).toContain("REASONING:");
+    expect(prompt).toContain("ANSWER:");
+    expect(prompt).toContain("【{{query}}】");
   });
 });
 
@@ -79,7 +103,7 @@ describe("generate", () => {
       reading: "これ",
       dictionaryName: "test dictionary",
       definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
-      promptTemplate: "SYSTEM\nQ={{query}} / {{query}}\nR={{reading}}\nROLE={{role_key}}\nDICT={{dictionary_name}}\nJSON={{definition_json}}\nVER={{prompt_version}}",
+      promptTemplate: buildPromptTemplate("SYSTEM\nQ={{query}} / {{query}}\nR={{reading}}\nROLE={{role_key}}\nDICT={{dictionary_name}}\nJSON={{definition_json}}\nVER={{prompt_version}}"),
       promptVersion: "v9",
     });
 
@@ -100,16 +124,18 @@ describe("generate", () => {
     expect(promptText).toContain("ROLE=pemula");
     expect(promptText).toContain("DICT=test dictionary");
     expect(promptText).toContain("VER=v9");
+    expect(promptText).toContain("REASONING:");
+    expect(promptText).toContain("ANSWER:");
   });
 
-  it("OpenRouter fallback でも active prompt 本文をそのまま送る", async () => {
+  it("OpenRouter fallback でも ANSWER セクションだけ返す", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         choices: [
           {
             message: {
-              content: "【これ】\n意味:\nこれはテストです",
+              content: "REASONING:\ninternal notes\n\nANSWER:\n【これ】\n意味:\nこれはテストです",
             },
           },
         ],
@@ -126,11 +152,10 @@ describe("generate", () => {
       reading: "これ",
       dictionaryName: "test dictionary",
       definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
-      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptTemplate: buildPromptTemplate("SYSTEM\nHELLO={{query}}\n{{prompt_version}}"),
       promptVersion: "v9",
     });
 
-    expect(result.startsWith("【これ】")).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     const secondCall = fetchMock.mock.calls[1] as unknown as [RequestInfo | URL, RequestInit?];
@@ -143,5 +168,6 @@ describe("generate", () => {
 
     expect(requestBody.messages[0]?.content).toContain("HELLO=これ");
     expect(requestBody.messages[0]?.content).toContain("v9");
+    expect(result).toBe("【これ】\n意味:\nこれはテストです");
   });
 });

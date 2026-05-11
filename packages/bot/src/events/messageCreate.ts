@@ -6,7 +6,7 @@ import { PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import { lookupWord } from "../services/dictionary.service.js";
 import { resolveRoleKey } from "../services/role-mapper.service.js";
 import { getCachedResponse, saveResponse } from "../services/response-cache.service.js";
-import { generate } from "../services/llm.service.js";
+import { buildPromptTemplate, generate } from "../services/llm.service.js";
 import { recordLookup } from "../services/lookup-log.service.js";
 import { checkRateLimit, incrementUsage } from "../services/rate-limit.service.js";
 import { formatReply, formatNotFound, formatError } from "../services/reply-formatter.js";
@@ -68,11 +68,12 @@ async function loadActivePromptContext(message: Message, traceId: string): Promi
     return null;
   }
 
-  const promptContentHash = createHash("sha256").update(activePrompt.content, "utf8").digest("hex");
+  const promptTemplate = buildPromptTemplate(activePrompt.content);
+  const promptContentHash = createHash("sha256").update(promptTemplate, "utf8").digest("hex");
   console.log(`[Lookup] trace=${traceId} active prompt loaded → version=${activePrompt.version} hash=${promptContentHash.slice(0, 8)}`);
   return {
     promptVersion: activePrompt.version,
-    promptTemplate: activePrompt.content,
+    promptTemplate,
     promptContentHash,
   };
 }
