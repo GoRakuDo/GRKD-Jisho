@@ -22,7 +22,8 @@ function Invoke-Step {
 Write-Host "Repo root: $repoRoot" -ForegroundColor DarkGray
 
 Invoke-Step -Name 'Codesight wiki + scan' -Command {
-  npx codesight --wiki
+  # Pinned for reproducibility; update intentionally when bumping Codesight.
+  npx --yes codesight@1.14.0 --wiki
 }
 
 Invoke-Step -Name 'Graphify update' -Command {
