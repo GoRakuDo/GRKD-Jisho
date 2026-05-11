@@ -8,7 +8,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "typecheck": "astro check"
+    "typecheck": "astro check",
+    "auth:reset": "tsx scripts/reset-auth.ts"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.9",
@@ -21,12 +22,16 @@
     "adm-zip": "^0.5.17",
     "astro": "^5.7.8",
     "drizzle-orm": "^0.41.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "speakeasy": "^2.0.0",
     "tailwindcss": "^4.2.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/adm-zip": "^0.5.8"
+    "@types/adm-zip": "^0.5.8",
+    "@types/qrcode": "^1.5.6",
+    "@types/speakeasy": "^2.0.10"
   }
 }

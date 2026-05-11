@@ -12,3 +12,4 @@ export * from "./ops-jobs";
 export * from "./mcp-audit-logs";
 export * from "./prompts";
 export * from "./role-bindings";
+export * from "./admin-totp-secrets";

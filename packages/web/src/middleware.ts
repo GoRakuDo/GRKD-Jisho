@@ -6,17 +6,15 @@ import { validateCsrfRequest } from "./lib/csrf";
 /** Paths that do not require authentication */
 const PUBLIC_PATHS = new Set([
   "/auth/login",
-  "/api/auth/authorize",
-  "/api/auth/callback",
+  "/auth/setup",
   "/auth/logout",
 ]);
 
 /** Paths that are exempt from CSRF check */
 const CSRF_EXEMPT_PATHS = new Set([
   "/api/health",
-  "/api/auth/authorize",
-  // Defense-in-depth: callback is already public, keep exempt if PUBLIC_PATHS changes later.
-  "/api/auth/callback",
+  // TOTP verify is POST with no session yet; TOTP code itself is the auth factor.
+  "/api/auth/verify",
   // Import preview validates CSRF again inside route handler; avoid duplicate middleware check.
   "/api/admin/dictionaries/import-preview",
 ]);

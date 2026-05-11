@@ -1,0 +1,151 @@
+---
+import "../../styles/globals.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Setup TOTP — GRKD-Jisho Admin</title>
+  </head>
+  <body class="bg-porcelain-50 min-h-dvh flex flex-col items-center justify-center font-grkd-sans">
+    <main class="w-full max-w-2xl px-6 flex flex-col items-center">
+      <div class="mb-12 text-center">
+        <h1 class="text-display font-bold text-graphite-800 tracking-tight mb-4">Set Up Two-Factor Auth</h1>
+        <p class="text-body text-graphite-650 max-w-lg mx-auto">
+          Scan this QR code with an authenticator app<br />
+          (Google Authenticator, Authy, or 1Password).
+        </p>
+      </div>
+
+      <div id="setupContainer" class="w-full max-w-md flex flex-col items-center">
+        <!-- Loading state -->
+        <div id="loading" class="text-body-sm text-graphite-500">
+          Generating setup code…
+        </div>
+
+        <!-- QR image (hidden until loaded) -->
+        <div id="qrSection" class="hidden w-full max-w-sm bg-porcelain-100 border border-graphite-180 rounded-panel p-8 shadow-sm mb-6">
+          <img id="qrImage" src="" alt="TOTP QR Code"
+               class="w-full aspect-square mb-6" />
+          <p class="text-caption text-graphite-500 text-center mb-6">
+            Can't scan? Manually enter: <code id="manualSecret" class="font-grkd-mono text-body-sm text-royal-blue-700 break-all"></code>
+          </p>
+        </div>
+
+        <!-- Code input form (hidden until QR is ready) -->
+        <form id="setupForm" class="hidden w-full max-w-sm bg-porcelain-100 border border-graphite-180 rounded-panel p-8 shadow-sm">
+          <label for="totpCode" class="block text-body-sm font-medium text-graphite-700 mb-2">
+            Enter the 6-digit code from your authenticator app
+          </label>
+          <input
+            id="totpCode"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]{6}"
+            maxlength="6"
+            autocomplete="one-time-code"
+            placeholder="000000"
+            class="w-full text-center text-display font-bold font-grkd-mono tracking-widest bg-porcelain-50 border border-graphite-250 rounded-button px-4 py-3 text-graphite-800 placeholder:text-graphite-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-blue-600 focus-visible:border-royal-blue-600 mb-4"
+          />
+          <button
+            type="submit"
+            class="w-full bg-royal-blue-600 text-porcelain-50 border border-royal-blue-700 hover:bg-royal-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-blue-600 focus-visible:ring-offset-2 focus-visible:ring-offset-porcelain-100 rounded-button px-6 py-3 text-body-sm font-semibold transition-colors shadow-sm cursor-pointer"
+          >
+            Verify &amp; Complete Setup
+          </button>
+          <p id="setupError" class="hidden text-danger-600 text-body-sm mt-4 text-center"></p>
+        </form>
+
+        <!-- Already-setup notice -->
+        <div id="alreadySetup" class="hidden text-body-sm text-graphite-650 text-center">
+          TOTP is already configured.
+          <a href="/auth/login" class="text-royal-blue-600 hover:text-royal-blue-700 underline">Go to login</a>.
+        </div>
+      </div>
+
+      <footer class="mt-16 text-center text-caption text-graphite-500">
+        <p class="mb-1">GRKD-Jisho Admin &bull; v0.1.0</p>
+        <p class="opacity-60">Powered by GoRakuDo</p>
+      </footer>
+    </main>
+
+    <script>
+      (async () => {
+        const loading = document.getElementById("loading");
+        const qrSection = document.getElementById("qrSection");
+        const setupForm = document.getElementById("setupForm");
+        const alreadySetup = document.getElementById("alreadySetup");
+        const qrImage = document.getElementById("qrImage") as HTMLImageElement | null;
+        const manualSecret = document.getElementById("manualSecret");
+        const setupError = document.getElementById("setupError");
+
+        if (!loading || !qrSection || !setupForm || !alreadySetup || !qrImage || !manualSecret || !setupError) return;
+
+        try {
+          const res = await fetch("/api/auth/setup");
+          const data = await res.json();
+
+          if (data.alreadySetup) {
+            loading.classList.add("hidden");
+            alreadySetup.classList.remove("hidden");
+            return;
+          }
+
+          if (!data.qrDataUrl) {
+            loading.textContent = "Failed to generate QR code. Check server logs.";
+            return;
+          }
+
+          // Show QR
+          qrImage.src = data.qrDataUrl;
+          manualSecret.textContent = data.secret;
+
+          loading.classList.add("hidden");
+          qrSection.classList.remove("hidden");
+          setupForm.classList.remove("hidden");
+        } catch (err) {
+          loading.textContent = "Failed to connect to server. Is the server running?";
+          console.error("[TOTP/Setup] Fetch failed:", err);
+          return;
+        }
+
+        // Handle form submission
+        setupForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const codeInput = document.getElementById("totpCode") as HTMLInputElement | null;
+          if (!codeInput) return;
+          const code = codeInput.value.trim();
+
+          setupError.classList.add("hidden");
+
+          try {
+            const res = await fetch("/api/auth/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ code }),
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.ok) {
+              window.location.href = "/admin";
+            } else if (data.error === "invalid_code") {
+              setupError.textContent = "Invalid code. Try again with the current 6-digit code from your authenticator app.";
+              setupError.classList.remove("hidden");
+            } else {
+              setupError.textContent = data.error || "Verification failed. Try again.";
+              setupError.classList.remove("hidden");
+            }
+          } catch (err) {
+            setupError.textContent = "Connection error. Is the server running?";
+            setupError.classList.remove("hidden");
+            console.error("[TOTP/Setup] Verify failed:", err);
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>
