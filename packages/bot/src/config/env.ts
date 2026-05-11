@@ -18,9 +18,6 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1),
   OPENROUTER_API_KEY: z.string().min(1),
 
-  // Prompt
-  PROMPT_VERSION: z.string().default("v1"),
-
   // Ops
   CACHE_REFRESH_MAX_ROWS: z.coerce.number().int().min(0).max(10000).default(100),
   LOG_RETENTION_DAYS: z.coerce.number().int().min(30).max(365).default(90),

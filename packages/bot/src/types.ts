@@ -19,6 +19,7 @@ export interface CacheKey {
   entryId: bigint;
   roleKey: RoleKey;
   promptVersion: string;
+  promptContentHash: string;
   modelName: string;
 }
 

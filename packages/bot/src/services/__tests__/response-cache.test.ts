@@ -26,14 +26,14 @@ const { mockDb, mockSchema, setDbResults } = vi.hoisted(() => {
     insert: vi.fn(() => qb),
   };
 
-  const schema = {
-    responseCache: {
-      normalizedQuery: "test", dictionaryId: "test",
-      dictionaryEntryId: "test", roleKey: "test",
-      promptVersion: "test", modelName: "test",
-      isManualOverride: "test", query: "test",
-      responseText: "test",
-    },
+    const schema = {
+      responseCache: {
+        normalizedQuery: "test", dictionaryId: "test",
+        dictionaryEntryId: "test", roleKey: "test",
+        promptVersion: "test", promptContentHash: "test", modelName: "test",
+        isManualOverride: "test", query: "test",
+        responseText: "test",
+      },
   };
 
   return {
@@ -57,6 +57,7 @@ const baseKey: CacheKey = {
   entryId: BigInt(100),
   roleKey: "pemula",
   promptVersion: "v1",
+  promptContentHash: "hash-v1",
   modelName: PRIMARY_LLM_MODEL,
 };
 
@@ -74,6 +75,7 @@ describe("getCachedResponse", () => {
       dictionaryEntryId: BigInt(100),
       roleKey: "pemula",
       promptVersion: "v1",
+      promptContentHash: "hash-v1",
       modelName: PRIMARY_LLM_MODEL,
       responseText: "answer",
       isManualOverride: false,
@@ -101,6 +103,7 @@ describe("getCachedResponse", () => {
       dictionaryEntryId: BigInt(100),
       roleKey: "pemula",
       promptVersion: "v1",
+      promptContentHash: "hash-v1",
       modelName: PRIMARY_LLM_MODEL,
       responseText: "manual answer",
       isManualOverride: true,
@@ -139,6 +142,7 @@ describe("saveResponse", () => {
       dictionaryEntryId: BigInt(100),
       roleKey: "pemula",
       promptVersion: "v1",
+      promptContentHash: "hash-v1",
       modelName: PRIMARY_LLM_MODEL,
       responseText: "saved",
       isManualOverride: false,

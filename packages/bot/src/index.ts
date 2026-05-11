@@ -20,7 +20,7 @@ const client = new Client({
 
 client.once("ready", () => {
   console.log(`Bot logged in as ${client.user?.tag}`);
-  console.log(`Prompt version: ${env.PROMPT_VERSION}`);
+  console.log("Prompt source: active prompt row in DB");
 
   // 2分ごとに heartbeat を送信
   setInterval(async () => {

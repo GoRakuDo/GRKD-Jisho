@@ -1,5 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { type Message } from "discord.js";
+import { getActivePrompt } from "@grkd-jisho/db";
 import { env } from "../config/env.js";
 import { PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import { lookupWord } from "../services/dictionary.service.js";
@@ -42,6 +43,38 @@ async function finalizeLookup(
     cacheHit: params.cacheHit,
   });
   await incrementUsage({ userId: message.author.id, guildId });
+}
+
+type ActivePromptContext = {
+  promptVersion: string;
+  promptTemplate: string;
+  promptContentHash: string;
+};
+
+async function loadActivePromptContext(message: Message, traceId: string): Promise<ActivePromptContext | null> {
+  const activePrompt = await getActivePrompt();
+
+  if (!activePrompt) {
+    await traceEvent(traceId, "llm.error", "error", { error: "Active prompt missing" });
+    console.error(`[Lookup] trace=${traceId} active prompt missing → Check prompts table and set one row active`);
+    await message.reply(formatError("有効なプロンプトが見つかりません。管理画面で Active を設定してください。"));
+    return null;
+  }
+
+  if (activePrompt.content.trim().length === 0) {
+    await traceEvent(traceId, "llm.error", "error", { error: `Active prompt empty: ${activePrompt.version}` });
+    console.error(`[Lookup] trace=${traceId} active prompt empty → Check prompts.content for version=${activePrompt.version}`);
+    await message.reply(formatError("有効なプロンプトが空です。管理画面で内容を確認してください。"));
+    return null;
+  }
+
+  const promptContentHash = createHash("sha256").update(activePrompt.content, "utf8").digest("hex");
+  console.log(`[Lookup] trace=${traceId} active prompt loaded → version=${activePrompt.version} hash=${promptContentHash.slice(0, 8)}`);
+  return {
+    promptVersion: activePrompt.version,
+    promptTemplate: activePrompt.content,
+    promptContentHash,
+  };
 }
 
 export const messageCreateHandler = async (message: Message): Promise<void> => {
@@ -133,12 +166,18 @@ async function handleMessage(message: Message): Promise<void> {
       normalizedQuery: result.normalizedQuery,
     });
 
+    const promptContext = await loadActivePromptContext(message, traceId);
+    if (!promptContext) {
+      return;
+    }
+
     const cacheKey = {
       normalizedQuery: result.normalizedQuery,
       dictionaryId: result.dictionary.id,
       entryId: result.entry.id,
       roleKey,
-      promptVersion: env.PROMPT_VERSION,
+      promptVersion: promptContext.promptVersion,
+      promptContentHash: promptContext.promptContentHash,
       modelName: PRIMARY_LLM_MODEL,
     };
 
@@ -159,10 +198,13 @@ async function handleMessage(message: Message): Promise<void> {
       return;
     }
 
-    console.log(`[Lookup] trace=${traceId} cache miss → LLM ${PRIMARY_LLM_MODEL}`);
+    console.log(`[Lookup] trace=${traceId} cache miss → LLM ${PRIMARY_LLM_MODEL} version=${promptContext.promptVersion} hash=${promptContext.promptContentHash.slice(0, 8)}`);
 
     await traceEvent(traceId, "cache.miss", "info", {});
-    await traceEvent(traceId, "llm.generate.started", "info", {});
+    await traceEvent(traceId, "llm.generate.started", "info", {
+      promptVersion: promptContext.promptVersion,
+      promptContentHash: promptContext.promptContentHash,
+    });
     console.log(`[Lookup] trace=${traceId} llm.generate.started`);
 
     try {
@@ -172,7 +214,8 @@ async function handleMessage(message: Message): Promise<void> {
         reading: result.entry.reading,
         dictionaryName: result.dictionary.name,
         definitionJson: JSON.stringify(result.entry.definitionsJson),
-        promptVersion: env.PROMPT_VERSION,
+        promptTemplate: promptContext.promptTemplate,
+        promptVersion: promptContext.promptVersion,
       });
       console.log(`[Lookup] trace=${traceId} llm.generate.success`);
       await traceEvent(traceId, "llm.generated", "info", {});
@@ -280,12 +323,18 @@ async function handleMessage(message: Message): Promise<void> {
     normalizedQuery: result.normalizedQuery,
   });
 
+  const promptContext = await loadActivePromptContext(message, traceId);
+  if (!promptContext) {
+    return;
+  }
+
   const cacheKey = {
     normalizedQuery: result.normalizedQuery,
     dictionaryId: result.dictionary.id,
     entryId: result.entry.id,
     roleKey,
-    promptVersion: env.PROMPT_VERSION,
+    promptVersion: promptContext.promptVersion,
+    promptContentHash: promptContext.promptContentHash,
     modelName: PRIMARY_LLM_MODEL,
   };
 
@@ -305,10 +354,13 @@ async function handleMessage(message: Message): Promise<void> {
     });
     return;
   }
-  console.log(`[Lookup] trace=${traceId} cache miss → LLM ${PRIMARY_LLM_MODEL}`);
+  console.log(`[Lookup] trace=${traceId} cache miss → LLM ${PRIMARY_LLM_MODEL} version=${promptContext.promptVersion} hash=${promptContext.promptContentHash.slice(0, 8)}`);
   await traceEvent(traceId, "cache.miss", "info", {});
 
-  await traceEvent(traceId, "llm.generate.started", "info", {});
+  await traceEvent(traceId, "llm.generate.started", "info", {
+    promptVersion: promptContext.promptVersion,
+    promptContentHash: promptContext.promptContentHash,
+  });
   console.log(`[Lookup] trace=${traceId} llm.generate.started`);
   try {
     const responseText = await generate({
@@ -317,7 +369,8 @@ async function handleMessage(message: Message): Promise<void> {
       reading: result.entry.reading,
       dictionaryName: result.dictionary.name,
       definitionJson: JSON.stringify(result.entry.definitionsJson),
-      promptVersion: env.PROMPT_VERSION,
+      promptTemplate: promptContext.promptTemplate,
+      promptVersion: promptContext.promptVersion,
     });
     console.log(`[Lookup] trace=${traceId} llm.generate.success`);
     await traceEvent(traceId, "llm.generated", "info", {});

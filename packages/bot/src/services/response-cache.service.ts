@@ -13,6 +13,7 @@ export async function getCachedResponse(key: CacheKey) {
         eq(schema.responseCache.dictionaryEntryId, key.entryId),
         eq(schema.responseCache.roleKey, key.roleKey),
         eq(schema.responseCache.promptVersion, key.promptVersion),
+        eq(schema.responseCache.promptContentHash, key.promptContentHash),
         eq(schema.responseCache.modelName, key.modelName),
       ),
     )
@@ -39,6 +40,7 @@ export async function saveResponse(
       dictionaryEntryId: params.entryId,
       roleKey: params.roleKey,
       promptVersion: params.promptVersion,
+      promptContentHash: params.promptContentHash,
       modelName: params.modelName,
       responseText: params.responseText,
     })

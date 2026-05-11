@@ -8,6 +8,7 @@ interface GenerateParams {
   reading: string;
   dictionaryName: string;
   definitionJson: string;
+  promptTemplate: string;
   promptVersion: string;
 }
 
@@ -21,38 +22,6 @@ interface GeminiResponse {
   }>;
 }
 
-const PROMPT_TEMPLATE = `
-あなたは日本語学習者向けの辞書アシスタントです。
-
-主な目的:
-Discordユーザーの日本語レベルに合わせて、辞書定義をわかりやすく説明し、
-L1（インドネシア語）のネガティブ転移を避けるサポートをすること。
-
-重要ルール:
-- 与えられた辞書データだけを根拠にしてください
-- 辞書にない意味を追加しないでください
-- 不明な場合は「辞書情報が不足しています」と言ってください
-- Discord で読みやすい短い回答にしてください
-- ユーザーロールに合わせて難易度を調整してください
-- 内部の思考、下書き、検討メモ、英語のメタコメントは出力しないでください
-- 最終回答のみを出力し、必ず 「【{{query}}】」 から始めてください
-
-プロンプト版: {{prompt_version}}
-ユーザーロール: {{role_key}}
-検索語: {{query}}
-読み: {{reading}}
-辞書ソース: {{dictionary_name}}
-辞書定義: {{definition_json}}
-
-出力形式:
-【{{query}}】
-読み: {{reading}}
-意味:
-わかりやすい説明:
-ニュアンス:
-関連語:
-`;
-
 function shouldUseInsufficientDataFallback(definitionJson: string): boolean {
   const compact = definitionJson.replace(/\s+/g, "");
   return compact.length < 20 && !/example/i.test(definitionJson);
@@ -60,6 +29,16 @@ function shouldUseInsufficientDataFallback(definitionJson: string): boolean {
 
 function buildInsufficientDataReply(query: string): string {
   return `【${query}】\n辞書情報が不足しています。別の単語を調べてみてください。`;
+}
+
+function renderPromptTemplate(promptTemplate: string, params: GenerateParams): string {
+  return promptTemplate
+    .replaceAll("{{role_key}}", params.roleKey)
+    .replaceAll("{{query}}", params.query)
+    .replaceAll("{{reading}}", params.reading)
+    .replaceAll("{{dictionary_name}}", params.dictionaryName)
+    .replaceAll("{{definition_json}}", params.definitionJson)
+    .replaceAll("{{prompt_version}}", params.promptVersion);
 }
 
 export function extractFinalReply(text: string, query: string): string {
@@ -82,23 +61,16 @@ export async function generate(params: GenerateParams): Promise<string> {
     return buildInsufficientDataReply(params.query);
   }
 
-  const prompt = PROMPT_TEMPLATE
-    .replace("{{role_key}}", params.roleKey)
-    .replace("{{query}}", params.query)
-    .replace("{{reading}}", params.reading)
-    .replace("{{dictionary_name}}", params.dictionaryName)
-    .replace("{{definition_json}}", params.definitionJson);
-  
-  const promptWithVersion = prompt.replace("{{prompt_version}}", params.promptVersion);
+  const prompt = renderPromptTemplate(params.promptTemplate, params);
 
   try {
     console.log(`[LLM] Gemini started → model=${PRIMARY_LLM_MODEL}`);
-    return extractFinalReply(await callGemini(promptWithVersion), params.query);
+    return extractFinalReply(await callGemini(prompt), params.query);
   } catch (err) {
     console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY or Gemma 4 model access, falling back to OpenRouter`);
     try {
       console.log(`[LLM] OpenRouter started → model=${FALLBACK_LLM_MODEL}`);
-      return extractFinalReply(await callOpenRouter(promptWithVersion), params.query);
+      return extractFinalReply(await callOpenRouter(prompt), params.query);
     } catch (openRouterErr) {
       console.error(`[LLM] OpenRouter failed: ${openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr)} → Check OPENROUTER_API_KEY or OpenRouter model access`);
       throw openRouterErr;

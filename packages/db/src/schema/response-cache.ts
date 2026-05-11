@@ -17,6 +17,7 @@ export const responseCache = pgTable(
       .references(() => dictionaryEntries.id),
     roleKey: text("role_key").notNull(),
     promptVersion: text("prompt_version").notNull(),
+    promptContentHash: text("prompt_content_hash").notNull(),
     modelName: text("model_name").notNull(),
     responseText: text("response_text").notNull(),
     isManualOverride: boolean("is_manual_override").notNull().default(false),
@@ -30,6 +31,7 @@ export const responseCache = pgTable(
       table.dictionaryEntryId,
       table.roleKey,
       table.promptVersion,
+      table.promptContentHash,
       table.modelName
     ),
   ]
