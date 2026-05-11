@@ -26,7 +26,7 @@ export const GET: APIRoute = async (context) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("[RoleBindings] GET failed:", err instanceof Error ? err.message : err);
+    console.error(`[RoleBindings] GET failed: ${err instanceof Error ? err.message : err} → Check guild bindings in DB`);
     return new Response(JSON.stringify({ error: "Failed to fetch bindings" }), { status: 500 });
   }
 };
@@ -70,7 +70,7 @@ export const PUT: APIRoute = async (context) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("[RoleBindings] PUT failed:", err instanceof Error ? err.message : err);
+    console.error(`[RoleBindings] PUT failed: ${err instanceof Error ? err.message : err} → Check request body or DB constraints`);
     return new Response(JSON.stringify({ error: "Failed to upsert binding" }), { status: 500 });
   }
 };
@@ -105,7 +105,7 @@ export const DELETE: APIRoute = async (context) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("[RoleBindings] DELETE failed:", err instanceof Error ? err.message : err);
+    console.error(`[RoleBindings] DELETE failed: ${err instanceof Error ? err.message : err} → Check id param and guild bindings`);
     return new Response(JSON.stringify({ error: "Failed to delete binding" }), { status: 500 });
   }
 };

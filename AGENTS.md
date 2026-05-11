@@ -36,7 +36,7 @@ LLMは、DBから取得した定義の説明係に限定する。
 | ORM | Drizzle ORM |
 | Package Manager | pnpm workspaces |
 | LLM | Gemini primary / OpenRouter fallback |
-| Web UI | Astro + React islands |
+| Web UI | Astro + React islands（複雑なテーブル操作・モーダルは vanilla JS `<script>` を許容） |
 | Agent Control Plane | MCP Server (Node.js + TypeScript) |
 | Local infra | Docker Compose |
 
@@ -212,8 +212,9 @@ Botは許可チャンネルでのみ反応する。
 
 ```txt
 mention検知
+-> DM owner 判定（config の固定ユーザーIDに合致すれば DM を通す、その他 DM はブロック）
 -> query抽出
--> channel guard
+-> channel guard（DM はスキップ）
 -> rate limit check
 -> dictionary lookup
 -> role_key resolve
