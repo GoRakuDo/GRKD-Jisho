@@ -72,9 +72,6 @@ if (session?.isAdmin) {
       client:load
       entries={searchResults}
       csrfToken={csrfToken}
-      onDeleted={() => {
-        // Cache entries deleted; user can refresh or continue searching
-      }}
     />
   )}
 

@@ -1,4 +1,4 @@
-import { eq, and, sql, count, ilike } from "drizzle-orm";
+import { eq, and, count, ilike, inArray } from "drizzle-orm";
 import { db } from "../../index";
 import * as schema from "../../schema";
 
@@ -72,10 +72,7 @@ export async function bulkDeleteCache(ids: string[]): Promise<number> {
   const result = await db
     .delete(schema.responseCache)
     .where(
-      and(
-        sql`${schema.responseCache.id} IN ${numericIds}`,
-        eq(schema.responseCache.isManualOverride, false),
-      ),
+      and(inArray(schema.responseCache.id, numericIds), eq(schema.responseCache.isManualOverride, false)),
     )
     .returning({ id: schema.responseCache.id });
 
