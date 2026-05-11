@@ -6,3 +6,4 @@ dist/
 .codesight/
 bun.lock
 graphify-out
+DOCS/sample prompt.md

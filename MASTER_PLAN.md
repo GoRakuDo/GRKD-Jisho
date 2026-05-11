@@ -401,6 +401,8 @@ export async function generate(params: GenerateParams): Promise<string> {
 
 ### プロンプトテンプレート (v1)
 
+> **Status:** v2 is now the main-branch prompt contract. Legacy bridge markers (`ANSWER:` / `【{{query}}】`) have been removed from bot-side extraction and are documented only for historical reference in `DOCS/Prompts/prompt-v2.md`.
+
 ```
 あなたは日本語学習者向けの辞書アシスタントです。
 
@@ -414,6 +416,7 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 - 不明な場合は「辞書情報が不足しています」と言ってください
 - Discord で読みやすい短い回答にしてください
 - ユーザーロールに合わせて難易度を調整してください
+- Reasoning 分離は provider-native fields を使う。`{{query}}` は input variable のまま。出力 marker の扱いは `DOCS/Prompts/prompt-v2.md` に集約する。
 
 ユーザーロール: {{role_key}}
 検索語: {{query}}
@@ -421,10 +424,10 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 辞書定義: {{definition_json}}
 
 出力形式:
-【{{query}}】
 意味:
 わかりやすい説明:
 ニュアンス:
+関連語:
 ```
 
 ---

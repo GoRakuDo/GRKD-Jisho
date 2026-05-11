@@ -17,35 +17,61 @@ interface GeminiResponse {
     content?: {
       parts?: Array<{
         text?: string;
+        thought?: boolean;
       }>;
     };
   }>;
 }
 
-const ANSWER_SECTION_CONTRACT = `REASONING:
-- Tulis catatan penalaran singkat untuk model saja.
-- Jangan campurkan reasoning ke jawaban akhir.
-
-ANSWER:
-- Tulis kartu final saja.
-- Baris pertama harus dimulai persis dengan 【{{query}}】
-- Bagian ini yang akan dipakai bot.`;
+interface OpenRouterResponse {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+      reasoning?: string | null;
+      reasoning_details?: unknown;
+    };
+  }>;
+}
 
 function shouldUseInsufficientDataFallback(definitionJson: string): boolean {
-  const compact = definitionJson.replace(/\s+/g, "");
-  return compact.length < 20 && !/example/i.test(definitionJson);
+  if (definitionJson.replace(/\s+/g, "").length >= 20) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(definitionJson) as unknown;
+    return !hasExampleSentences(parsed);
+  } catch {
+    return true;
+  }
+}
+
+function hasExampleSentences(value: unknown): boolean {
+  if (typeof value === "string") {
+    return /example|examples|例文|用例/i.test(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => hasExampleSentences(item));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.entries(value).some(([key, child]) => /example/i.test(key) || hasExampleSentences(child));
+  }
+
+  return false;
 }
 
 function buildInsufficientDataReply(query: string): string {
   return `【${query}】\n辞書情報が不足しています。別の単語を調べてみてください。`;
 }
 
-export function buildPromptTemplate(promptTemplate: string): string {
-  return `${promptTemplate.trim()}\n\n${ANSWER_SECTION_CONTRACT}`;
+export function normalizePromptTemplate(promptTemplate: string): string {
+  return promptTemplate.trim();
 }
 
 function renderPromptTemplate(promptTemplate: string, params: GenerateParams): string {
-  return promptTemplate
+  return normalizePromptTemplate(promptTemplate)
     .replaceAll("{{role_key}}", params.roleKey)
     .replaceAll("{{query}}", params.query)
     .replaceAll("{{reading}}", params.reading)
@@ -54,30 +80,32 @@ function renderPromptTemplate(promptTemplate: string, params: GenerateParams): s
     .replaceAll("{{prompt_version}}", params.promptVersion);
 }
 
-function extractAnswerSection(text: string): string {
-  const trimmed = text.trim();
-  const answerMarker = trimmed.match(/(?:^|\n)ANSWER\s*:\s*/i);
+function extractGeminiAnswer(data: GeminiResponse): string {
+  const parts = data.candidates?.[0]?.content?.parts ?? [];
+  const answerParts = parts.filter((part) => !part.thought);
+  const answerText = answerParts.map((part) => part.text ?? "").join("").trim();
 
-  if (!answerMarker || answerMarker.index === undefined) {
-    return trimmed;
+  if (!answerText) {
+    throw new Error("Gemini returned empty answer part");
   }
 
-  return trimmed.slice(answerMarker.index + answerMarker[0].length).trim();
+  const thoughtParts = parts.filter((part) => part.thought && typeof part.text === "string" && part.text.trim().length > 0);
+  if (thoughtParts.length > 0) {
+    console.debug(`[LLM] Gemini reasoning separated → thoughtParts=${thoughtParts.length}`);
+  }
+
+  return answerText;
 }
 
-export function extractFinalReply(text: string, query: string): string {
-  const trimmed = extractAnswerSection(text);
-  const explicitStart = trimmed.indexOf(`【${query}】`);
-  if (explicitStart >= 0) {
-    return trimmed.slice(explicitStart).trim();
+function extractOpenRouterAnswer(data: OpenRouterResponse): string {
+  const message = data.choices?.[0]?.message;
+  const answerText = message?.content?.trim() ?? "";
+
+  if (!answerText) {
+    throw new Error("OpenRouter returned empty answer content");
   }
 
-  const genericStart = trimmed.indexOf("【");
-  if (genericStart >= 0) {
-    return trimmed.slice(genericStart).trim();
-  }
-
-  return trimmed;
+  return answerText;
 }
 
 export async function generate(params: GenerateParams): Promise<string> {
@@ -89,12 +117,12 @@ export async function generate(params: GenerateParams): Promise<string> {
 
   try {
     console.log(`[LLM] Gemini started → model=${PRIMARY_LLM_MODEL}`);
-    return extractFinalReply(await callGemini(prompt), params.query);
+    return await callGemini(prompt);
   } catch (err) {
     console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY or Gemma 4 model access, falling back to OpenRouter`);
     try {
       console.log(`[LLM] OpenRouter started → model=${FALLBACK_LLM_MODEL}`);
-      return extractFinalReply(await callOpenRouter(prompt), params.query);
+      return await callOpenRouter(prompt);
     } catch (openRouterErr) {
       console.error(`[LLM] OpenRouter failed: ${openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr)} → Check OPENROUTER_API_KEY or OpenRouter model access`);
       throw openRouterErr;
@@ -121,6 +149,7 @@ async function callGemini(prompt: string): Promise<string> {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           thinkingConfig: {
+            includeThoughts: true,
             thinkingLevel: "HIGH",
           },
         },
@@ -132,9 +161,7 @@ async function callGemini(prompt: string): Promise<string> {
     }
 
     const data = (await response.json()) as GeminiResponse;
-
-    const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("").trim();
-    if (!text) throw new Error("Gemini returned empty response");
+    const text = extractGeminiAnswer(data);
     console.log(`[LLM] Gemini success → model=${PRIMARY_LLM_MODEL}`);
     return text;
   } catch (err) {
@@ -163,7 +190,8 @@ async function callOpenRouter(prompt: string): Promise<string> {
         model: FALLBACK_LLM_MODEL,
         messages: [{ role: "user", content: prompt }],
         reasoning: {
-          effort: "high",
+          max_tokens: 4096,
+          exclude: true,
         },
       }),
     });
@@ -172,11 +200,8 @@ async function callOpenRouter(prompt: string): Promise<string> {
       throw new Error(`OpenRouter error: ${response.status} ${await response.text()}`);
     }
 
-    const data = await response.json();
-    const text = data?.choices?.[0]?.message?.content;
-    if (typeof text !== "string" || !text) {
-      throw new Error("OpenRouter returned empty response");
-    }
+    const data = (await response.json()) as OpenRouterResponse;
+    const text = extractOpenRouterAnswer(data);
     console.log(`[LLM] OpenRouter success → model=${FALLBACK_LLM_MODEL}`);
     return text;
   } catch (err) {

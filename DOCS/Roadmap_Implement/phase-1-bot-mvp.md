@@ -530,10 +530,12 @@ export async function saveResponse(params: CacheKey & { responseText: string }) 
 
 `packages/bot/src/services/llm.service.ts` を作成する。
 
+> **Legacy reference only:** the snippet below reflects the older bridge template that existed before provider-native separation. For the improved v2 prompt format, see `DOCS/Prompts/prompt-v2.md`.
+
 **責務:**
 - Gemini API を呼び出し
 - Gemini 失敗 → OpenRouter フォールバック
-- プロンプトテンプレート `v1` を適用
+- プロンプトテンプレート `v1` を適用（legacy reference）
 - `model_name` の追跡
 
 ```typescript
@@ -563,7 +565,7 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 - Discord で読みやすい短い回答にしてください
 - ユーザーロールに合わせて難易度を調整してください
 - 内部の思考、下書き、検討メモ、英語のメタコメントは出力しないでください
-- 最終回答のみを出力し、必ず `【{{query}}】` から始めてください
+- Reasoning 分離は provider-native fields を使う。`{{query}}` は input variable のまま。出力 marker の詳細は `DOCS/Prompts/prompt-v2.md` を参照してください。
 
 プロンプト版: {{prompt_version}}
 
@@ -574,7 +576,6 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 辞書定義: {{definition_json}}
 
 出力形式:
-【{{query}}】
 読み: {{reading}}
 意味:
 わかりやすい説明:

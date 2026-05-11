@@ -14,17 +14,21 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 - 不明な場合は「辞書情報が不足しています」と言ってください
 - Discord で読みやすい短い回答にしてください
 - ユーザーロールに合わせて難易度を調整してください
+- 内部の思考、下書き、検討メモ、英語のメタコメントは出力しないでください
+- Reasoning は provider-native の field で扱い、テキストの ANSWER や query header は出力しないでください
 
 ユーザーロール: {{role_key}}
 検索語: {{query}}
+読み: {{reading}}
 辞書ソース: {{dictionary_name}}
 辞書定義: {{definition_json}}
 
 出力形式:
-【{{query}}】
 意味:
 わかりやすい説明:
 ニュアンス:
+関連語:
+出典: {{dictionary_name}}
 `.trim();
 
 async function seedDefaults() {
