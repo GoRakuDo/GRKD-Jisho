@@ -67,11 +67,15 @@ if (!session?.isAdmin) {
             <tbody>
               <tr class="var-tr">
                 <td class="var-td var-code">{'{{role_key}}'}</td>
-                <td class="var-td var-desc">User's Discord role &mdash; <span class="mono text-graphite-600">pemula</span>, <span class="mono text-graphite-600">pemula_atas</span>, <span class="mono text-graphite-600">menengah</span>, <span class="mono text-graphite-600">mahir</span></td>
+                <td class="var-td var-desc">User's Discord role &mdash; <span class="mono text-graphite-600">pemula</span>, <span class="mono text-graphite-600">pemula-atas</span>, <span class="mono text-graphite-600">menengah</span>, <span class="mono text-graphite-600">mahir</span></td>
               </tr>
               <tr class="var-tr">
                 <td class="var-td var-code">{'{{query}}'}</td>
                 <td class="var-td var-desc">The word or phrase the user searched for</td>
+              </tr>
+              <tr class="var-tr">
+                <td class="var-td var-code">{'{{reading}}'}</td>
+                <td class="var-td var-desc">Reading or pronunciation of the queried word</td>
               </tr>
               <tr class="var-tr">
                 <td class="var-td var-code">{'{{dictionary_name}}'}</td>
@@ -84,10 +88,6 @@ if (!session?.isAdmin) {
               <tr class="var-tr">
                 <td class="var-td var-code">{'{{prompt_version}}'}</td>
                 <td class="var-td var-desc">Current prompt version label</td>
-              </tr>
-              <tr class="var-tr">
-                <td class="var-td var-code">{'{{current_date}}'}</td>
-                <td class="var-td var-desc">Today's date for time-sensitive instructions</td>
               </tr>
             </tbody>
           </table>
