@@ -44,6 +44,81 @@ if (session?.isAdmin) {
 ---
 
 <AdminLayout title="Cache" active="cache">
+  <details class="activity-card" open>
+    <summary class="activity-summary">
+      <span>
+        <span class="activity-kicker">Recent Cache Activity</span>
+        <span class="activity-title">Latest additions and edits</span>
+      </span>
+      <span class="activity-meta">{recentActivity.length.toLocaleString()} items</span>
+    </summary>
+
+    {recentActivityError ? (
+      <div class="activity-empty">
+        <p class="activity-empty-title">Failed to load activity</p>
+        <p class="activity-empty-text">{recentActivityError}</p>
+      </div>
+    ) : recentActivity.length > 0 ? (
+      <div class="activity-table-wrap">
+        <p class="activity-note">Prompt version reflects the cache row at display time, so older edits may be shown against a newer active version.</p>
+        <table class="activity-table">
+          <thead>
+            <tr>
+              <th class="col-no" scope="col">No.</th>
+              <th class="col-time" scope="col">Date &amp; time</th>
+              <th class="col-query" scope="col">Query</th>
+              <th class="col-state" scope="col">State</th>
+              <th class="col-prompt" scope="col">Prompt version</th>
+              <th class="col-role" scope="col">Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentActivity.map((entry, index) => (
+              <tr class={entry.activity === "edited" ? "row-edited" : "row-added"}>
+                <td class="col-no mono">{index + 1}</td>
+                <td class="col-time mono">
+                  {entry.createdAt
+                    ? new Intl.DateTimeFormat("ja-JP", {
+                        timeZone: "Asia/Jakarta",
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      }).format(entry.createdAt)
+                    : "—"}
+                </td>
+                <td class="col-query">
+                  <span class="query-cell" title={entry.query}>{entry.query}</span>
+                </td>
+                <td class="col-state">
+                  <span
+                    class={`state-pill ${entry.activity === "edited" ? "state-edited" : "state-added"}`}
+                    title={entry.activity === "edited" ? "Cache edit event" : "Cache addition event"}
+                  >
+                    {entry.activity === "edited" ? "Edited" : "Added"}
+                  </span>
+                </td>
+                <td class="col-prompt mono">
+                  <span class="prompt-pill" title="Current cache row prompt version">{entry.promptVersion}</span>
+                </td>
+                <td class="col-role">
+                  <span class="role-pill">{entry.roleKey}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <div class="activity-empty">
+        <p class="activity-empty-title">No recent activity yet</p>
+        <p class="activity-empty-text">New cache additions and edits will appear here as they happen.</p>
+      </div>
+    )}
+  </details>
+
   {!query && (
     <div class="stats-row">
       <div class="stat-card">
@@ -118,80 +193,6 @@ if (session?.isAdmin) {
     </div>
   )}
 
-  <details class="activity-card" open>
-    <summary class="activity-summary">
-      <span>
-        <span class="activity-kicker">Recent Cache Activity</span>
-        <span class="activity-title">Latest additions and edits</span>
-      </span>
-      <span class="activity-meta">{recentActivity.length.toLocaleString()} items</span>
-    </summary>
-
-    {recentActivityError ? (
-      <div class="activity-empty">
-        <p class="activity-empty-title">Failed to load activity</p>
-        <p class="activity-empty-text">{recentActivityError}</p>
-      </div>
-    ) : recentActivity.length > 0 ? (
-      <div class="activity-table-wrap">
-        <p class="activity-note">Prompt version reflects the cache row at display time, so older edits may be shown against a newer active version.</p>
-        <table class="activity-table">
-          <thead>
-            <tr>
-              <th class="col-no">No.</th>
-              <th class="col-time">Date &amp; time</th>
-              <th class="col-query">Query</th>
-              <th class="col-state">State</th>
-              <th class="col-prompt">Prompt version</th>
-              <th class="col-role">Role</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recentActivity.map((entry, index) => (
-              <tr class={entry.activity === "edited" ? "row-edited" : "row-added"}>
-                <td class="col-no mono">{index + 1}</td>
-                <td class="col-time mono">
-                  {entry.createdAt
-                    ? new Intl.DateTimeFormat("ja-JP", {
-                        timeZone: "Asia/Jakarta",
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      }).format(entry.createdAt)
-                    : "—"}
-                </td>
-                <td class="col-query">
-                  <span class="query-cell" title={entry.query}>{entry.query}</span>
-                </td>
-                <td class="col-state">
-                  <span
-                    class={`state-pill ${entry.activity === "edited" ? "state-edited" : "state-added"}`}
-                    title={entry.activity === "edited" ? "Cache edit event" : "Cache addition event"}
-                  >
-                    {entry.activity === "edited" ? "Edited" : "Added"}
-                  </span>
-                </td>
-                <td class="col-prompt mono">
-                  <span class="prompt-pill" title="Current cache row prompt version">{entry.promptVersion}</span>
-                </td>
-                <td class="col-role">
-                  <span class="role-pill">{entry.roleKey}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    ) : (
-      <div class="activity-empty">
-        <p class="activity-empty-title">No recent activity yet</p>
-        <p class="activity-empty-text">New cache additions and edits will appear here as they happen.</p>
-      </div>
-    )}
-  </details>
 </AdminLayout>
 
 <style>
@@ -481,7 +482,7 @@ if (session?.isAdmin) {
   }
 
   .activity-card {
-    margin-top: 20px;
+    margin-bottom: 20px;
     border: 1px solid var(--color-graphite-180);
     border-radius: var(--radius-panel);
     background: linear-gradient(180deg, var(--color-porcelain-100), var(--color-porcelain-50));
@@ -501,6 +502,18 @@ if (session?.isAdmin) {
 
   .activity-summary::-webkit-details-marker {
     display: none;
+  }
+
+  .activity-summary::after {
+    content: "▾";
+    margin-left: auto;
+    font-size: 14px;
+    color: var(--color-graphite-400);
+    transition: transform 0.15s ease;
+  }
+
+  details[open] .activity-summary::after {
+    transform: rotate(180deg);
   }
 
   .activity-kicker {
@@ -556,6 +569,7 @@ if (session?.isAdmin) {
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+    text-align: center;
   }
 
   .activity-table td {
@@ -564,6 +578,7 @@ if (session?.isAdmin) {
     color: var(--color-graphite-800);
     font-size: 14px;
     vertical-align: middle;
+    text-align: center;
   }
 
   .activity-table tbody tr:hover {
