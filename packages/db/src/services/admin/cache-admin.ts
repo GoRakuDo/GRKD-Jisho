@@ -1,4 +1,4 @@
-import { eq, and, count, ilike, inArray } from "drizzle-orm";
+import { eq, and, count, ilike, inArray, desc } from "drizzle-orm";
 import { db } from "../../index";
 import * as schema from "../../schema";
 
@@ -88,4 +88,71 @@ export async function bulkDeleteCache(ids: string[]): Promise<number> {
   });
 
   return result.length;
+}
+
+export interface RecentCacheActivityRow {
+  activity: "added" | "edited";
+  query: string;
+  roleKey: string;
+  promptVersion: string;
+  createdAt: Date | null;
+}
+
+export async function getRecentCacheActivity(limit = 10): Promise<RecentCacheActivityRow[]> {
+  const safeLimit = Number.isFinite(limit) ? Math.floor(limit) : 10;
+  if (safeLimit <= 0) {
+    return [];
+  }
+
+  const fetchLimit = Math.min(safeLimit, 100);
+
+  const [addedRows, editedRows] = await Promise.all([
+    db
+      .select({
+        query: schema.responseCache.query,
+        roleKey: schema.responseCache.roleKey,
+        promptVersion: schema.responseCache.promptVersion,
+        createdAt: schema.responseCache.createdAt,
+      })
+      .from(schema.responseCache)
+      .orderBy(desc(schema.responseCache.createdAt))
+      .limit(fetchLimit),
+    db
+      .select({
+        query: schema.responseCache.query,
+        roleKey: schema.responseCache.roleKey,
+        promptVersion: schema.responseCache.promptVersion,
+        createdAt: schema.responseEdits.createdAt,
+      })
+      .from(schema.responseEdits)
+      .innerJoin(
+        schema.responseCache,
+        eq(schema.responseEdits.responseCacheId, schema.responseCache.id),
+      )
+      .orderBy(desc(schema.responseEdits.createdAt))
+      .limit(fetchLimit),
+  ]);
+
+  const merged = [
+    ...addedRows.map((row) => ({
+      activity: "added" as const,
+      query: row.query,
+      roleKey: row.roleKey,
+      promptVersion: row.promptVersion,
+      createdAt: row.createdAt,
+    })),
+    ...editedRows.map((row) => ({
+      activity: "edited" as const,
+      query: row.query,
+      roleKey: row.roleKey,
+      promptVersion: row.promptVersion,
+      createdAt: row.createdAt,
+    })),
+  ].sort((a, b) => {
+    const timeA = a.createdAt?.getTime() ?? 0;
+    const timeB = b.createdAt?.getTime() ?? 0;
+    return timeB - timeA;
+  });
+
+  return merged.slice(0, limit);
 }

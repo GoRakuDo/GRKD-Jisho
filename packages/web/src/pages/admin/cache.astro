@@ -1,7 +1,7 @@
 ---
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
-import { getCacheStats, searchCacheEntries } from "@grkd-jisho/db";
+import { getCacheStats, getRecentCacheActivity, searchCacheEntries } from "@grkd-jisho/db";
 import { CacheDeletePanel } from "../../components/admin/CacheDeletePanel";
 import { generateCsrfToken } from "../../lib/csrf";
 
@@ -14,6 +14,8 @@ let total = 0;
 let manualOverride = 0;
 let deletable = 0;
 let searchResults: Awaited<ReturnType<typeof searchCacheEntries>> = [];
+let recentActivity: Awaited<ReturnType<typeof getRecentCacheActivity>> = [];
+let recentActivityError = "";
 
 if (session?.isAdmin) {
   try {
@@ -25,9 +27,18 @@ if (session?.isAdmin) {
       manualOverride = stats.manualOverride;
       deletable = stats.deletable;
     }
+
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[Cache] SSR error: ${reason} → Check DB connection and cache-admin service availability`);
+  }
+
+  try {
+    recentActivity = await getRecentCacheActivity(8);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    recentActivityError = reason;
+    console.error(`[Cache] Recent activity SSR error: ${reason} → Check response_cache and response_edits availability`);
   }
 }
 ---
@@ -106,6 +117,81 @@ if (session?.isAdmin) {
       </ul>
     </div>
   )}
+
+  <details class="activity-card" open>
+    <summary class="activity-summary">
+      <span>
+        <span class="activity-kicker">Recent Cache Activity</span>
+        <span class="activity-title">Latest additions and edits</span>
+      </span>
+      <span class="activity-meta">{recentActivity.length.toLocaleString()} items</span>
+    </summary>
+
+    {recentActivityError ? (
+      <div class="activity-empty">
+        <p class="activity-empty-title">Failed to load activity</p>
+        <p class="activity-empty-text">{recentActivityError}</p>
+      </div>
+    ) : recentActivity.length > 0 ? (
+      <div class="activity-table-wrap">
+        <p class="activity-note">Prompt version reflects the cache row at display time, so older edits may be shown against a newer active version.</p>
+        <table class="activity-table">
+          <thead>
+            <tr>
+              <th class="col-no">No.</th>
+              <th class="col-time">Date &amp; time</th>
+              <th class="col-query">Query</th>
+              <th class="col-state">State</th>
+              <th class="col-prompt">Prompt version</th>
+              <th class="col-role">Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentActivity.map((entry, index) => (
+              <tr class={entry.activity === "edited" ? "row-edited" : "row-added"}>
+                <td class="col-no mono">{index + 1}</td>
+                <td class="col-time mono">
+                  {entry.createdAt
+                    ? new Intl.DateTimeFormat("ja-JP", {
+                        timeZone: "Asia/Jakarta",
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      }).format(entry.createdAt)
+                    : "—"}
+                </td>
+                <td class="col-query">
+                  <span class="query-cell" title={entry.query}>{entry.query}</span>
+                </td>
+                <td class="col-state">
+                  <span
+                    class={`state-pill ${entry.activity === "edited" ? "state-edited" : "state-added"}`}
+                    title={entry.activity === "edited" ? "Cache edit event" : "Cache addition event"}
+                  >
+                    {entry.activity === "edited" ? "Edited" : "Added"}
+                  </span>
+                </td>
+                <td class="col-prompt mono">
+                  <span class="prompt-pill" title="Current cache row prompt version">{entry.promptVersion}</span>
+                </td>
+                <td class="col-role">
+                  <span class="role-pill">{entry.roleKey}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <div class="activity-empty">
+        <p class="activity-empty-title">No recent activity yet</p>
+        <p class="activity-empty-text">New cache additions and edits will appear here as they happen.</p>
+      </div>
+    )}
+  </details>
 </AdminLayout>
 
 <style>
@@ -392,5 +478,172 @@ if (session?.isAdmin) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .activity-card {
+    margin-top: 20px;
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-panel);
+    background: linear-gradient(180deg, var(--color-porcelain-100), var(--color-porcelain-50));
+    overflow: hidden;
+  }
+
+  .activity-summary {
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: center;
+    padding: 18px 20px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .activity-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .activity-kicker {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-royal-blue-600);
+  }
+
+  .activity-title {
+    display: block;
+    margin-top: 4px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-graphite-900);
+  }
+
+  .activity-meta {
+    flex: none;
+    border-radius: 999px;
+    padding: 6px 12px;
+    background: var(--color-royal-blue-100);
+    color: var(--color-royal-blue-700);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .activity-table-wrap {
+    overflow-x: auto;
+  }
+
+  .activity-note {
+    margin: 0;
+    padding: 14px 20px 0;
+    font-size: 12px;
+    color: var(--color-graphite-500);
+  }
+
+  .activity-table {
+    width: 100%;
+    min-width: 920px;
+    border-collapse: collapse;
+  }
+
+  .activity-table th {
+    padding: 12px 16px;
+    background: var(--color-porcelain-150);
+    border-bottom: 1px solid var(--color-graphite-180);
+    color: var(--color-graphite-500);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .activity-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--color-graphite-180);
+    color: var(--color-graphite-800);
+    font-size: 14px;
+    vertical-align: middle;
+  }
+
+  .activity-table tbody tr:hover {
+    background: var(--color-porcelain-150);
+  }
+
+  .activity-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .row-edited {
+    box-shadow: inset 3px 0 0 var(--color-royal-blue-600);
+  }
+
+  .row-added {
+    box-shadow: inset 3px 0 0 var(--color-success-600);
+  }
+
+  .state-pill,
+  .prompt-pill,
+  .role-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .state-pill {
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .state-added {
+    background: var(--color-success-100);
+    color: var(--color-success-600);
+  }
+
+  .state-edited {
+    background: var(--color-royal-blue-100);
+    color: var(--color-royal-blue-700);
+  }
+
+  .prompt-pill {
+    padding: 4px 10px;
+    background: var(--color-porcelain-150);
+    border: 1px solid var(--color-graphite-180);
+    color: var(--color-graphite-650);
+  }
+
+  .role-pill {
+    padding: 4px 10px;
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    color: var(--color-graphite-800);
+    font-weight: 500;
+  }
+
+  .activity-empty {
+    padding: 28px 20px 30px;
+    text-align: center;
+  }
+
+  .activity-empty-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+  }
+
+  .activity-empty-text {
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: var(--color-graphite-500);
+  }
+
+  @media (max-width: 900px) {
+    .activity-summary {
+      align-items: flex-start;
+      flex-direction: column;
+    }
   }
 </style>
