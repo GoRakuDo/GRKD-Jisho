@@ -601,7 +601,7 @@ export async function generate(params: GenerateParams): Promise<string> {
 
 async function callGemini(prompt: string): Promise<string> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45_000);
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
 
   try {
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${PRIMARY_LLM_MODEL}:generateContent`, {
@@ -615,6 +615,7 @@ async function callGemini(prompt: string): Promise<string> {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           thinkingConfig: {
+            includeThoughts: true,
             thinkingLevel: "HIGH",
           },
         },
@@ -633,29 +634,45 @@ async function callGemini(prompt: string): Promise<string> {
 }
 
 async function callOpenRouter(prompt: string): Promise<string> {
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "openrouter/free",
-      messages: [{ role: "user", content: prompt }],
-      reasoning: {
-        effort: "high",
-      },
-    }),
-  });
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 150_000);
 
-  if (!response.ok) {
-    throw new Error(`OpenRouter error: ${response.status} ${await response.text()}`);
+    try {
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: "openrouter/free",
+          messages: [{ role: "user", content: prompt }],
+          reasoning: {
+            exclude: true,
+            max_tokens: 4096,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter error: ${response.status} ${await response.text()}`);
+      }
+
+      const data = await response.json();
+      const text: string | undefined = data.choices?.[0]?.message?.content;
+      if (!text) throw new Error("OpenRouter returned empty response");
+      return text;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError" && attempt < 3) {
+        continue;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
-
-  const data = await response.json();
-  const text: string | undefined = data.choices?.[0]?.message?.content;
-  if (!text) throw new Error("OpenRouter returned empty response");
-  return text;
 }
 ```
 
@@ -1329,7 +1346,7 @@ client.once("ready", () => {
   // 30秒ごとにジョブをポーリング
   setInterval(async () => {
     await pollAndExecuteJobs();
-  }, 45_000); // 45秒
+  }, 60_000); // 60秒
 });
 ```
 

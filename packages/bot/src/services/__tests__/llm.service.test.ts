@@ -194,4 +194,44 @@ describe("generate", () => {
     expect(requestBody.reasoning?.max_tokens).toBe(4096);
     expect(requestBody.reasoning?.exclude).toBe(true);
   });
+
+  it("OpenRouter は timeout 時に 3 回までリトライする", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
+      .mockRejectedValue(new DOMException("The operation was aborted.", "AbortError"));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(generate({
+      roleKey: "pemula",
+      query: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    })).rejects.toThrow(/OpenRouter request timed out after 150 seconds/i);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("OpenRouter の 500 エラーは即失敗し、リトライしない", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
+      .mockResolvedValueOnce(new Response("OpenRouter failed", { status: 500 }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(generate({
+      roleKey: "pemula",
+      query: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    })).rejects.toThrow(/OpenRouter error: 500/i);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

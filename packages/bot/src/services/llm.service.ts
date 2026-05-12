@@ -2,6 +2,10 @@ import { env } from "../config/env.js";
 import { FALLBACK_LLM_MODEL, PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import type { RoleKey } from "../types.js";
 
+const GEMINI_TIMEOUT_MS = 60_000;
+const OPENROUTER_TIMEOUT_MS = 150_000;
+const OPENROUTER_MAX_ATTEMPTS = 3;
+
 interface GenerateParams {
   roleKey: RoleKey;
   query: string;
@@ -130,9 +134,13 @@ export async function generate(params: GenerateParams): Promise<string> {
   }
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
 async function callGemini(prompt: string): Promise<string> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45_000);
+  const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
 
   try {
     const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${PRIMARY_LLM_MODEL}:generateContent`);
@@ -165,8 +173,8 @@ async function callGemini(prompt: string): Promise<string> {
     console.log(`[LLM] Gemini success → model=${PRIMARY_LLM_MODEL}`);
     return text;
   } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error("Gemini request timed out after 45 seconds");
+    if (isAbortError(err)) {
+      throw new Error(`Gemini request timed out after ${GEMINI_TIMEOUT_MS / 1000} seconds`);
     }
     throw err;
   } finally {
@@ -175,8 +183,35 @@ async function callGemini(prompt: string): Promise<string> {
 }
 
 async function callOpenRouter(prompt: string): Promise<string> {
+  let lastTimeoutError: Error | null = null;
+
+  for (let attempt = 1; attempt <= OPENROUTER_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      console.log(`[LLM] OpenRouter started → model=${FALLBACK_LLM_MODEL} attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}`);
+      const text = await callOpenRouterOnce(prompt);
+      console.log(`[LLM] OpenRouter success → model=${FALLBACK_LLM_MODEL} attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}`);
+      return text;
+    } catch (err) {
+      if (!isAbortError(err)) {
+        throw err;
+      }
+
+      lastTimeoutError = new Error(`OpenRouter request timed out after ${OPENROUTER_TIMEOUT_MS / 1000} seconds (attempt ${attempt}/${OPENROUTER_MAX_ATTEMPTS})`);
+      if (attempt < OPENROUTER_MAX_ATTEMPTS) {
+        console.warn(`[LLM] OpenRouter timeout → attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}, retrying`);
+        continue;
+      }
+
+      throw lastTimeoutError;
+    }
+  }
+
+  throw lastTimeoutError ?? new Error(`OpenRouter request timed out after ${OPENROUTER_TIMEOUT_MS / 1000} seconds`);
+}
+
+async function callOpenRouterOnce(prompt: string): Promise<string> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45_000);
+  const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
 
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -201,14 +236,7 @@ async function callOpenRouter(prompt: string): Promise<string> {
     }
 
     const data = (await response.json()) as OpenRouterResponse;
-    const text = extractOpenRouterAnswer(data);
-    console.log(`[LLM] OpenRouter success → model=${FALLBACK_LLM_MODEL}`);
-    return text;
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error("OpenRouter request timed out after 45 seconds");
-    }
-    throw err;
+    return extractOpenRouterAnswer(data);
   } finally {
     clearTimeout(timeoutId);
   }
