@@ -9,4 +9,4 @@ CREATE TABLE "prompts" (
 );
 --> statement-breakpoint
 ALTER TABLE "dictionary_entries" ALTER COLUMN "reading" SET NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "uq_dict_entries_dict_term_reading" ON "dictionary_entries" USING btree ("dictionary_id","term","reading");
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_dict_entries_dict_term_reading" ON "dictionary_entries" USING btree ("dictionary_id","term","reading");
