@@ -4,6 +4,9 @@ import { getSession } from "../../lib/session";
 import { generateCsrfToken } from "../../lib/csrf";
 import { Button } from "../../components/admin/Button";
 import { OUTPUT_BUCKET_KEYS, getOutputBucketLabel } from "@grkd-jisho/db";
+import { WEBUI_CONFIG } from "../../config/webui";
+
+const roleSettingsUi = WEBUI_CONFIG.roleSettings;
 
 const session = getSession(Astro);
 const csrfToken = session ? generateCsrfToken(session.discordUserId) : "";
@@ -15,26 +18,26 @@ if (!session?.isAdmin) {
 
 <meta name="csrf-token" content={csrfToken} />
 
-<AdminLayout title="Role Settings" active="role-settings">
+<AdminLayout title={roleSettingsUi.page.title} active="role-settings">
   <div class="page-header">
     <div>
-      <h1 class="page-title">Role Settings</h1>
-      <p class="page-description">Configure output bucket bindings, per-role daily search limits, and reset user usage.</p>
+      <h1 class="page-title">{roleSettingsUi.page.title}</h1>
+      <p class="page-description">{roleSettingsUi.page.description}</p>
     </div>
     <Button variant="secondary" id="add-role-btn">
-      + Add Role Limit
+      {roleSettingsUi.page.addRoleLimit}
     </Button>
   </div>
 
   <div class="info-card">
     <div class="section-header">
-      <h2 class="section-title">Default Limit</h2>
-      <button id="edit-default-btn" class="btn-ghost">✎ Edit</button>
+      <h2 class="section-title">{roleSettingsUi.page.defaultLimitTitle}</h2>
+      <button id="edit-default-btn" class="btn-ghost">{roleSettingsUi.page.defaultLimitEdit}</button>
     </div>
     <p class="info-text">
-      All roles without a custom limit: <strong id="default-limit-display">—</strong> searches/day
+      {roleSettingsUi.page.defaultLimitCopy} <strong id="default-limit-display">—</strong>{roleSettingsUi.page.searchesPerDaySuffix}
     </p>
-    <p class="info-hint">Owner and Administrator roles are always unlimited.</p>
+    <p class="info-hint">{roleSettingsUi.page.defaultLimitHint}</p>
   </div>
 
   <div id="table-container" class="table-container">
@@ -42,18 +45,18 @@ if (!session?.isAdmin) {
   </div>
 
   <div class="info-card info-card-reset" style="margin-top: 20px;">
-    <h2 class="section-title">Reset User Usage</h2>
-    <p class="info-text" style="margin-bottom: 12px;">Reset a user's search count for today (GMT+7).</p>
+    <h2 class="section-title">{roleSettingsUi.page.resetTitle}</h2>
+    <p class="info-text" style="margin-bottom: 12px;">{roleSettingsUi.page.resetCopy}</p>
     <div class="reset-row">
       <div class="field-group">
-        <label class="field-label" for="reset-user-id">User ID</label>
-        <input type="text" id="reset-user-id" class="text-input" placeholder="e.g. 123456789012345678" />
+        <label class="field-label" for="reset-user-id">{roleSettingsUi.page.fieldLabels.resetUserId}</label>
+        <input type="text" id="reset-user-id" class="text-input" placeholder={roleSettingsUi.page.placeholders.resetUserId} />
       </div>
       <div class="field-group">
-        <label class="field-label" for="reset-guild-id">Guild ID</label>
-        <input type="text" id="reset-guild-id" class="text-input" placeholder="e.g. 987654321098765432" />
+        <label class="field-label" for="reset-guild-id">{roleSettingsUi.page.fieldLabels.resetGuildId}</label>
+        <input type="text" id="reset-guild-id" class="text-input" placeholder={roleSettingsUi.page.placeholders.resetGuildId} />
       </div>
-      <button id="reset-usage-btn" class="btn-primary">Reset Usage</button>
+      <button id="reset-usage-btn" class="btn-primary">{roleSettingsUi.page.resetButton}</button>
     </div>
     <p id="reset-result" class="reset-result"></p>
   </div>
@@ -62,29 +65,29 @@ if (!session?.isAdmin) {
     <div class="modal-content">
       <div class="editor-panel">
         <div class="editor-header">
-          <h3 id="role-modal-title" class="editor-title">Add Role Limit</h3>
-          <button id="role-modal-close" class="btn-secondary" style="padding: 6px 14px; font-size: 13px;">✕ Close</button>
+          <h3 id="role-modal-title" class="editor-title">{roleSettingsUi.page.roleModalAdd}</h3>
+          <button id="role-modal-close" class="btn-secondary" style="padding: 6px 14px; font-size: 13px;">{roleSettingsUi.page.roleModalClose}</button>
         </div>
 
         <div class="editor-grid" style="grid-template-columns: 1fr;">
           <div class="editor-col">
-            <label class="editor-col-label">Discord Role ID *</label>
-            <input type="text" id="role-id-input" class="text-input" placeholder="e.g. 123456789012345678" />
+            <label class="editor-col-label">{roleSettingsUi.page.fieldLabels.roleId}</label>
+            <input type="text" id="role-id-input" class="text-input" placeholder={roleSettingsUi.page.placeholders.roleId} />
           </div>
           <div class="editor-col">
-            <label class="editor-col-label">Role Label (optional)</label>
-            <input type="text" id="role-label-input" class="text-input" placeholder="e.g. Moderator" />
+            <label class="editor-col-label">{roleSettingsUi.page.fieldLabels.roleLabel}</label>
+            <input type="text" id="role-label-input" class="text-input" placeholder={roleSettingsUi.page.placeholders.roleLabel} />
           </div>
           <div class="editor-col">
-            <label class="editor-col-label">Daily Limit *</label>
-            <input type="number" id="role-limit-input" class="text-input" placeholder="-1 for unlimited, or 1–99999" min="-1" max="99999" />
-            <span class="field-hint">-1 = unlimited. Owner/Admin are always unlimited regardless of this setting.</span>
+            <label class="editor-col-label">{roleSettingsUi.page.fieldLabels.dailyLimit}</label>
+            <input type="number" id="role-limit-input" class="text-input" placeholder={roleSettingsUi.page.placeholders.dailyLimit} min="-1" max="99999" />
+            <span class="field-hint">{roleSettingsUi.page.hints.dailyLimit}</span>
           </div>
         </div>
 
         <div class="editor-footer">
-          <button id="role-cancel-btn" class="btn-secondary">Cancel</button>
-          <button id="role-save-btn" class="btn-primary">Save</button>
+          <button id="role-cancel-btn" class="btn-secondary">{roleSettingsUi.page.roleModalCancel}</button>
+          <button id="role-save-btn" class="btn-primary">{roleSettingsUi.page.roleModalSave}</button>
         </div>
       </div>
     </div>
@@ -93,12 +96,12 @@ if (!session?.isAdmin) {
   <div class="section-divider"></div>
   <div class="page-header" style="margin-top: 32px;">
     <div>
-      <h2 class="section-title" style="margin: 0;">Output Bucket Bindings</h2>
-      <p class="info-text" style="margin: 4px 0 0;">Map Discord role IDs to output buckets for prompt routing.</p>
-      <p class="info-hint" style="margin: 4px 0 0;">日常日本語の出力が優先。どちらにも当たらない場合はインドネシア語に落ちます。複数の Discord role IDs を同じバケットに紐づけられます。</p>
+      <h2 class="section-title" style="margin: 0;">{roleSettingsUi.page.bindingsTitle}</h2>
+      <p class="info-text" style="margin: 4px 0 0;">{roleSettingsUi.page.bindingsCopy}</p>
+      <p class="info-hint" style="margin: 4px 0 0;">{roleSettingsUi.page.bindingsHint}</p>
     </div>
     <Button variant="secondary" id="add-binding-btn">
-      + Add Binding
+      {roleSettingsUi.page.addBinding}
     </Button>
   </div>
 
@@ -109,13 +112,13 @@ if (!session?.isAdmin) {
   <!-- Role Binding Editor Modal -->
   <div id="binding-modal" class="modal-overlay hidden">
     <div class="modal-content modal-content-small">
-      <h3 class="editor-title" style="margin-bottom: 16px;">Edit Output Bucket Binding</h3>
+      <h3 class="editor-title" style="margin-bottom: 16px;">{roleSettingsUi.page.bindingModalTitle}</h3>
       <div class="field-group">
-        <label class="field-label" for="binding-role-id">Discord Role ID</label>
-        <input type="text" id="binding-role-id" class="text-input" placeholder="e.g. 123456789012345678" />
+        <label class="field-label" for="binding-role-id">{roleSettingsUi.page.fieldLabels.bindingRoleId}</label>
+        <input type="text" id="binding-role-id" class="text-input" placeholder={roleSettingsUi.page.placeholders.bindingRoleId} />
       </div>
       <div class="field-group">
-        <label class="field-label" for="binding-output-bucket">Output Bucket</label>
+        <label class="field-label" for="binding-output-bucket">{roleSettingsUi.page.fieldLabels.bindingBucket}</label>
         <select id="binding-output-bucket" class="text-input">
           {OUTPUT_BUCKET_KEYS.map((value) => (
             <option value={value}>{getOutputBucketLabel(value)}</option>
@@ -123,14 +126,19 @@ if (!session?.isAdmin) {
         </select>
       </div>
       <div class="editor-footer">
-        <button id="binding-cancel-btn" class="btn-secondary">Cancel</button>
-        <button id="binding-save-btn" class="btn-primary">Save</button>
+        <button id="binding-cancel-btn" class="btn-secondary">{roleSettingsUi.page.bindingModalCancel}</button>
+        <button id="binding-save-btn" class="btn-primary">{roleSettingsUi.page.bindingModalSave}</button>
       </div>
     </div>
   </div>
 </AdminLayout>
 
 <script>
+import { WEBUI_CONFIG } from '../../config/webui';
+
+const roleSettingsUi = WEBUI_CONFIG.roleSettings;
+const outputBucketLabels: Record<string, string> = WEBUI_CONFIG.shared.outputBucketLabels;
+
 // ── Types ──
 type RoleLimit = {
   discordRoleId: string;
@@ -172,7 +180,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
     const defaultLimit = currentDefaultLimit;
 
       const defaultDisplay = getEl("default-limit-display");
-      if (defaultDisplay) defaultDisplay.textContent = defaultLimit === -1 ? "Unlimited" : defaultLimit + " /day";
+      if (defaultDisplay) defaultDisplay.textContent = defaultLimit === -1 ? roleSettingsUi.page.unlimitedLabel : defaultLimit + roleSettingsUi.page.perDaySuffix;
 
       const container = getEl("table-container");
       if (!container) return;
@@ -182,14 +190,14 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
           <table class="data-table w-full text-left border-collapse">
             <thead>
               <tr class="bg-porcelain-150 border-b border-graphite-180">
-                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Role Name</th>
-                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Role ID</th>
-                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Daily Limit</th>
-                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap text-right">Actions</th>
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">${roleSettingsUi.page.tableHeaders.roleName}</th>
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">${roleSettingsUi.page.tableHeaders.roleId}</th>
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">${roleSettingsUi.page.tableHeaders.dailyLimit}</th>
+                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap text-right">${roleSettingsUi.page.tableHeaders.actions}</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="4" class="empty-cell">No custom role limits configured.</td></tr>
+              <tr><td colspan="4" class="empty-cell">${roleSettingsUi.page.emptyRoleLimits}</td></tr>
             </tbody>
           </table>`;
         return;
@@ -199,16 +207,16 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
         <table class="data-table w-full text-left border-collapse">
           <thead>
             <tr class="bg-porcelain-150 border-b border-graphite-180">
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Role Name</th>
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Role ID</th>
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Daily Limit</th>
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap text-right">Actions</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">${roleSettingsUi.page.tableHeaders.roleName}</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">${roleSettingsUi.page.tableHeaders.roleId}</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">${roleSettingsUi.page.tableHeaders.dailyLimit}</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap text-right">${roleSettingsUi.page.tableHeaders.actions}</th>
             </tr>
           </thead>
           <tbody>
             ${roleCache.map((r: RoleLimit) => {
               const isDefault = r.discordRoleId === "__default__";
-              const limitText = r.dailyLimit === -1 ? "Unlimited" : r.dailyLimit + " /day";
+              const limitText = r.dailyLimit === -1 ? roleSettingsUi.page.unlimitedLabel : r.dailyLimit + roleSettingsUi.page.perDaySuffix;
               const roleName = r.roleLabel || r.discordRoleId;
               const shortId = r.discordRoleId.length > 18
                 ? r.discordRoleId.slice(0, 8) + "…" + r.discordRoleId.slice(-4)
@@ -216,15 +224,15 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
               return `
                 <tr class="border-b border-graphite-180 last:border-0 hover:bg-porcelain-150 transition-colors min-h-[48px]">
                   <td class="px-4 py-3 text-[14px]">
-                    <span class="text-graphite-800 font-medium">${isDefault ? '<span class="status-badge badge-enabled">Default</span>' : roleName}</span>
+                    <span class="text-graphite-800 font-medium">${isDefault ? `<span class="status-badge badge-enabled">${roleSettingsUi.page.rowBadges.default}</span>` : roleName}</span>
                   </td>
                   <td class="px-4 py-3 text-[13px] text-graphite-500 mono">${shortId}</td>
                   <td class="px-4 py-3 text-[14px]">${limitText}</td>
                   <td class="px-4 py-3 text-right flex gap-2 justify-end">
                     ${isDefault
-                      ? '<span class="text-graphite-400 text-[12px]">Protected</span>'
-                      : `<button class="edit-role-btn bg-royal-blue-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-royal-blue-700 transition-colors" data-role-id="${r.discordRoleId}">Edit</button>
-                      <button class="delete-role-btn bg-danger-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-danger-700 transition-colors" data-role-id="${r.discordRoleId}">Delete</button>`}
+                      ? `<span class="text-graphite-400 text-[12px]">${roleSettingsUi.page.rowBadges.protected}</span>`
+                      : `<button class="edit-role-btn bg-royal-blue-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-royal-blue-700 transition-colors" data-role-id="${r.discordRoleId}">${roleSettingsUi.page.rowActions.edit}</button>
+                      <button class="delete-role-btn bg-danger-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-danger-700 transition-colors" data-role-id="${r.discordRoleId}">${roleSettingsUi.page.rowActions.delete}</button>`}
                   </td>
                 </tr>`;
             }).join("")}
@@ -249,7 +257,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
           e.stopPropagation();
           const roleId = btn.getAttribute("data-role-id");
           if (!roleId) return;
-          if (!confirm("Delete this role limit? This cannot be undone.")) return;
+          if (!confirm(roleSettingsUi.page.alerts.deleteRoleLimitConfirm)) return;
           handleDelete(roleId);
         });
       });
@@ -270,8 +278,8 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
     if (!title || !idInput || !labelInput || !limitInput || !modal) return;
 
     title.textContent = role.discordRoleId === "__default__"
-      ? "Edit Default Limit"
-      : "Edit: " + (role.roleLabel || role.discordRoleId);
+      ? roleSettingsUi.page.roleModalEditDefault
+      : roleSettingsUi.page.roleModalEditPrefix + (role.roleLabel || role.discordRoleId);
     idInput.value = role.discordRoleId;
     idInput.disabled = true;
     labelInput.value = role.roleLabel ?? "";
@@ -296,7 +304,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
     const limitInput = getEl<HTMLInputElement>("role-limit-input");
     const modal = getEl("role-modal");
 
-    if (title) title.textContent = "Add Role Limit";
+    if (title) title.textContent = roleSettingsUi.page.roleModalAdd;
     if (idInput) { idInput.value = ""; idInput.disabled = false; }
     if (labelInput) labelInput.value = "";
     if (limitInput) limitInput.value = "";
@@ -316,16 +324,16 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
     const roleLabel = labelEl.value.trim();
     const rawLimit = limitEl.value.trim();
 
-    if (!roleId) { alert("Discord Role ID is required."); return; }
-    if (rawLimit === "") { alert("Daily Limit is required."); return; }
+    if (!roleId) { alert(roleSettingsUi.page.alerts.roleIdRequired); return; }
+    if (rawLimit === "") { alert(roleSettingsUi.page.alerts.dailyLimitRequired); return; }
 
     const dailyLimit = parseInt(rawLimit, 10);
     if (!Number.isInteger(dailyLimit) || dailyLimit < -1 || dailyLimit === 0 || dailyLimit > 99999) {
-      alert("Daily Limit must be -1 (unlimited) or between 1 and 99999.");
+      alert(roleSettingsUi.page.alerts.dailyLimitInvalid);
       return;
     }
 
-    if (!csrfToken) { alert("CSRF token not available. Please reload the page."); return; }
+    if (!csrfToken) { alert(roleSettingsUi.page.alerts.csrfUnavailableReload); return; }
 
     try {
       const body: Record<string, unknown> = {
@@ -357,7 +365,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
   // ── Delete ──
   async function handleDelete(roleId: string) {
-    if (!csrfToken) { alert("CSRF token not available. Please reload the page."); return; }
+    if (!csrfToken) { alert(roleSettingsUi.page.alerts.csrfUnavailableReload); return; }
 
     try {
       const res = await fetch("/api/admin/role-limits?discordRoleId=" + encodeURIComponent(roleId), {
@@ -389,9 +397,9 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
     const userId = userIdEl.value.trim();
     const guildId = guildIdEl.value.trim();
 
-    if (!userId) { resultEl.textContent = "User ID is required."; resultEl.style.color = "var(--color-danger-600)"; return; }
-    if (!guildId) { resultEl.textContent = "Guild ID is required."; resultEl.style.color = "var(--color-danger-600)"; return; }
-    if (!csrfToken) { resultEl.textContent = "CSRF token not available."; resultEl.style.color = "var(--color-danger-600)"; return; }
+    if (!userId) { resultEl.textContent = roleSettingsUi.page.alerts.userIdRequired; resultEl.style.color = "var(--color-danger-600)"; return; }
+    if (!guildId) { resultEl.textContent = roleSettingsUi.page.alerts.guildIdRequired; resultEl.style.color = "var(--color-danger-600)"; return; }
+    if (!csrfToken) { resultEl.textContent = roleSettingsUi.page.alerts.csrfUnavailable; resultEl.style.color = "var(--color-danger-600)"; return; }
 
     try {
       const res = await fetch("/api/admin/role-limits/reset-usage", {
@@ -403,16 +411,16 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
       const body: { success?: boolean; affected?: number; error?: string } = await res.json().catch(() => ({ error: "Unknown error" }));
 
       if (!res.ok) {
-        resultEl.textContent = "Error: " + (body.error || "Failed to reset usage.");
+        resultEl.textContent = roleSettingsUi.page.resetMessages.errorPrefix + (body.error || "Failed to reset usage.");
         resultEl.style.color = "var(--color-danger-600)";
         return;
       }
 
-      resultEl.textContent = "✓ Usage reset for user " + userId + " (rows affected: " + (body.affected ?? 0) + ")";
+      resultEl.textContent = roleSettingsUi.page.resetMessages.successPrefix + userId + " (rows affected: " + (body.affected ?? 0) + ")";
       resultEl.style.color = "var(--color-royal-blue-600)";
     } catch (err: unknown) {
       console.error("[RoleLimits] Reset failed:", err);
-      resultEl.textContent = "Failed to reset usage. Check console.";
+      resultEl.textContent = roleSettingsUi.page.resetMessages.failed;
       resultEl.style.color = "var(--color-danger-600)";
     }
   }
@@ -459,13 +467,8 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
     outputBucketKey: string;
   }> = [];
 
-  const OUTPUT_BUCKET_LABELS: Record<string, string> = {
-    "daily-japanese": "日常日本語の出力",
-    indonesian: "インドネシア語の出力",
-  };
-
   function formatOutputBucketLabel(value: string): string {
-    return OUTPUT_BUCKET_LABELS[value] ?? `Legacy: ${value}`;
+    return outputBucketLabels[value] ?? `Legacy: ${value}`;
   }
 
   function ensureOutputBucketOption(select: HTMLSelectElement, value: string) {
@@ -493,7 +496,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
       if (!container) return;
 
       if (bindingsCache.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No custom bindings configured. Add Discord role IDs to map them to output buckets.</p></div>';
+        container.innerHTML = `<div class="empty-state"><p>${roleSettingsUi.page.emptyBindings}</p></div>`;
         return;
       }
 
@@ -501,9 +504,9 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
         <table class="data-table w-full text-left border-collapse">
           <thead>
             <tr class="bg-porcelain-150 border-b border-graphite-180">
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">Discord Role ID</th>
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">Output Bucket</th>
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium text-right">Actions</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">${roleSettingsUi.page.tableHeaders.bindingRoleId}</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">${roleSettingsUi.page.tableHeaders.bindingBucket}</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium text-right">${roleSettingsUi.page.tableHeaders.actions}</th>
             </tr>
           </thead>
           <tbody>
@@ -512,8 +515,8 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
                 <td class="px-4 py-3 text-[14px] text-graphite-800 font-medium mono">${b.discordRoleId}</td>
                 <td class="px-4 py-3 text-[14px]"><span class="mono text-graphite-650">${formatOutputBucketLabel(b.outputBucketKey)}</span></td>
                 <td class="px-4 py-3 text-[14px] text-right">
-                  <button class="edit-binding-btn btn-ghost" data-id="${b.id}">✎ Edit</button>
-                  <button class="delete-binding-btn btn-danger-sm" data-id="${b.id}">Delete</button>
+                  <button class="edit-binding-btn btn-ghost" data-id="${b.id}">${roleSettingsUi.page.bindingActions.edit}</button>
+                  <button class="delete-binding-btn btn-danger-sm" data-id="${b.id}">${roleSettingsUi.page.bindingActions.delete}</button>
                 </td>
               </tr>
             `).join('')}
@@ -540,18 +543,18 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
       container.querySelectorAll('.delete-binding-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
           const id = Number(btn.getAttribute('data-id'));
-          if (!confirm('Delete this role binding?')) return;
-          if (!csrfToken) { alert('CSRF token not available.'); return; }
+           if (!confirm(roleSettingsUi.page.alerts.deleteBindingConfirm)) return;
+           if (!csrfToken) { alert(roleSettingsUi.page.alerts.csrfUnavailable); return; }
           try {
             const res = await fetch('/api/admin/role-bindings?id=' + id, {
               method: 'DELETE',
               headers: { 'x-csrf-token': csrfToken },
             });
-            if (!res.ok) throw new Error('Delete failed');
+           if (!res.ok) throw new Error('Delete failed');
             await renderBindings();
           } catch (err) {
             console.error('[RoleBindings] Delete failed:', err);
-            alert('Failed to delete binding.');
+           alert('Failed to delete binding.');
           }
         });
       });
@@ -579,9 +582,9 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
     const discordRoleId = nameInput.value.trim();
     const outputBucketKey = keySelect.value;
-    if (!discordRoleId) { alert('Discord role ID is required.'); return; }
+    if (!discordRoleId) { alert(roleSettingsUi.page.alerts.roleIdRequired); return; }
 
-    if (!csrfToken) { alert('CSRF token not available.'); return; }
+    if (!csrfToken) { alert(roleSettingsUi.page.alerts.csrfUnavailable); return; }
     try {
       const res = await fetch('/api/admin/role-bindings', {
         method: 'PUT',

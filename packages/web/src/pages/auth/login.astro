@@ -1,5 +1,8 @@
 ---
 import "../../styles/globals.css";
+import { WEBUI_CONFIG } from "../../config/webui";
+
+const loginUi = WEBUI_CONFIG.login;
 ---
 
 <!doctype html>
@@ -7,135 +10,126 @@ import "../../styles/globals.css";
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Login — GRKD-Jisho Admin</title>
+    <title>{loginUi.title}</title>
   </head>
-  <body class="min-h-dvh bg-porcelain-50 font-grkd-sans text-graphite-900">
-    <main class="relative min-h-dvh overflow-hidden px-4 py-4 sm:px-6 lg:px-8">
+  <body class={loginUi.shell.bodyClass}>
+    <main class={loginUi.shell.mainClass}>
       <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,oklch(92%_0.08_262/0.32),transparent_28%),radial-gradient(circle_at_86%_80%,oklch(94.5%_0.04_95/0.45),transparent_28%),linear-gradient(180deg,oklch(97%_0.012_95),oklch(95%_0.01_95))]" />
 
-      <section class="relative mx-auto flex min-h-[calc(100dvh-2rem)] max-w-7xl items-center">
-        <div class="grid w-full overflow-hidden rounded-modal border border-graphite-180 bg-[oklch(97%_0.012_95/0.82)] shadow-[0_30px_80px_oklch(20%_0.018_255/0.16)] backdrop-blur-sm lg:min-h-[760px] lg:grid-cols-[0.68fr_1.32fr]">
+      <section class={loginUi.shell.stageClass}>
+        <div class={loginUi.shell.shellClass}>
           <aside class="relative flex flex-col justify-between gap-10 overflow-hidden bg-[linear-gradient(160deg,oklch(43%_0.19_262),oklch(38%_0.18_251))] px-7 py-8 text-porcelain-50 sm:px-9 sm:py-10 lg:px-10 lg:py-12">
             <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,oklch(96%_0.025_262/0.18),transparent_28%),radial-gradient(circle_at_82%_82%,oklch(94%_0.06_95/0.12),transparent_26%)]" />
 
             <div class="relative space-y-8 max-w-lg">
               <div class="flex items-center gap-3 text-caption uppercase tracking-[0.34em] text-porcelain-50/75">
                 <span class="h-2.5 w-2.5 rounded-full bg-royal-blue-100 shadow-[0_0_0_6px_oklch(96%_0.025_262/0.1)]" />
-                Secure admin access
+                {loginUi.hero.kicker}
               </div>
 
               <div class="space-y-5">
-                <p class="text-body-sm uppercase tracking-[0.28em] text-porcelain-50/70">GRKD-Jisho Admin</p>
+                <p class="text-body-sm uppercase tracking-[0.28em] text-porcelain-50/70">{loginUi.hero.product}</p>
                 <h1 class="max-w-md text-[clamp(2.4rem,5vw,4.75rem)] leading-[0.94] font-bold tracking-[-0.05em] text-porcelain-50">
-                  Calm entry.
-                  <span class="block text-royal-blue-100">Fast access.</span>
+                  {loginUi.hero.headline}
+                  <span class="block text-royal-blue-100">{loginUi.hero.accent}</span>
                 </h1>
                 <p class="max-w-md text-body text-porcelain-50/78">
-                  The command surface for the Indonesian-Japanese dictionary bot.
-                  If setup is missing, this screen shows the QR onboarding lane.
+                  {loginUi.hero.description}
                 </p>
               </div>
 
               <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-2">
                 <article class="rounded-panel border border-porcelain-50/14 bg-porcelain-50/8 p-5 backdrop-blur-sm xl:min-h-[148px]">
-                  <p class="text-caption uppercase tracking-[0.26em] text-porcelain-50/60">Step 01</p>
-                  <p class="mt-3 text-body text-porcelain-50/88">Register the device once with a QR scan.</p>
+                  <p class="text-caption uppercase tracking-[0.26em] text-porcelain-50/60">{loginUi.steps.stepLabels[0]}</p>
+                  <p class="mt-3 text-body text-porcelain-50/88">{loginUi.steps.setup[0]}</p>
                 </article>
                 <article class="rounded-panel border border-porcelain-50/14 bg-porcelain-50/8 p-5 backdrop-blur-sm xl:min-h-[148px]">
-                  <p class="text-caption uppercase tracking-[0.26em] text-porcelain-50/60">Step 02</p>
-                  <p class="mt-3 text-body text-porcelain-50/88">Use the current six-digit code from your app.</p>
+                  <p class="text-caption uppercase tracking-[0.26em] text-porcelain-50/60">{loginUi.steps.stepLabels[1]}</p>
+                  <p class="mt-3 text-body text-porcelain-50/88">{loginUi.steps.setup[1]}</p>
                 </article>
                 <article class="rounded-panel border border-porcelain-50/14 bg-porcelain-50/8 p-5 backdrop-blur-sm xl:col-span-2 xl:min-h-[120px]">
-                  <p class="text-caption uppercase tracking-[0.26em] text-porcelain-50/60">Step 03</p>
-                  <p class="mt-3 text-body text-porcelain-50/88">Reset from SSH only when you want a fresh secret.</p>
+                  <p class="text-caption uppercase tracking-[0.26em] text-porcelain-50/60">{loginUi.steps.stepLabels[2]}</p>
+                  <p class="mt-3 text-body text-porcelain-50/88">{loginUi.steps.setup[2]}</p>
                 </article>
               </div>
             </div>
 
             <div class="relative flex flex-col gap-4 rounded-panel border border-porcelain-50/12 bg-porcelain-50/8 p-5 backdrop-blur-sm">
               <div class="flex items-center justify-between gap-4">
-                <span class="text-caption uppercase tracking-[0.3em] text-porcelain-50/60">Access mode</span>
+                <span class="text-caption uppercase tracking-[0.3em] text-porcelain-50/60">{loginUi.hero.accessModeLabel}</span>
                 <span class="rounded-full border border-royal-blue-100/35 bg-royal-blue-100/12 px-3 py-1 text-caption font-semibold text-royal-blue-50">
-                  TOTP secured
+                  {loginUi.hero.accessModeBadge}
                 </span>
               </div>
-              <p class="max-w-sm text-body-sm text-porcelain-50/80">
-                Built for one human, one server, and a short path back into the dashboard.
-              </p>
+              <p class="max-w-sm text-body-sm text-porcelain-50/80">{loginUi.hero.accessModeCopy}</p>
             </div>
           </aside>
 
           <section class="relative flex min-h-[560px] flex-col justify-center gap-6 px-5 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
-            <div id="loading" class="flex items-center gap-3 text-body-sm text-graphite-500">
+            <div id="loading" class={loginUi.layout.loadingClass}>
               <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-royal-blue-600" />
-              Checking authentication setup…
+              {loginUi.auth.loading}
             </div>
 
-            <div id="authContainer" class="hidden w-full rounded-modal border border-graphite-180 bg-porcelain-50 px-6 py-6 shadow-[0_20px_50px_oklch(20%_0.018_255/0.12)] lg:px-8 lg:py-8">
+            <div id="authContainer" class={loginUi.layout.authCardClass}>
               <div class="flex flex-wrap items-start justify-between gap-4 border-b border-graphite-180 pb-5">
                 <div class="space-y-2">
-                  <p class="text-caption uppercase tracking-[0.3em] text-graphite-500">Authentication lane</p>
-                  <h2 id="modeTitle" class="text-heading-md font-semibold tracking-tight text-graphite-900">Returning admin</h2>
-                  <p id="modeCopy" class="max-w-2xl text-body-sm text-graphite-650">
-                    Open your authenticator app and enter the current 6-digit code to enter the dashboard.
-                  </p>
+                  <p class="text-caption uppercase tracking-[0.3em] text-graphite-500">{loginUi.auth.laneLabel}</p>
+                  <h2 id="modeTitle" class="text-heading-md font-semibold tracking-tight text-graphite-900">{loginUi.auth.returningTitle}</h2>
+                  <p id="modeCopy" class="max-w-2xl text-body-sm text-graphite-650">{loginUi.auth.returningCopy}</p>
                 </div>
                 <span id="modeBadge" class="rounded-full border border-royal-blue-100 bg-royal-blue-50 px-3 py-1 text-caption font-semibold text-royal-blue-700">
-                  Ready
+                  {loginUi.auth.returningBadge}
                 </span>
               </div>
 
               <div id="setupGuide" class="hidden mt-6 rounded-panel border border-graphite-180 bg-porcelain-100 p-5">
-                <p class="text-body-sm font-semibold text-graphite-900">First-time setup</p>
+                <p class="text-body-sm font-semibold text-graphite-900">{loginUi.auth.setupGuideTitle}</p>
                 <div class="mt-4 grid gap-4 md:grid-cols-3">
                   <article class="rounded-panel border border-graphite-180 bg-porcelain-50 p-5">
-                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">Step 01</p>
-                    <p class="mt-2 text-body-sm text-graphite-650">Scan the QR code with your authenticator app.</p>
+                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">{loginUi.steps.stepLabels[0]}</p>
+                    <p class="mt-2 text-body-sm text-graphite-650">{loginUi.auth.setupGuideSteps[0]}</p>
                   </article>
                   <article class="rounded-panel border border-graphite-180 bg-porcelain-50 p-5">
-                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">Step 02</p>
-                    <p class="mt-2 text-body-sm text-graphite-650">Enter the six-digit code to finish setup.</p>
+                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">{loginUi.steps.stepLabels[1]}</p>
+                    <p class="mt-2 text-body-sm text-graphite-650">{loginUi.auth.setupGuideSteps[1]}</p>
                   </article>
                   <article class="rounded-panel border border-graphite-180 bg-porcelain-50 p-5">
-                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">Step 03</p>
-                    <p class="mt-2 text-body-sm text-graphite-650">Keep the app installed for future logins.</p>
+                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">{loginUi.steps.stepLabels[2]}</p>
+                    <p class="mt-2 text-body-sm text-graphite-650">{loginUi.auth.setupGuideSteps[2]}</p>
                   </article>
                 </div>
               </div>
 
               <div id="loginGuide" class="mt-6 rounded-panel border border-graphite-180 bg-porcelain-100 p-5">
-                <p class="text-body-sm font-semibold text-graphite-900">Quick access</p>
+                <p class="text-body-sm font-semibold text-graphite-900">{loginUi.auth.loginGuideTitle}</p>
                 <div class="mt-4 grid gap-4 md:grid-cols-3">
                   <article class="rounded-panel border border-graphite-180 bg-porcelain-50 p-5">
-                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">Step 01</p>
-                    <p class="mt-2 text-body-sm text-graphite-650">Open your authenticator app.</p>
+                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">{loginUi.steps.stepLabels[0]}</p>
+                    <p class="mt-2 text-body-sm text-graphite-650">{loginUi.auth.loginGuideSteps[0]}</p>
                   </article>
                   <article class="rounded-panel border border-graphite-180 bg-porcelain-50 p-5">
-                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">Step 02</p>
-                    <p class="mt-2 text-body-sm text-graphite-650">Use the six-digit code for GRKD-Jisho Admin.</p>
+                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">{loginUi.steps.stepLabels[1]}</p>
+                    <p class="mt-2 text-body-sm text-graphite-650">{loginUi.auth.loginGuideSteps[1]}</p>
                   </article>
                   <article class="rounded-panel border border-graphite-180 bg-porcelain-50 p-5">
-                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">Step 03</p>
-                    <p class="mt-2 text-body-sm text-graphite-650">You’re straight into the dashboard.</p>
+                    <p class="text-caption uppercase tracking-[0.26em] text-graphite-500">{loginUi.steps.stepLabels[2]}</p>
+                    <p class="mt-2 text-body-sm text-graphite-650">{loginUi.auth.loginGuideSteps[2]}</p>
                   </article>
                 </div>
               </div>
 
-              <div id="qrSection" class="hidden mt-6 w-full rounded-panel border border-graphite-180 bg-porcelain-100 p-4">
-                <div class="mx-auto w-full max-w-[360px] rounded-[18px] border border-graphite-180 bg-porcelain-50 p-4">
+              <div id="qrSection" class={loginUi.layout.qrCardClass}>
+                <div class={loginUi.layout.qrWrapClass}>
                   <img id="qrImage" src="" alt="TOTP QR Code" class="aspect-square w-full rounded-[14px] bg-porcelain-50 object-contain p-1.5" />
                 </div>
-                <p class="mt-4 text-center text-caption text-graphite-500">
-                  Can’t scan? Copy the manual key below into your authenticator app.
-                </p>
-                <code id="manualSecret" class="mx-auto mt-3 block max-w-[360px] rounded-panel border border-royal-blue-100 bg-royal-blue-50 px-3 py-3 text-center font-grkd-mono text-caption leading-6 text-royal-blue-700 break-all select-all"></code>
+                <p class="mt-4 text-center text-caption text-graphite-500">{loginUi.auth.qrHelp}</p>
+                <code id="manualSecret" class={loginUi.layout.manualKeyClass}></code>
               </div>
 
-              <form id="loginForm" class="mx-auto mt-4 w-full max-w-[560px] space-y-3">
+              <form id="loginForm" class={loginUi.layout.formClass}>
                 <div>
-                  <label for="totpCode" class="mb-1.5 block text-body-sm font-semibold text-graphite-800">
-                    Authenticator Code
-                  </label>
+                  <label for="totpCode" class="mb-1.5 block text-body-sm font-semibold text-graphite-800">{loginUi.auth.codeLabel}</label>
                   <input
                     id="totpCode"
                     type="text"
@@ -143,7 +137,7 @@ import "../../styles/globals.css";
                     pattern="[0-9]{6}"
                     maxlength="6"
                     autocomplete="one-time-code"
-                    placeholder="000000"
+                    placeholder={loginUi.auth.codePlaceholder}
                     class="w-full rounded-button border border-graphite-250 bg-porcelain-50 px-4 py-3.5 text-center font-grkd-mono text-heading-sm font-bold tracking-[0.45em] text-graphite-900 placeholder:text-graphite-400 focus-visible:border-royal-blue-600 focus-visible:ring-2 focus-visible:ring-royal-blue-100"
                   />
                 </div>
@@ -153,27 +147,31 @@ import "../../styles/globals.css";
                   type="submit"
                   class="w-full rounded-button border border-royal-blue-700 bg-royal-blue-600 px-6 py-3.5 text-body-sm font-semibold text-porcelain-50 shadow-sm transition-colors hover:bg-royal-blue-700 focus-visible:ring-2 focus-visible:ring-royal-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Log In
+                  {loginUi.auth.submitLogin}
                 </button>
 
                 <p id="loginError" class="hidden text-center text-body-sm text-danger-600"></p>
               </form>
 
               <p class="mt-6 text-center text-caption text-graphite-500">
-                Lost the app? Run <code class="font-grkd-mono text-royal-blue-700">pnpm auth:reset</code> on the server.
+                <span set:html={loginUi.auth.resetHint} />
               </p>
             </div>
           </section>
         </div>
       </section>
 
-      <footer class="relative mx-auto mt-6 max-w-7xl px-2 text-center text-caption text-graphite-500 sm:mt-8">
-        <p class="mb-1">GRKD-Jisho Admin &bull; v0.1.0</p>
-        <p class="opacity-60">Powered by GoRakuDo</p>
+      <footer class={loginUi.shell.footerClass}>
+        <p class="mb-1">{loginUi.shell.footerTitle} &bull; {loginUi.shell.footerSuffix}</p>
+        <p class="opacity-60">{loginUi.shell.footerPoweredBy}</p>
       </footer>
     </main>
 
     <script>
+      import { WEBUI_CONFIG } from "../../config/webui";
+
+      const loginUi = WEBUI_CONFIG.login;
+
       (async () => {
         const loading = document.getElementById("loading");
         const authContainer = document.getElementById("authContainer");
@@ -210,9 +208,9 @@ import "../../styles/globals.css";
               setupGuide.classList.remove("hidden");
               loginGuide.classList.add("hidden");
               qrSection.classList.remove("hidden");
-              modeTitle.textContent = "First-time setup";
-              modeBadge.textContent = "Configure once";
-              modeCopy.textContent = "Scan the code, confirm the 6-digit token, and the admin login becomes ready for next time.";
+              modeTitle.textContent = loginUi.auth.setupTitle;
+              modeBadge.textContent = loginUi.auth.setupBadge;
+              modeCopy.textContent = loginUi.auth.setupCopy;
             } else {
               throw new Error("Failed to load setup payload");
             }
@@ -222,18 +220,18 @@ import "../../styles/globals.css";
             setupGuide.classList.add("hidden");
             qrSection.classList.add("hidden");
             loginGuide.classList.remove("hidden");
-            submitButton.textContent = "Log In";
-            modeTitle.textContent = "Returning admin";
-            modeBadge.textContent = "Ready";
-            modeCopy.textContent = "Open your authenticator app and enter the current 6-digit code to enter the dashboard.";
+            submitButton.textContent = loginUi.auth.submitLogin;
+            modeTitle.textContent = loginUi.auth.returningTitle;
+            modeBadge.textContent = loginUi.auth.returningBadge;
+            modeCopy.textContent = loginUi.auth.returningCopy;
           } else {
-            submitButton.textContent = "Verify & Complete Setup";
+            submitButton.textContent = loginUi.auth.submitSetup;
           }
 
           loading.classList.add("hidden");
           authContainer.classList.remove("hidden");
         } catch (err) {
-          loading.innerHTML = 'Failed to connect. <a href="/auth/login" class="text-royal-blue-600 underline">Retry</a>.';
+          loading.innerHTML = loginUi.auth.loadingFailed;
           console.error("[TOTP/Login] Status check failed:", err);
           return;
         }
@@ -246,9 +244,9 @@ import "../../styles/globals.css";
           const code = codeInput.value.trim();
 
           loginError.classList.add("hidden");
-          const previousLabel = submitButton.textContent || "Log In";
+          const previousLabel = submitButton.textContent || loginUi.auth.submitLogin;
           submitButton.setAttribute("disabled", "true");
-          submitButton.textContent = previousLabel === "Verify & Complete Setup" ? "Verifying…" : "Signing in…";
+          submitButton.textContent = previousLabel === loginUi.auth.submitSetup ? loginUi.auth.submitBusySetup : loginUi.auth.submitBusyLogin;
 
           try {
             const res = await fetch("/api/auth/verify", {
@@ -262,21 +260,21 @@ import "../../styles/globals.css";
             if (res.ok && data.ok) {
               window.location.href = "/admin";
             } else if (data.error === "invalid_code") {
-              loginError.textContent = "Invalid code. Try again with the current 6-digit code from your authenticator app.";
+              loginError.textContent = loginUi.auth.invalidCode;
               loginError.classList.remove("hidden");
             } else if (data.error === "setup_required") {
-              window.location.href = "/auth/setup";
+              window.location.href = loginUi.auth.setupRequiredRedirect;
             } else {
-              loginError.textContent = data.error || "Verification failed. Try again.";
+              loginError.textContent = data.error || loginUi.auth.verificationFailed;
               loginError.classList.remove("hidden");
             }
           } catch (err) {
-            loginError.textContent = "Connection error. Is the server running?";
+            loginError.textContent = loginUi.auth.connectionError;
             loginError.classList.remove("hidden");
             console.error("[TOTP/Login] Verify failed:", err);
           } finally {
             submitButton.removeAttribute("disabled");
-            submitButton.textContent = setupRequired ? "Verify & Complete Setup" : "Log In";
+            submitButton.textContent = setupRequired ? loginUi.auth.submitSetup : loginUi.auth.submitLogin;
           }
         });
       })();

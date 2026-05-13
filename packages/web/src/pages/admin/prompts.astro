@@ -2,6 +2,9 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
 import { generateCsrfToken } from "../../lib/csrf";
+import { WEBUI_CONFIG } from "../../config/webui";
+
+const promptsUi = WEBUI_CONFIG.prompts;
 
 const session = getSession(Astro);
 const csrfToken = session ? generateCsrfToken(session.discordUserId) : "";
@@ -13,24 +16,24 @@ if (!session?.isAdmin) {
 
 <meta name="csrf-token" content={csrfToken} />
 
-<AdminLayout title="Prompts" active="prompts">
+<AdminLayout title={promptsUi.page.title} active="prompts">
   <div class="prompt-page">
     <div class="page-header">
       <div>
-        <p class="page-kicker">Prompt Library</p>
-        <h1 class="page-title">Scoped prompt control</h1>
-        <p class="page-description">Default prompt plus two private bucket overrides. The default remains the public baseline.</p>
+        <p class="page-kicker">{promptsUi.page.libraryLabel}</p>
+        <h1 class="page-title">{promptsUi.page.title}</h1>
+        <p class="page-description">{promptsUi.page.description}</p>
       </div>
       <div class="header-actions">
-        <button id="create-version-btn" class="action-btn action-btn-primary" type="button">Create New Version</button>
+        <button id="create-version-btn" class="action-btn action-btn-primary" type="button">{promptsUi.page.createVersion}</button>
       </div>
     </div>
 
     <div class="prompt-layout">
       <aside class="scope-rail" aria-label="Prompt scopes">
         <div class="rail-heading">
-          <p class="card-kicker">Scopes</p>
-          <p class="rail-note">Select one scope to inspect its version history and runtime state.</p>
+          <p class="card-kicker">{promptsUi.page.scopeNavigatorLabel}</p>
+          <p class="rail-note">{promptsUi.page.scopeNavigatorNote}</p>
         </div>
         <div id="scope-rail-list" class="scope-list"></div>
       </aside>
@@ -38,33 +41,33 @@ if (!session?.isAdmin) {
       <section class="scope-workspace">
         <header class="workspace-hero">
           <div>
-            <p class="card-kicker">Selected scope</p>
-            <h2 id="scope-title" class="scope-title">Default Prompt</h2>
-            <p id="scope-description" class="scope-description">Shared baseline prompt used by every bucket unless overridden.</p>
+            <p class="card-kicker">{promptsUi.page.selectedScopeLabel}</p>
+            <h2 id="scope-title" class="scope-title">{promptsUi.page.defaultScopeTitle}</h2>
+            <p id="scope-description" class="scope-description">{promptsUi.page.defaultScopeDescription}</p>
           </div>
           <div class="scope-hero-meta">
-            <div class="hero-chip" id="scope-resolution-chip">Runtime fallback</div>
-            <div class="hero-chip hero-chip-secondary" id="scope-version-chip">No active version</div>
+            <div class="hero-chip" id="scope-resolution-chip">{promptsUi.page.runtimeFallback}</div>
+            <div class="hero-chip hero-chip-secondary" id="scope-version-chip">{promptsUi.page.noActiveVersion}</div>
           </div>
         </header>
 
         <div class="versions-card">
           <div class="versions-card-header">
             <div>
-              <p class="card-kicker">Version history</p>
-              <h3 id="versions-title" class="versions-title">Default Prompt</h3>
+              <p class="card-kicker">{promptsUi.page.versionHistoryLabel}</p>
+              <h3 id="versions-title" class="versions-title">{promptsUi.page.defaultScopeTitle}</h3>
             </div>
             <div class="versions-actions">
-              <button id="scope-reset-btn" class="action-btn action-btn-secondary" type="button">Reset Override</button>
-              <button id="scope-create-btn" class="action-btn action-btn-primary" type="button">Create New Version</button>
+              <button id="scope-reset-btn" class="action-btn action-btn-secondary" type="button">{promptsUi.page.resetOverride}</button>
+              <button id="scope-create-btn" class="action-btn action-btn-primary" type="button">{promptsUi.page.createVersion}</button>
             </div>
           </div>
 
           <div id="versions-empty" class="empty-state hidden">
             <div class="empty-state-body">
-              <p class="empty-title">No override yet</p>
-              <p class="empty-copy">This scope still inherits the default prompt. Create a new version to specialize it.</p>
-              <button id="empty-create-btn" class="action-btn action-btn-primary" type="button">Create Override Version</button>
+              <p class="empty-title">{promptsUi.page.noOverride}</p>
+              <p class="empty-copy">{promptsUi.page.noOverrideCopy}</p>
+              <button id="empty-create-btn" class="action-btn action-btn-primary" type="button">{promptsUi.page.createOverride}</button>
             </div>
           </div>
 
@@ -73,50 +76,33 @@ if (!session?.isAdmin) {
 
         <div class="reference-grid">
           <details class="reference-card">
-            <summary class="reference-summary">Template variables</summary>
+            <summary class="reference-summary">{promptsUi.page.templateVariablesLabel}</summary>
             <table class="reference-table">
               <thead>
                 <tr>
-                  <th>Variable</th>
-                  <th>Description</th>
+                  <th>{promptsUi.page.referenceTableHeaders.variable}</th>
+                  <th>{promptsUi.page.referenceTableHeaders.description}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td class="reference-code">{'{{role_key}}'}</td>
+                  <td class="reference-code">{promptsUi.variables[0].name}</td>
                   <td>Output bucket used for routing: <span class="mono">daily-japanese</span> or <span class="mono">indonesian</span></td>
                 </tr>
-                <tr>
-                  <td class="reference-code">{'{{query}}'}</td>
-                  <td>The searched word or phrase</td>
-                </tr>
-                <tr>
-                  <td class="reference-code">{'{{reading}}'}</td>
-                  <td>Reading or pronunciation of the query</td>
-                </tr>
-                <tr>
-                  <td class="reference-code">{'{{dictionary_name}}'}</td>
-                  <td>Name of the dictionary that supplied the entry</td>
-                </tr>
-                <tr>
-                  <td class="reference-code">{'{{definition_json}}'}</td>
-                  <td>Raw dictionary payload as JSON</td>
-                </tr>
-                <tr>
-                  <td class="reference-code">{'{{prompt_version}}'}</td>
-                  <td>Current prompt version label</td>
-                </tr>
+                {promptsUi.variables.slice(1).map((variable: { name: string; description: string }) => (
+                  <tr>
+                    <td class="reference-code">{variable.name}</td>
+                    <td>{variable.description}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </details>
 
           <details class="reference-card">
-            <summary class="reference-summary">Routing contract</summary>
+            <summary class="reference-summary">{promptsUi.page.routingContractLabel}</summary>
             <ul class="reference-list">
-              <li>Default prompt stays public and shared.</li>
-              <li>Bucket override wins when it exists and is active.</li>
-              <li>If a bucket has no override, it inherits the default prompt.</li>
-              <li>Clone/export for general users should use the default scope only.</li>
+              {promptsUi.routing.map((line: string) => <li>{line}</li>)}
             </ul>
           </details>
         </div>
@@ -130,37 +116,40 @@ if (!session?.isAdmin) {
       <div class="editor-shell">
         <div class="editor-header">
           <div>
-            <p class="card-kicker" id="editor-scope-label">Scope</p>
-            <h3 id="editor-title" class="editor-title">Edit version</h3>
+            <p class="card-kicker" id="editor-scope-label">{promptsUi.page.editorScopeLabel}</p>
+            <h3 id="editor-title" class="editor-title">{promptsUi.page.editVersion}</h3>
             <p id="editor-version-hint" class="editor-hint"></p>
           </div>
           <label class="editor-active-label">
             <input id="editor-active-checkbox" type="checkbox" class="editor-checkbox" />
-            <span>Set as active version</span>
+            <span>{promptsUi.page.activeVersionLabel}</span>
           </label>
         </div>
 
         <div class="editor-grid">
           <div class="editor-col">
-            <label class="editor-col-label" for="editor-textarea">Editor</label>
+            <label class="editor-col-label" for="editor-textarea">{promptsUi.page.editorLabel}</label>
             <textarea id="editor-textarea" class="editor-textarea" spellcheck="false"></textarea>
           </div>
           <div class="editor-col">
-            <label class="editor-col-label" for="editor-preview">Preview</label>
+            <label class="editor-col-label" for="editor-preview">{promptsUi.page.previewLabel}</label>
             <pre id="editor-preview" class="editor-preview"></pre>
           </div>
         </div>
 
         <div class="editor-footer">
-          <button id="editor-cancel-btn" class="action-btn action-btn-secondary" type="button">Cancel</button>
-          <button id="editor-save-btn" class="action-btn action-btn-primary" type="button">Save Changes</button>
+          <button id="editor-cancel-btn" class="action-btn action-btn-secondary" type="button">{promptsUi.page.cancel}</button>
+          <button id="editor-save-btn" class="action-btn action-btn-primary" type="button">{promptsUi.page.save}</button>
         </div>
       </div>
     </div>
   </div>
 
   <script>
+    import { WEBUI_CONFIG } from '../../config/webui';
     import type { PromptScopeView, PromptVersion } from '../../lib/prompt-types';
+
+    const promptsUi = WEBUI_CONFIG.prompts;
 
     const scopeRailList = document.getElementById('scope-rail-list') as HTMLElement | null;
     const scopeTitle = document.getElementById('scope-title') as HTMLElement | null;
@@ -202,15 +191,15 @@ if (!session?.isAdmin) {
     }
 
     function runtimeStateText(scope: PromptScopeView | null): string {
-      if (!scope) return 'Loading';
-      if (scope.inheritedFromDefault && scope.scopeKey !== 'default') return 'Inherited from default';
-      if (scope.resolvedPrompt) return `Active · ${scope.resolvedPrompt.version}`;
-      return 'No active version';
+      if (!scope) return promptsUi.page.loading;
+      if (scope.inheritedFromDefault && scope.scopeKey !== 'default') return promptsUi.page.inheritedFromDefault;
+      if (scope.resolvedPrompt) return `${promptsUi.page.activeVersionPrefix}${scope.resolvedPrompt.version}`;
+      return promptsUi.page.noActiveVersion;
     }
 
     function scopeCardState(scope: PromptScopeView): string {
-      if (scope.scopeKey === 'default') return 'Baseline';
-      return scope.inheritedFromDefault ? 'Inherited' : 'Override active';
+      if (scope.scopeKey === 'default') return promptsUi.page.scopeCardBaseline;
+      return scope.inheritedFromDefault ? promptsUi.page.scopeCardInherited : promptsUi.page.scopeCardOverrideActive;
     }
 
     function renderScopeRail(): void {
@@ -218,7 +207,7 @@ if (!session?.isAdmin) {
 
       scopeRailList.innerHTML = promptScopes.map((scope) => {
         const selected = scope.scopeKey === selectedScopeKey;
-        const activeVersion = scope.resolvedPrompt ? escapeHtml(scope.resolvedPrompt.version) : 'No active version';
+        const activeVersion = scope.resolvedPrompt ? escapeHtml(scope.resolvedPrompt.version) : promptsUi.page.noActiveVersion;
         const versionCount = scope.versions.length;
         const state = scopeCardState(scope);
 
@@ -256,11 +245,11 @@ if (!session?.isAdmin) {
       if (scopeTitle) scopeTitle.textContent = scope.scopeLabel;
       if (scopeDescription) scopeDescription.textContent = scope.scopeDescription;
       if (scopeResolutionChip) scopeResolutionChip.textContent = runtimeStateText(scope);
-      if (scopeVersionChip) scopeVersionChip.textContent = scope.resolvedPrompt ? `Runtime version ${scope.resolvedPrompt.version}` : 'No resolved prompt';
+      if (scopeVersionChip) scopeVersionChip.textContent = scope.resolvedPrompt ? `${promptsUi.page.runtimeVersionPrefix}${scope.resolvedPrompt.version}` : promptsUi.page.noResolvedPrompt;
       if (versionsTitle) versionsTitle.textContent = `${scope.scopeLabel} versions`;
       if (scopeResetBtn) scopeResetBtn.hidden = scope.scopeKey === 'default' || scope.versions.length === 0;
 
-      const createLabel = scope.scopeKey === 'default' ? 'Create New Version' : 'Create Override Version';
+      const createLabel = scope.scopeKey === 'default' ? promptsUi.page.createNewScopeVersion : promptsUi.page.createOverrideVersion;
       if (createVersionBtn) createVersionBtn.textContent = createLabel;
       if (scopeCreateBtn) scopeCreateBtn.textContent = createLabel;
       if (emptyCreateBtn) emptyCreateBtn.textContent = createLabel;
@@ -278,16 +267,16 @@ if (!session?.isAdmin) {
         <table class="versions-table">
           <thead>
             <tr>
-              <th>Version</th>
-              <th>Updated</th>
-              <th>Status</th>
-              <th class="versions-table-actions">Actions</th>
+              <th>${promptsUi.page.tableHeaders.version}</th>
+              <th>${promptsUi.page.tableHeaders.updated}</th>
+              <th>${promptsUi.page.tableHeaders.status}</th>
+              <th class="versions-table-actions">${promptsUi.page.tableHeaders.actions}</th>
             </tr>
           </thead>
           <tbody>
             ${scope.versions.map((version) => {
               const isDefaultSeed = scope.scopeKey === 'default' && version.version === 'default';
-              const statusLabel = version.isActive ? 'Active' : 'Inactive';
+              const statusLabel = version.isActive ? promptsUi.page.status.active : promptsUi.page.status.inactive;
               return `
                 <tr>
                   <td>
@@ -299,9 +288,9 @@ if (!session?.isAdmin) {
                   <td>${new Date(version.updatedAt).toLocaleString()}</td>
                   <td><span class="row-badge ${version.isActive ? 'row-badge-active' : 'row-badge-inactive'}">${statusLabel}</span></td>
                   <td class="versions-table-actions">
-                    <button type="button" class="table-btn table-btn-primary" data-action="edit" data-id="${escapeHtml(version.id)}">Edit</button>
-                    <button type="button" class="table-btn table-btn-secondary" data-action="activate" data-id="${escapeHtml(version.id)}" ${version.isActive ? 'disabled' : ''}>Activate</button>
-                    <button type="button" class="table-btn table-btn-danger" data-action="delete" data-id="${escapeHtml(version.id)}" ${isDefaultSeed ? 'disabled' : ''}>Delete</button>
+                    <button type="button" class="table-btn table-btn-primary" data-action="edit" data-id="${escapeHtml(version.id)}">${promptsUi.page.edit}</button>
+                    <button type="button" class="table-btn table-btn-secondary" data-action="activate" data-id="${escapeHtml(version.id)}" ${version.isActive ? 'disabled' : ''}>${promptsUi.page.activate}</button>
+                    <button type="button" class="table-btn table-btn-danger" data-action="delete" data-id="${escapeHtml(version.id)}" ${isDefaultSeed ? 'disabled' : ''}>${promptsUi.page.delete}</button>
                   </td>
                 </tr>
               `;
@@ -348,7 +337,7 @@ if (!session?.isAdmin) {
       const scopeLabel = scope.scopeLabel;
 
       editorScopeLabel.textContent = scopeLabel;
-      editorTitle.textContent = mode === 'create' ? 'Create new prompt version' : 'Edit prompt version';
+      editorTitle.textContent = mode === 'create' ? promptsUi.page.createPromptVersion : promptsUi.page.editPromptVersion;
       editorVersionHint.textContent = mode === 'create'
         ? (seedVersion ? `Cloning ${seedVersion.version} into ${scope.scopeKey}` : `New version · ${scope.scopeKey}`)
         : (seedVersion ? `Version ${seedVersion.version} · ${scope.scopeKey}` : `Version · ${scope.scopeKey}`);
@@ -378,7 +367,7 @@ if (!session?.isAdmin) {
       if (!scope || !editorTextarea || !editorActiveCheckbox || !editorSaveBtn) return;
 
       editorSaveBtn.disabled = true;
-      editorSaveBtn.textContent = 'Saving...';
+      editorSaveBtn.textContent = promptsUi.page.saving;
 
       try {
         const body: Record<string, unknown> = {
@@ -407,20 +396,20 @@ if (!session?.isAdmin) {
         closeEditor();
       } catch (err) {
         console.error('[Prompts] Save failed:', err);
-        alert(err instanceof Error ? err.message : 'Failed to save prompt version.');
+        alert(err instanceof Error ? err.message : promptsUi.page.failedToSave);
       } finally {
         editorSaveBtn.disabled = false;
-        editorSaveBtn.textContent = 'Save Changes';
+        editorSaveBtn.textContent = promptsUi.page.save;
       }
     }
 
     async function deleteVersion(version: PromptVersion): Promise<void> {
       if (selectedScopeKey === 'default' && version.version === 'default') {
-        alert('The default prompt version cannot be deleted.');
+        alert(promptsUi.page.deleteDefaultWarning);
         return;
       }
 
-      if (!confirm(`Delete prompt version ${version.version}? This cannot be undone.`)) return;
+      if (!confirm(`${promptsUi.page.deleteConfirmPrefix}${version.version}${promptsUi.page.deleteConfirmSuffix}`)) return;
 
       try {
         const res = await fetch(`/api/admin/prompts?id=${encodeURIComponent(version.id)}`, {
@@ -468,7 +457,7 @@ if (!session?.isAdmin) {
       const scope = selectedScope();
       if (!scope || scope.scopeKey === 'default') return;
 
-      if (!confirm(`Reset the ${scope.scopeLabel} override and fall back to the default prompt?`)) return;
+      if (!confirm(`${promptsUi.page.resetOverrideConfirmPrefix}${scope.scopeLabel}${promptsUi.page.resetOverrideConfirmSuffix}`)) return;
 
       try {
         const res = await fetch(`/api/admin/prompts?scope=${encodeURIComponent(scope.scopeKey)}`, {
@@ -508,8 +497,8 @@ if (!session?.isAdmin) {
         if (scopeRailList) {
           scopeRailList.innerHTML = `
             <div class="error-card">
-              <p class="empty-title">Failed to load prompt scopes</p>
-              <p class="empty-copy">Check the admin API and database connection.</p>
+              <p class="empty-title">${promptsUi.page.loadErrorTitle}</p>
+              <p class="empty-copy">${promptsUi.page.loadErrorCopy}</p>
             </div>
           `;
         }
