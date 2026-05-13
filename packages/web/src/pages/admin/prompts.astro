@@ -1296,4 +1296,319 @@ if (!session?.isAdmin) {
       }
     }
   </style>
+
+  <style is:global>
+    /* JS-generated prompt cards need global selectors because Astro scoped CSS does not match innerHTML output. */
+    .prompt-page .scope-card {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 6px minmax(0, 1fr);
+      gap: 14px;
+      align-items: stretch;
+      text-align: left;
+      padding: 14px;
+      border-radius: 20px;
+      border: 1px solid var(--color-graphite-180);
+      background: var(--color-porcelain-100);
+      cursor: pointer;
+      transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .prompt-page .scope-card-accent {
+      border-radius: 999px;
+      min-height: 100%;
+    }
+
+    .prompt-page .scope-card-accent-default {
+      background: linear-gradient(180deg, var(--color-royal-blue-500), var(--color-royal-blue-700));
+    }
+
+    .prompt-page .scope-card-accent-override {
+      background: linear-gradient(180deg, var(--color-graphite-350), var(--color-graphite-500));
+    }
+
+    .prompt-page .scope-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .prompt-page .scope-card:hover {
+      transform: translateY(-1px);
+      border-color: var(--color-graphite-250);
+      background: var(--color-porcelain-150);
+    }
+
+    .prompt-page .scope-card-selected {
+      border-color: var(--color-royal-blue-600);
+      background: color-mix(in oklch, var(--color-royal-blue-100) 65%, var(--color-porcelain-50));
+      box-shadow: inset 0 0 0 1px var(--color-royal-blue-100);
+    }
+
+    .prompt-page .scope-card-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .prompt-page .scope-card-label-wrap {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .prompt-page .scope-card-label {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 650;
+      color: var(--color-graphite-900);
+    }
+
+    .prompt-page .scope-card-description {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--color-graphite-600);
+    }
+
+    .prompt-page .scope-badge,
+    .prompt-page .row-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .prompt-page .scope-badge-default,
+    .prompt-page .row-badge-active {
+      background: var(--color-royal-blue-100);
+      color: var(--color-royal-blue-700);
+      border: 1px solid var(--color-royal-blue-200);
+    }
+
+    .prompt-page .scope-badge-override,
+    .prompt-page .row-badge-inactive {
+      background: var(--color-porcelain-150);
+      color: var(--color-graphite-700);
+      border: 1px solid var(--color-graphite-220);
+    }
+
+    .prompt-page .scope-card-footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--color-graphite-160);
+      font-size: 12px;
+      color: var(--color-graphite-550);
+    }
+
+    .prompt-page .scope-card-count,
+    .prompt-page .scope-card-runtime {
+      min-width: 0;
+    }
+
+    .prompt-page .scope-card-runtime {
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .prompt-page .version-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .prompt-page .version-card {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 16px 18px;
+      border-radius: 18px;
+      border: 1px solid var(--color-graphite-180);
+      background: var(--color-porcelain-50);
+      box-shadow: 0 8px 24px color-mix(in oklch, var(--color-graphite-900) 5%, transparent);
+    }
+
+    .prompt-page .version-card-mark {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, var(--color-royal-blue-600), var(--color-royal-blue-700));
+      color: var(--color-porcelain-50);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    .prompt-page .version-card-active {
+      border-color: var(--color-royal-blue-200);
+      background: color-mix(in oklch, var(--color-royal-blue-50) 72%, var(--color-porcelain-50));
+    }
+
+    .prompt-page .version-card-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .prompt-page .version-card-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .prompt-page .version-name {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--color-graphite-900);
+    }
+
+    .prompt-page .version-scope {
+      font-size: 11px;
+      color: var(--color-graphite-550);
+    }
+
+    .prompt-page .version-card-updated {
+      margin: 0;
+      font-size: 12px;
+      color: var(--color-graphite-550);
+    }
+
+    .prompt-page .version-card-status {
+      justify-self: start;
+    }
+
+    .prompt-page .version-card-side {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .prompt-page .version-card-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .prompt-page .table-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+    }
+
+    .prompt-page .table-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .prompt-page .table-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .prompt-page .table-btn-primary {
+      background: var(--color-royal-blue-600);
+      border-color: var(--color-royal-blue-700);
+      color: var(--color-porcelain-50);
+    }
+
+    .prompt-page .table-btn-secondary {
+      background: var(--color-porcelain-100);
+      border-color: var(--color-graphite-280);
+      color: var(--color-graphite-800);
+    }
+
+    .prompt-page .table-btn-danger {
+      background: var(--color-danger-100);
+      border-color: var(--color-danger-500);
+      color: var(--color-danger-600);
+    }
+
+    .prompt-page .error-card {
+      border-radius: 18px;
+      border: 1px solid var(--color-danger-300);
+      background: var(--color-danger-50);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .prompt-page .empty-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 650;
+      color: var(--color-graphite-900);
+    }
+
+    .prompt-page .empty-copy {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--color-graphite-600);
+    }
+
+    @media (max-width: 768px) {
+      .prompt-page .scope-card,
+      .prompt-page .version-card {
+        grid-template-columns: 1fr;
+      }
+
+      .prompt-page .scope-card-accent,
+      .prompt-page .version-card-mark {
+        width: 100%;
+        min-height: 6px;
+        height: 6px;
+        border-radius: 999px;
+      }
+
+      .prompt-page .scope-card-header,
+      .prompt-page .scope-card-footer,
+      .prompt-page .version-card-side {
+        width: 100%;
+      }
+
+      .prompt-page .version-card-actions {
+        justify-content: flex-start;
+      }
+
+      .prompt-page .scope-card-runtime {
+        text-align: left;
+      }
+
+      .prompt-page .table-btn {
+        width: 100%;
+      }
+
+      .prompt-page .action-btn {
+        width: 100%;
+      }
+    }
+  </style>
 </AdminLayout>
