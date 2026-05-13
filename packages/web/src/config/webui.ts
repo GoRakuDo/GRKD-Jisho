@@ -136,12 +136,6 @@ export const WEBUI_CONFIG = {
         variable: "Variable",
         description: "Description",
       },
-      tableHeaders: {
-        version: "Version",
-        updated: "Updated",
-        status: "Status",
-        actions: "Actions",
-      },
       status: {
         active: "Active",
         inactive: "Inactive",

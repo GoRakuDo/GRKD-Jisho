@@ -164,6 +164,7 @@ if (!session?.isAdmin) {
     const emptyCreateBtn = document.getElementById('empty-create-btn') as HTMLButtonElement | null;
     const scopeResetBtn = document.getElementById('scope-reset-btn') as HTMLButtonElement | null;
     const editorModal = document.getElementById('editor-modal') as HTMLElement | null;
+    const editorBackdrop = document.querySelector('.editor-modal-backdrop') as HTMLElement | null;
     const editorScopeLabel = document.getElementById('editor-scope-label') as HTMLElement | null;
     const editorTitle = document.getElementById('editor-title') as HTMLElement | null;
     const editorVersionHint = document.getElementById('editor-version-hint') as HTMLElement | null;
@@ -213,16 +214,16 @@ if (!session?.isAdmin) {
 
         return `
           <button type="button" class="scope-card ${selected ? 'scope-card-selected' : ''}" data-scope-key="${escapeHtml(scope.scopeKey)}">
-            <div class="scope-card-top">
-              <div>
+            <div class="scope-card-header">
+              <div class="scope-card-label-wrap">
                 <p class="scope-card-label">${escapeHtml(scope.scopeLabel)}</p>
                 <p class="scope-card-description">${escapeHtml(scope.scopeDescription)}</p>
               </div>
               <span class="scope-badge ${scope.scopeKey === 'default' ? 'scope-badge-default' : 'scope-badge-override'}">${escapeHtml(state)}</span>
             </div>
-            <div class="scope-card-meta">
-              <span>${versionCount} version${versionCount === 1 ? '' : 's'}</span>
-              <span>${activeVersion}</span>
+            <div class="scope-card-footer">
+              <span class="scope-card-count">${versionCount} version${versionCount === 1 ? '' : 's'}</span>
+              <span class="scope-card-runtime">${activeVersion}</span>
             </div>
           </button>
         `;
@@ -264,39 +265,31 @@ if (!session?.isAdmin) {
 
       versionsEmpty.classList.add('hidden');
       versionsContainer.innerHTML = `
-        <table class="versions-table">
-          <thead>
-            <tr>
-              <th>${promptsUi.page.tableHeaders.version}</th>
-              <th>${promptsUi.page.tableHeaders.updated}</th>
-              <th>${promptsUi.page.tableHeaders.status}</th>
-              <th class="versions-table-actions">${promptsUi.page.tableHeaders.actions}</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${scope.versions.map((version) => {
-              const isDefaultSeed = scope.scopeKey === 'default' && version.version === 'default';
-              const statusLabel = version.isActive ? promptsUi.page.status.active : promptsUi.page.status.inactive;
-              return `
-                <tr>
-                  <td>
-                    <div class="version-cell-main">
-                      <span class="version-name">${escapeHtml(version.version)}</span>
-                      <span class="version-scope">${escapeHtml(version.scopeKey)}</span>
-                    </div>
-                  </td>
-                  <td>${new Date(version.updatedAt).toLocaleString()}</td>
-                  <td><span class="row-badge ${version.isActive ? 'row-badge-active' : 'row-badge-inactive'}">${statusLabel}</span></td>
-                  <td class="versions-table-actions">
-                    <button type="button" class="table-btn table-btn-primary" data-action="edit" data-id="${escapeHtml(version.id)}">${promptsUi.page.edit}</button>
-                    <button type="button" class="table-btn table-btn-secondary" data-action="activate" data-id="${escapeHtml(version.id)}" ${version.isActive ? 'disabled' : ''}>${promptsUi.page.activate}</button>
-                    <button type="button" class="table-btn table-btn-danger" data-action="delete" data-id="${escapeHtml(version.id)}" ${isDefaultSeed ? 'disabled' : ''}>${promptsUi.page.delete}</button>
-                  </td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
+        <div class="version-list">
+          ${scope.versions.map((version) => {
+            const isDefaultSeed = scope.scopeKey === 'default' && version.version === 'default';
+            const statusLabel = version.isActive ? promptsUi.page.status.active : promptsUi.page.status.inactive;
+            return `
+              <article class="version-card ${version.isActive ? 'version-card-active' : ''}">
+                <div class="version-card-main">
+                  <div class="version-card-head">
+                    <span class="version-name">${escapeHtml(version.version)}</span>
+                    <span class="version-scope">${escapeHtml(version.scopeKey)}</span>
+                  </div>
+                  <p class="version-card-updated">${new Date(version.updatedAt).toLocaleString()}</p>
+                </div>
+                <div class="version-card-status">
+                  <span class="row-badge ${version.isActive ? 'row-badge-active' : 'row-badge-inactive'}">${escapeHtml(statusLabel)}</span>
+                </div>
+                <div class="version-card-actions">
+                  <button type="button" class="table-btn table-btn-primary" data-action="edit" data-id="${escapeHtml(version.id)}">${promptsUi.page.edit}</button>
+                  <button type="button" class="table-btn table-btn-secondary" data-action="activate" data-id="${escapeHtml(version.id)}" ${version.isActive ? 'disabled' : ''}>${promptsUi.page.activate}</button>
+                  <button type="button" class="table-btn table-btn-danger" data-action="delete" data-id="${escapeHtml(version.id)}" ${isDefaultSeed ? 'disabled' : ''}>${promptsUi.page.delete}</button>
+                </div>
+              </article>
+            `;
+          }).join('')}
+        </div>
       `;
 
       versionsContainer.querySelectorAll('[data-action]').forEach((button) => {
@@ -365,6 +358,7 @@ if (!session?.isAdmin) {
     async function saveEditor(): Promise<void> {
       const scope = selectedScope();
       if (!scope || !editorTextarea || !editorActiveCheckbox || !editorSaveBtn) return;
+      if (!editorModal || editorModal.classList.contains('hidden')) return;
 
       editorSaveBtn.disabled = true;
       editorSaveBtn.textContent = promptsUi.page.saving;
@@ -513,7 +507,7 @@ if (!session?.isAdmin) {
     editorSaveBtn?.addEventListener('click', saveEditor);
 
     editorModal?.addEventListener('click', (event) => {
-      if (event.target === editorModal) closeEditor();
+      if (event.target === editorBackdrop) closeEditor();
     });
 
     document.addEventListener('keydown', (event) => {
@@ -668,6 +662,10 @@ if (!session?.isAdmin) {
 
     .scope-card {
       width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: stretch;
       text-align: left;
       padding: 16px;
       border-radius: 20px;
@@ -689,11 +687,18 @@ if (!session?.isAdmin) {
       box-shadow: inset 0 0 0 1px var(--color-royal-blue-100);
     }
 
-    .scope-card-top {
+    .scope-card-header {
       display: flex;
       justify-content: space-between;
       gap: 12px;
       align-items: flex-start;
+    }
+
+    .scope-card-label-wrap {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .scope-card-label {
@@ -704,7 +709,7 @@ if (!session?.isAdmin) {
     }
 
     .scope-card-description {
-      margin: 6px 0 0;
+      margin: 0;
       font-size: 13px;
       line-height: 1.6;
       color: var(--color-graphite-600);
@@ -740,13 +745,26 @@ if (!session?.isAdmin) {
       border: 1px solid var(--color-graphite-220);
     }
 
-    .scope-card-meta {
+    .scope-card-footer {
       display: flex;
       justify-content: space-between;
       gap: 12px;
-      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--color-graphite-160);
       font-size: 12px;
       color: var(--color-graphite-550);
+    }
+
+    .scope-card-count,
+    .scope-card-runtime {
+      min-width: 0;
+    }
+
+    .scope-card-runtime {
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .scope-workspace {
@@ -817,51 +835,40 @@ if (!session?.isAdmin) {
       justify-content: flex-end;
     }
 
-    .versions-table-wrap {
-      overflow: auto;
+    .version-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .version-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 16px;
+      align-items: center;
+      padding: 16px 18px;
       border-radius: 18px;
       border: 1px solid var(--color-graphite-180);
       background: var(--color-porcelain-50);
     }
 
-    .versions-table {
-      width: 100%;
-      border-collapse: collapse;
+    .version-card-active {
+      border-color: var(--color-royal-blue-200);
+      background: color-mix(in oklch, var(--color-royal-blue-50) 72%, var(--color-porcelain-50));
     }
 
-    .versions-table th,
-    .versions-table td {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--color-graphite-160);
-      font-size: 13px;
-      text-align: left;
-      vertical-align: middle;
-    }
-
-    .versions-table th {
-      position: sticky;
-      top: 0;
-      background: var(--color-porcelain-100);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--color-graphite-550);
-      z-index: 1;
-    }
-
-    .versions-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .versions-table-actions {
-      text-align: right;
-      white-space: nowrap;
-    }
-
-    .version-cell-main {
+    .version-card-main {
       display: flex;
       flex-direction: column;
       gap: 4px;
+      min-width: 0;
+    }
+
+    .version-card-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
     }
 
     .version-name {
@@ -875,11 +882,27 @@ if (!session?.isAdmin) {
       color: var(--color-graphite-550);
     }
 
+    .version-card-updated {
+      margin: 0;
+      font-size: 12px;
+      color: var(--color-graphite-550);
+    }
+
+    .version-card-status {
+      justify-self: start;
+    }
+
+    .version-card-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
     .table-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      margin-left: 8px;
       padding: 8px 12px;
       border-radius: 999px;
       border: 1px solid transparent;
@@ -921,6 +944,14 @@ if (!session?.isAdmin) {
       border-radius: 18px;
       border: 1px dashed var(--color-graphite-220);
       background: var(--color-porcelain-100);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .error-card {
+      border-radius: 18px;
+      border: 1px solid var(--color-danger-300);
+      background: var(--color-danger-50);
       padding: 20px;
       margin-bottom: 16px;
     }
@@ -1178,14 +1209,24 @@ if (!session?.isAdmin) {
         align-items: stretch;
       }
 
+      .scope-card-header,
+      .scope-card-footer,
+      .version-card {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+      }
+
+      .version-card-actions {
+        justify-content: flex-start;
+      }
+
+      .scope-card-runtime {
+        text-align: left;
+      }
+
       .action-btn,
       .table-btn {
         width: 100%;
-      }
-
-      .versions-table-actions {
-        text-align: left;
-        white-space: normal;
       }
     }
   </style>
