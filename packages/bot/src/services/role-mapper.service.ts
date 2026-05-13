@@ -6,7 +6,7 @@ const DEFAULT_OUTPUT_BUCKET_KEY: RoleKey = "indonesian";
 
 /**
  * Load role bindings from the database for a given guild.
- * Role ID mappings are guild-specific; invalid legacy values are ignored.
+ * Role ID mappings are guild-specific; invalid DB values are ignored.
  */
 async function loadBindings(guildId: string): Promise<Record<string, RoleKey>> {
   try {

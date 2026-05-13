@@ -472,7 +472,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
   }> = [];
 
   function formatOutputBucketLabel(value: string): string {
-    return outputBucketLabels[value] ?? `Legacy: ${value}`;
+    return outputBucketLabels[value] ?? `Unknown: ${value}`;
   }
 
   function ensureOutputBucketOption(select: HTMLSelectElement, value: string) {

@@ -1593,6 +1593,10 @@ reviewed: 2026-05-13 | Verdict: ✅ Approve
 
 Code review 後に、残っていた `.header-actions` の dead CSS も削除した。
 
+**Step G.3 Legacy role cleanup**
+
+`packages/db/src/schema/role-bindings.ts` から `SYSTEM_ROLE_KEYS` / `SystemRoleKey` の legacy alias を削除し、`Legacy:` だった invalid label fallback を `Unknown:` に統一した。`role-mapper.service.ts` と `role-settings.astro` の legacy 文言も合わせて整理した。
+
 Step I 実装ログ
 Step J 調査ログ
 Step K 最終検証ログ

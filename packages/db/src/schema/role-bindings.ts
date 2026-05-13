@@ -26,7 +26,7 @@ export function isOutputBucketKey(value: string): value is OutputBucketKey {
 }
 
 export function getOutputBucketLabel(value: string): string {
-  return isOutputBucketKey(value) ? OUTPUT_BUCKET_LABELS[value] : `Legacy: ${value}`;
+  return isOutputBucketKey(value) ? OUTPUT_BUCKET_LABELS[value] : `Unknown: ${value}`;
 }
 
 export const roleBindings = pgTable(
@@ -34,7 +34,7 @@ export const roleBindings = pgTable(
   {
     id: serial("id").primaryKey(),
     guildId: text("guild_id").notNull(),
-    // Legacy physical column name kept for DB compatibility; semantic value is the Discord role ID.
+    // Physical column name kept for DB compatibility; semantic value is the Discord role ID.
     discordRoleId: text("discord_role_name").notNull(),
     outputBucketKey: text("system_role_key").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
@@ -48,12 +48,3 @@ export const roleBindings = pgTable(
 
 export type RoleBinding = typeof roleBindings.$inferSelect;
 export type NewRoleBinding = typeof roleBindings.$inferInsert;
-
-/**
- * Legacy aliases kept for compatibility with older imports.
- * @deprecated Use OUTPUT_BUCKET_KEYS / OutputBucketKey.
- */
-export const SYSTEM_ROLE_KEYS = OUTPUT_BUCKET_KEYS;
-
-/** @deprecated Use OutputBucketKey. */
-export type SystemRoleKey = OutputBucketKey;
