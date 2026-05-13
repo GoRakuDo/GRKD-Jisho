@@ -14,9 +14,7 @@ if (!session?.isAdmin) {
 }
 ---
 
-<meta name="csrf-token" content={csrfToken} />
-
-<AdminLayout title={promptsUi.page.title} active="prompts">
+<AdminLayout title={promptsUi.page.title} active="prompts" csrfToken={csrfToken}>
   <div class="prompt-page">
     <div class="page-header">
       <div>
@@ -177,6 +175,7 @@ if (!session?.isAdmin) {
     let promptScopes: PromptScopeView[] = [];
     let selectedScopeKey: string = 'default';
     let editingId: string | null = null;
+    let lastFocusedTrigger: HTMLElement | null = null;
 
     function escapeHtml(value: string): string {
       return String(value)
@@ -211,19 +210,23 @@ if (!session?.isAdmin) {
         const activeVersion = scope.resolvedPrompt ? escapeHtml(scope.resolvedPrompt.version) : promptsUi.page.noActiveVersion;
         const versionCount = scope.versions.length;
         const state = scopeCardState(scope);
+        const accentClass = scope.scopeKey === 'default' ? 'scope-card-accent-default' : 'scope-card-accent-override';
 
         return `
-          <button type="button" class="scope-card ${selected ? 'scope-card-selected' : ''}" data-scope-key="${escapeHtml(scope.scopeKey)}">
-            <div class="scope-card-header">
-              <div class="scope-card-label-wrap">
-                <p class="scope-card-label">${escapeHtml(scope.scopeLabel)}</p>
-                <p class="scope-card-description">${escapeHtml(scope.scopeDescription)}</p>
+          <button type="button" class="scope-card ${selected ? 'scope-card-selected' : ''}" data-scope-key="${escapeHtml(scope.scopeKey)}" ${selected ? 'aria-current="true"' : ''}>
+            <span class="scope-card-accent ${accentClass}"></span>
+            <div class="scope-card-body">
+              <div class="scope-card-header">
+                <div class="scope-card-label-wrap">
+                  <p class="scope-card-label">${escapeHtml(scope.scopeLabel)}</p>
+                  <p class="scope-card-description">${escapeHtml(scope.scopeDescription)}</p>
+                </div>
+                <span class="scope-badge ${scope.scopeKey === 'default' ? 'scope-badge-default' : 'scope-badge-override'}">${escapeHtml(state)}</span>
               </div>
-              <span class="scope-badge ${scope.scopeKey === 'default' ? 'scope-badge-default' : 'scope-badge-override'}">${escapeHtml(state)}</span>
-            </div>
-            <div class="scope-card-footer">
-              <span class="scope-card-count">${versionCount} version${versionCount === 1 ? '' : 's'}</span>
-              <span class="scope-card-runtime">${activeVersion}</span>
+              <div class="scope-card-footer">
+                <span class="scope-card-count">${versionCount} version${versionCount === 1 ? '' : 's'}</span>
+                <span class="scope-card-runtime">${activeVersion}</span>
+              </div>
             </div>
           </button>
         `;
@@ -266,11 +269,13 @@ if (!session?.isAdmin) {
       versionsEmpty.classList.add('hidden');
       versionsContainer.innerHTML = `
         <div class="version-list">
-          ${scope.versions.map((version) => {
+          ${scope.versions.map((version, index) => {
             const isDefaultSeed = scope.scopeKey === 'default' && version.version === 'default';
             const statusLabel = version.isActive ? promptsUi.page.status.active : promptsUi.page.status.inactive;
+            const versionNumber = String(index + 1).padStart(2, '0');
             return `
               <article class="version-card ${version.isActive ? 'version-card-active' : ''}">
+                <div class="version-card-mark">${versionNumber}</div>
                 <div class="version-card-main">
                   <div class="version-card-head">
                     <span class="version-name">${escapeHtml(version.version)}</span>
@@ -278,13 +283,15 @@ if (!session?.isAdmin) {
                   </div>
                   <p class="version-card-updated">${new Date(version.updatedAt).toLocaleString()}</p>
                 </div>
-                <div class="version-card-status">
-                  <span class="row-badge ${version.isActive ? 'row-badge-active' : 'row-badge-inactive'}">${escapeHtml(statusLabel)}</span>
-                </div>
-                <div class="version-card-actions">
-                  <button type="button" class="table-btn table-btn-primary" data-action="edit" data-id="${escapeHtml(version.id)}">${promptsUi.page.edit}</button>
-                  <button type="button" class="table-btn table-btn-secondary" data-action="activate" data-id="${escapeHtml(version.id)}" ${version.isActive ? 'disabled' : ''}>${promptsUi.page.activate}</button>
-                  <button type="button" class="table-btn table-btn-danger" data-action="delete" data-id="${escapeHtml(version.id)}" ${isDefaultSeed ? 'disabled' : ''}>${promptsUi.page.delete}</button>
+                <div class="version-card-side">
+                  <div class="version-card-status">
+                    <span class="row-badge ${version.isActive ? 'row-badge-active' : 'row-badge-inactive'}">${escapeHtml(statusLabel)}</span>
+                  </div>
+                  <div class="version-card-actions">
+                    <button type="button" class="table-btn table-btn-primary" data-action="edit" data-id="${escapeHtml(version.id)}">${promptsUi.page.edit}</button>
+                    <button type="button" class="table-btn table-btn-secondary" data-action="activate" data-id="${escapeHtml(version.id)}" ${version.isActive ? 'disabled' : ''}>${promptsUi.page.activate}</button>
+                    <button type="button" class="table-btn table-btn-danger" data-action="delete" data-id="${escapeHtml(version.id)}" ${isDefaultSeed ? 'disabled' : ''}>${promptsUi.page.delete}</button>
+                  </div>
                 </div>
               </article>
             `;
@@ -325,6 +332,7 @@ if (!session?.isAdmin) {
       const scope = selectedScope();
       if (!scope || !editorModal || !editorScopeLabel || !editorTitle || !editorVersionHint || !editorTextarea || !editorPreview || !editorActiveCheckbox) return;
 
+      lastFocusedTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       editingId = version ? version.id : null;
       const seedVersion = version ?? scope.resolvedPrompt;
       const scopeLabel = scope.scopeLabel;
@@ -348,6 +356,8 @@ if (!session?.isAdmin) {
       if (!editorModal) return;
       editorModal.classList.add('hidden');
       editorModal.setAttribute('aria-hidden', 'true');
+      lastFocusedTrigger?.focus();
+      lastFocusedTrigger = null;
     }
 
     async function csrfHeaders(): Promise<Record<string, string>> {
@@ -662,17 +672,37 @@ if (!session?.isAdmin) {
 
     .scope-card {
       width: 100%;
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 6px minmax(0, 1fr);
       gap: 14px;
       align-items: stretch;
       text-align: left;
-      padding: 16px;
+      padding: 14px;
       border-radius: 20px;
       border: 1px solid var(--color-graphite-180);
       background: var(--color-porcelain-100);
       cursor: pointer;
       transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .scope-card-accent {
+      border-radius: 999px;
+      min-height: 100%;
+    }
+
+    .scope-card-accent-default {
+      background: linear-gradient(180deg, var(--color-royal-blue-500), var(--color-royal-blue-700));
+    }
+
+    .scope-card-accent-override {
+      background: linear-gradient(180deg, var(--color-graphite-350), var(--color-graphite-500));
+    }
+
+    .scope-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
     }
 
     .scope-card:hover {
@@ -843,13 +873,29 @@ if (!session?.isAdmin) {
 
     .version-card {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-columns: 52px minmax(0, 1fr) auto;
       gap: 16px;
       align-items: center;
       padding: 16px 18px;
       border-radius: 18px;
       border: 1px solid var(--color-graphite-180);
       background: var(--color-porcelain-50);
+      box-shadow: 0 8px 24px color-mix(in oklch, var(--color-graphite-900) 5%, transparent);
+    }
+
+    .version-card-mark {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, var(--color-royal-blue-600), var(--color-royal-blue-700));
+      color: var(--color-porcelain-50);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
     }
 
     .version-card-active {
@@ -890,6 +936,14 @@ if (!session?.isAdmin) {
 
     .version-card-status {
       justify-self: start;
+    }
+
+    .version-card-side {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+      min-width: 0;
     }
 
     .version-card-actions {
@@ -1209,11 +1263,23 @@ if (!session?.isAdmin) {
         align-items: stretch;
       }
 
-      .scope-card-header,
-      .scope-card-footer,
+      .scope-card,
       .version-card {
         grid-template-columns: 1fr;
-        flex-direction: column;
+      }
+
+      .scope-card-accent,
+      .version-card-mark {
+        width: 100%;
+        min-height: 6px;
+        height: 6px;
+        border-radius: 999px;
+      }
+
+      .scope-card-header,
+      .scope-card-footer,
+      .version-card-side {
+        width: 100%;
       }
 
       .version-card-actions {

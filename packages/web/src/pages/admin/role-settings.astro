@@ -16,9 +16,7 @@ if (!session?.isAdmin) {
 }
 ---
 
-<meta name="csrf-token" content={csrfToken} />
-
-<AdminLayout title={roleSettingsUi.page.title} active="role-settings">
+<AdminLayout title={roleSettingsUi.page.title} active="role-settings" csrfToken={csrfToken}>
   <div class="page-header">
     <div>
       <h1 class="page-title">{roleSettingsUi.page.title}</h1>
@@ -151,6 +149,8 @@ type RoleLimit = {
 // ── State ──
 let roleCache: RoleLimit[] = [];
 let editingDiscordRoleId: string | null = null;
+let lastFocusedRoleTrigger: HTMLElement | null = null;
+let lastFocusedBindingTrigger: HTMLElement | null = null;
 let currentDefaultLimit: number = 10;
 const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.getAttribute("content") ?? "";
 
@@ -268,6 +268,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
   // ── Modal Controls ──
   function openModal(role: RoleLimit) {
+    lastFocusedRoleTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     editingDiscordRoleId = role.discordRoleId;
     const title = getEl<HTMLHeadingElement>("role-modal-title");
     const idInput = getEl<HTMLInputElement>("role-id-input");
@@ -294,9 +295,12 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
     const idInput = getEl<HTMLInputElement>("role-id-input");
     if (modal) modal.classList.add("hidden");
     if (idInput) idInput.disabled = false;
+    lastFocusedRoleTrigger?.focus();
+    lastFocusedRoleTrigger = null;
   }
 
   function openAddModal() {
+    lastFocusedRoleTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     editingDiscordRoleId = null;
     const title = getEl<HTMLHeadingElement>("role-modal-title");
     const idInput = getEl<HTMLInputElement>("role-id-input");
@@ -526,35 +530,37 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
       container.querySelectorAll('.edit-binding-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            const id = Number(btn.getAttribute('data-id'));
-            const binding = bindingsCache.find(b => b.id === id);
-            if (!binding) return;
-            const nameInput = document.getElementById('binding-role-id') as HTMLInputElement | null;
-            const keySelect = document.getElementById('binding-output-bucket') as HTMLSelectElement | null;
-            if (nameInput && keySelect) {
-             nameInput.value = binding.discordRoleId;
-             ensureOutputBucketOption(keySelect, binding.outputBucketKey);
-             keySelect.value = binding.outputBucketKey;
-            }
+          const id = Number(btn.getAttribute('data-id'));
+          const binding = bindingsCache.find(b => b.id === id);
+          if (!binding) return;
+          lastFocusedBindingTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          const nameInput = document.getElementById('binding-role-id') as HTMLInputElement | null;
+          const keySelect = document.getElementById('binding-output-bucket') as HTMLSelectElement | null;
+          if (nameInput && keySelect) {
+            nameInput.value = binding.discordRoleId;
+            ensureOutputBucketOption(keySelect, binding.outputBucketKey);
+            keySelect.value = binding.outputBucketKey;
+          }
           document.getElementById('binding-modal')?.classList.remove('hidden');
+          nameInput?.focus();
         });
       });
 
       container.querySelectorAll('.delete-binding-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
           const id = Number(btn.getAttribute('data-id'));
-           if (!confirm(roleSettingsUi.page.alerts.deleteBindingConfirm)) return;
-           if (!csrfToken) { alert(roleSettingsUi.page.alerts.csrfUnavailable); return; }
+          if (!confirm(roleSettingsUi.page.alerts.deleteBindingConfirm)) return;
+          if (!csrfToken) { alert(roleSettingsUi.page.alerts.csrfUnavailable); return; }
           try {
             const res = await fetch('/api/admin/role-bindings?id=' + id, {
               method: 'DELETE',
               headers: { 'x-csrf-token': csrfToken },
             });
-           if (!res.ok) throw new Error('Delete failed');
+            if (!res.ok) throw new Error('Delete failed');
             await renderBindings();
           } catch (err) {
             console.error('[RoleBindings] Delete failed:', err);
-           alert('Failed to delete binding.');
+            alert('Failed to delete binding.');
           }
         });
       });
@@ -564,15 +570,19 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
   }
 
   document.getElementById('add-binding-btn')?.addEventListener('click', () => {
+    lastFocusedBindingTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const nameInput = document.getElementById('binding-role-id') as HTMLInputElement | null;
     const keySelect = document.getElementById('binding-output-bucket') as HTMLSelectElement | null;
     if (nameInput) nameInput.value = '';
     if (keySelect) keySelect.value = 'indonesian';
     document.getElementById('binding-modal')?.classList.remove('hidden');
+    nameInput?.focus();
   });
 
   document.getElementById('binding-cancel-btn')?.addEventListener('click', () => {
     document.getElementById('binding-modal')?.classList.add('hidden');
+    lastFocusedBindingTrigger?.focus();
+    lastFocusedBindingTrigger = null;
   });
 
   document.getElementById('binding-save-btn')?.addEventListener('click', async () => {
@@ -593,6 +603,8 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
       });
       if (!res.ok) throw new Error('Save failed');
       document.getElementById('binding-modal')?.classList.add('hidden');
+      lastFocusedBindingTrigger?.focus();
+      lastFocusedBindingTrigger = null;
       await renderBindings();
     } catch (err) {
       console.error('[RoleBindings] Save failed:', err);

@@ -51,8 +51,6 @@ if (session?.isAdmin) {
 }
 ---
 
-<meta name="csrf-token" content={csrfToken} />
-
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const SSR_CSRF_TOKEN = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
@@ -129,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
-<AdminLayout title="Dictionaries" active="dictionaries">
+<AdminLayout title="Dictionaries" active="dictionaries" csrfToken={csrfToken}>
   <div class="page-header">
     <div>
       <h1 class="page-title">Dictionaries</h1>

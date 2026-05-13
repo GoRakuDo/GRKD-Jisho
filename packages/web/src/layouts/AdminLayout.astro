@@ -6,9 +6,10 @@ import { TopBar } from "../components/admin/TopBar";
 export interface Props {
   title: string;
   active: string;
+  csrfToken?: string;
 }
 
-const { title, active } = Astro.props;
+const { title, active, csrfToken } = Astro.props;
 ---
 
 <!doctype html>
@@ -16,6 +17,7 @@ const { title, active } = Astro.props;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {csrfToken ? <meta name="csrf-token" content={csrfToken} /> : null}
     <title>{title} — GRKD-Jisho Admin</title>
   </head>
   <body>
