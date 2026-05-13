@@ -22,9 +22,6 @@ if (!session?.isAdmin) {
         <h1 class="page-title">{promptsUi.page.title}</h1>
         <p class="page-description">{promptsUi.page.description}</p>
       </div>
-      <div class="header-actions">
-        <button id="create-version-btn" class="action-btn action-btn-primary" type="button">{promptsUi.page.createVersion}</button>
-      </div>
     </div>
 
     <div class="prompt-layout">
@@ -157,7 +154,6 @@ if (!session?.isAdmin) {
     const versionsTitle = document.getElementById('versions-title') as HTMLElement | null;
     const versionsContainer = document.getElementById('versions-container') as HTMLElement | null;
     const versionsEmpty = document.getElementById('versions-empty') as HTMLElement | null;
-    const createVersionBtn = document.getElementById('create-version-btn') as HTMLButtonElement | null;
     const scopeCreateBtn = document.getElementById('scope-create-btn') as HTMLButtonElement | null;
     const emptyCreateBtn = document.getElementById('empty-create-btn') as HTMLButtonElement | null;
     const scopeResetBtn = document.getElementById('scope-reset-btn') as HTMLButtonElement | null;
@@ -254,7 +250,6 @@ if (!session?.isAdmin) {
       if (scopeResetBtn) scopeResetBtn.hidden = scope.scopeKey === 'default' || scope.versions.length === 0;
 
       const createLabel = scope.scopeKey === 'default' ? promptsUi.page.createNewScopeVersion : promptsUi.page.createOverrideVersion;
-      if (createVersionBtn) createVersionBtn.textContent = createLabel;
       if (scopeCreateBtn) scopeCreateBtn.textContent = createLabel;
       if (emptyCreateBtn) emptyCreateBtn.textContent = createLabel;
 
@@ -509,7 +504,6 @@ if (!session?.isAdmin) {
       }
     }
 
-    createVersionBtn?.addEventListener('click', () => openEditor(null, 'create'));
     scopeCreateBtn?.addEventListener('click', () => openEditor(null, 'create'));
     emptyCreateBtn?.addEventListener('click', () => openEditor(null, 'create'));
     scopeResetBtn?.addEventListener('click', resetOverride);
@@ -573,12 +567,6 @@ if (!session?.isAdmin) {
       font-size: 14px;
       line-height: 1.7;
       color: var(--color-graphite-600);
-    }
-
-    .header-actions {
-      display: flex;
-      gap: 12px;
-      align-items: center;
     }
 
     .action-btn {
@@ -1257,7 +1245,6 @@ if (!session?.isAdmin) {
 
       .scope-hero-meta,
       .versions-actions,
-      .header-actions,
       .editor-footer {
         width: 100%;
         align-items: stretch;

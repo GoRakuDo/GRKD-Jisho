@@ -1587,6 +1587,12 @@ reviewed: 2026-05-13 | Verdict: ✅ Approve
 | 残リスク | なし |
 | Git commit hash | `808c86a` |
 
+**Step G.2 Prompt CTA cleanup**
+
+`prompts.astro` のページ上部 `Create New Version` を削除し、Version History 内の作成導線だけを残した。作成モーダルは履歴側の CTA に統一し、重複ボタンによる見た目の混雑を解消した。
+
+Code review 後に、残っていた `.header-actions` の dead CSS も削除した。
+
 Step I 実装ログ
 Step J 調査ログ
 Step K 最終検証ログ
