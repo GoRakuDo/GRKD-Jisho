@@ -1575,6 +1575,18 @@ reviewed: 2026-05-07 | Verdict: ✅ Approve (after fixes)
 - Git commit hash: d333d17 (FormEvent), 67bbad7 (z.url)
 - 検証: `astro check`: 0 errors / 0 warnings / 0 hints
 
+**Step G.1 Prompt scope styling fix**
+
+reviewed: 2026-05-13 | Verdict: ✅ Approve
+
+| 項目 | 内容 |
+|---|---|
+| 作業 | `prompts.astro` の runtime 生成カード (`innerHTML`) が Astro scoped CSS を外れていたため、`.prompt-page` 前置きの `style is:global` を追加して scope/version/error fallback の全カードを再デザイン |
+| 変更ファイル | `packages/web/src/pages/admin/prompts.astro` |
+| 検証 | `pnpm --filter @grkd-jisho/web check` / `pnpm --filter @grkd-jisho/web build` / code-reviewer |
+| 残リスク | なし |
+| Git commit hash | `808c86a` |
+
 Step I 実装ログ
 Step J 調査ログ
 Step K 最終検証ログ
