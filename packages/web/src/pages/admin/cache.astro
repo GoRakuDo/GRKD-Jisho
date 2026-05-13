@@ -1,7 +1,7 @@
 ---
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
-import { getCacheStats, getRecentCacheActivity, searchCacheEntries } from "@grkd-jisho/db";
+import { getCacheStats, getRecentCacheActivity, searchCacheEntries, getOutputBucketLabel } from "@grkd-jisho/db";
 import { CacheDeletePanel } from "../../components/admin/CacheDeletePanel";
 import { generateCsrfToken } from "../../lib/csrf";
 
@@ -69,7 +69,7 @@ if (session?.isAdmin) {
               <th class="col-query" scope="col">Query</th>
               <th class="col-state" scope="col">State</th>
               <th class="col-prompt" scope="col">Prompt version</th>
-              <th class="col-role" scope="col">Role</th>
+              <th class="col-role" scope="col">Output Bucket</th>
             </tr>
           </thead>
           <tbody>
@@ -104,7 +104,7 @@ if (session?.isAdmin) {
                   <span class="prompt-pill" title="Current cache row prompt version">{entry.promptVersion}</span>
                 </td>
                 <td class="col-role">
-                  <span class="role-pill">{entry.roleKey}</span>
+                  <span class="role-pill">{getOutputBucketLabel(entry.roleKey)}</span>
                 </td>
               </tr>
             ))}

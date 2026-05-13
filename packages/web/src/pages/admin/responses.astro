@@ -1,7 +1,7 @@
 ---
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
-import { searchResponse } from "@grkd-jisho/db";
+import { searchResponse, getOutputBucketLabel } from "@grkd-jisho/db";
 
 const session = getSession(Astro);
 const urlParams = new URL(Astro.url.toString()).searchParams;
@@ -46,7 +46,7 @@ if (session?.isAdmin && query) {
           <tr>
             <th>ID</th>
             <th>Query</th>
-            <th>Role</th>
+            <th>Output Bucket</th>
             <th>Manual</th>
             <th>Preview</th>
             <th>Updated</th>
@@ -57,7 +57,7 @@ if (session?.isAdmin && query) {
             <tr class="clickable-row" data-href={`/admin/responses/${r.id}`}>
               <td class="mono">{r.id}</td>
               <td>{r.query}</td>
-              <td class="mono">{r.roleKey}</td>
+              <td class="mono">{getOutputBucketLabel(r.roleKey)}</td>
               <td>
                 {r.isManualOverride ? (
                   <span class="badge-manual">manual</span>

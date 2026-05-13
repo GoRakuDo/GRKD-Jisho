@@ -26,7 +26,7 @@ import type { SearchResult } from "@grkd-jisho/db";
 const makeResult = (overrides: Partial<SearchResult> = {}): SearchResult => ({
   id: "42",
   query: "test",
-  roleKey: "pemula",
+  roleKey: "indonesian",
   modelName: PRIMARY_LLM_MODEL,
   promptVersion: "v1",
   isManualOverride: false,

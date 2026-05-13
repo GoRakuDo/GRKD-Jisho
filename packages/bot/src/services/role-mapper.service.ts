@@ -1,28 +1,12 @@
+import { isOutputBucketKey } from "@grkd-jisho/db";
 import type { RoleKey } from "../types.js";
 
-const ROLE_ORDER: RoleKey[] = ["pemula", "pemula-atas", "menengah", "mahir"];
-
-/**
- * Cached DB bindings keyed by guildId, with 30-minute TTL.
- * Populated lazily on first resolveRoleKey call per guild.
- * Expired entries are refreshed on the next resolveRoleKey call.
- */
-const CACHE_TTL_MS = 30 * 60 * 1000;
-
-interface CacheEntry {
-  map: Record<string, RoleKey>;
-  timestamp: number;
-}
-
-const bindingCache = new Map<string, CacheEntry>();
-
-function isCacheValid(entry: CacheEntry): boolean {
-  return Date.now() - entry.timestamp < CACHE_TTL_MS;
-}
+const DAILY_JAPANESE_OUTPUT_BUCKET_KEY: RoleKey = "daily-japanese";
+const DEFAULT_OUTPUT_BUCKET_KEY: RoleKey = "indonesian";
 
 /**
  * Load role bindings from the database for a given guild.
- * Role ID mappings are guild-specific; if no binding exists, the default role key is used.
+ * Role ID mappings are guild-specific; invalid legacy values are ignored.
  */
 async function loadBindings(guildId: string): Promise<Record<string, RoleKey>> {
   try {
@@ -31,60 +15,42 @@ async function loadBindings(guildId: string): Promise<Record<string, RoleKey>> {
     const map: Record<string, RoleKey> = {};
 
     for (const b of bindings) {
-      if (ROLE_ORDER.includes(b.systemRoleKey as RoleKey)) {
-        map[b.discordRoleId] = b.systemRoleKey as RoleKey;
+      if (isOutputBucketKey(b.outputBucketKey)) {
+        map[b.discordRoleId] = b.outputBucketKey;
       }
     }
 
     return map;
-  } catch {
-    return {};
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[RoleMapper] Failed to load role bindings for guild=${guildId}: ${reason} → Check DB connectivity and role_bindings rows`,
+    );
+    throw new Error(`Failed to load role bindings for guild ${guildId}`);
   }
 }
 
 /**
- * Resolve the highest-priority system role key for a set of role IDs.
+ * Resolve the output bucket for a set of role IDs.
  *
- * Tries DB bindings first (lazy loaded per guild), falls back to pemula.
+ * daily-japanese wins when any bound role matches.
+ * If nothing matches, indonesian is the fallback bucket.
  */
-export async function resolveRoleKey(
+export async function resolveOutputBucketKey(
   roleIds: string[],
   guildId?: string,
 ): Promise<RoleKey> {
-  const cacheKey = guildId ?? "__default__";
-
-  const cached = bindingCache.get(cacheKey);
-  if (!cached || !isCacheValid(cached)) {
-    const map = await loadBindings(cacheKey);
-    bindingCache.set(cacheKey, { map, timestamp: Date.now() });
+  if (!guildId) {
+    return DEFAULT_OUTPUT_BUCKET_KEY;
   }
 
-  const map = bindingCache.get(cacheKey)!.map;
-  let best: RoleKey = "pemula";
-  let bestIndex = 0;
+  const map = await loadBindings(guildId);
 
   for (const roleId of roleIds) {
-    const key = map[roleId];
-    if (key) {
-      const idx = ROLE_ORDER.indexOf(key);
-      if (idx > bestIndex) {
-        best = key;
-        bestIndex = idx;
-      }
+    if (map[roleId] === DAILY_JAPANESE_OUTPUT_BUCKET_KEY) {
+      return DAILY_JAPANESE_OUTPUT_BUCKET_KEY;
     }
   }
 
-  return best;
-}
-
-/**
- * Invalidate the binding cache for a guild.
- * Called after an admin updates bindings via the WebUI or MCP.
- */
-export function invalidateBindingCache(guildId?: string): void {
-  if (guildId) {
-    bindingCache.delete(guildId);
-  } else {
-    bindingCache.clear();
-  }
+  return DEFAULT_OUTPUT_BUCKET_KEY;
 }

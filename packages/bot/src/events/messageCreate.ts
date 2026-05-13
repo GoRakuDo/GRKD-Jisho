@@ -4,7 +4,7 @@ import { getActivePrompt } from "@grkd-jisho/db";
 import { env } from "../config/env.js";
 import { PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import { lookupWord } from "../services/dictionary.service.js";
-import { resolveRoleKey } from "../services/role-mapper.service.js";
+import { resolveOutputBucketKey } from "../services/role-mapper.service.js";
 import { getCachedResponse, saveResponse } from "../services/response-cache.service.js";
 import { generate, normalizePromptTemplate } from "../services/llm.service.js";
 import { recordLookup } from "../services/lookup-log.service.js";
@@ -141,8 +141,8 @@ async function handleMessage(message: Message): Promise<void> {
   const guildContextId = message.guildId ?? env.DISCORD_GUILD_ID;
 
   if (isDmOwner) {
-    const roleKey = await resolveRoleKey([], guildContextId);
-    console.log(`[Lookup] trace=${traceId} DM owner path → roleKey=${roleKey}`);
+    const outputBucketKey = await resolveOutputBucketKey([], guildContextId);
+    console.log(`[Lookup] trace=${traceId} DM owner path → outputBucketKey=${outputBucketKey}`);
 
     const result = await lookupWord(query);
     if (!result) {
@@ -176,7 +176,7 @@ async function handleMessage(message: Message): Promise<void> {
       normalizedQuery: result.normalizedQuery,
       dictionaryId: result.dictionary.id,
       entryId: result.entry.id,
-      roleKey,
+      roleKey: outputBucketKey,
       promptVersion: promptContext.promptVersion,
       promptContentHash: promptContext.promptContentHash,
       modelName: PRIMARY_LLM_MODEL,
@@ -210,7 +210,7 @@ async function handleMessage(message: Message): Promise<void> {
 
     try {
       const responseText = await generate({
-        roleKey,
+        roleKey: outputBucketKey,
         query,
         reading: result.entry.reading,
         dictionaryName: result.dictionary.name,
@@ -299,8 +299,8 @@ async function handleMessage(message: Message): Promise<void> {
   await traceEvent(traceId, "rate_limit.checked", "info", {});
   console.log(`[Lookup] trace=${traceId} rate limit passed`);
 
-  const roleKey = await resolveRoleKey(roleIds, guildContextId);
-  console.log(`[Lookup] trace=${traceId} roleKey resolved → ${roleKey}`);
+  const outputBucketKey = await resolveOutputBucketKey(roleIds, guildContextId);
+  console.log(`[Lookup] trace=${traceId} output bucket resolved → ${outputBucketKey}`);
 
   const result = await lookupWord(query);
   if (!result) {
@@ -333,7 +333,7 @@ async function handleMessage(message: Message): Promise<void> {
     normalizedQuery: result.normalizedQuery,
     dictionaryId: result.dictionary.id,
     entryId: result.entry.id,
-    roleKey,
+    roleKey: outputBucketKey,
     promptVersion: promptContext.promptVersion,
     promptContentHash: promptContext.promptContentHash,
     modelName: PRIMARY_LLM_MODEL,
@@ -365,7 +365,7 @@ async function handleMessage(message: Message): Promise<void> {
   console.log(`[Lookup] trace=${traceId} llm.generate.started`);
   try {
     const responseText = await generate({
-      roleKey,
+      roleKey: outputBucketKey,
       query,
       reading: result.entry.reading,
       dictionaryName: result.dictionary.name,

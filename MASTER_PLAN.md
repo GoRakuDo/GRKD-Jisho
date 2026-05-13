@@ -225,7 +225,7 @@ CREATE TABLE response_cache (
   normalized_query     TEXT NOT NULL,          -- ひらがな正規化後
   dictionary_id        INTEGER REFERENCES dictionaries(id),
   dictionary_entry_id  BIGINT REFERENCES dictionary_entries(id),
-  role_key             TEXT NOT NULL,           -- pemula / pemula-atas / menengah / mahir
+  role_key             TEXT NOT NULL,           -- daily-japanese / indonesian
   prompt_version       TEXT NOT NULL,           -- "v1", "v2"
   model_name           TEXT NOT NULL,           -- "gemma-4-31b-it"
   response_text        TEXT NOT NULL,
@@ -278,38 +278,39 @@ CREATE TABLE lookup_logs (
 
 ---
 
-## 6. Role Mapping
+## 6. Output Bucket Routing
 
-Discord ロールを内部 `role_key` に変換することで、Discord 側の変更がプロンプトに直接影響しない設計にします。
+Discord role ID を内部 `role_key` に変換することで、Discord 側の変更がプロンプトに直接影響しない設計にします。
 
 ```typescript
 // packages/bot/src/services/role-mapper.service.ts
 
-const ROLE_MAP: Record<string, RoleKey> = {
-  "1段": "pemula",
-  "2段": "pemula-atas",
-  "3段": "menengah",
-  "4段": "mahir",
+const OUTPUT_BUCKET_KEYS = ["daily-japanese", "indonesian"] as const;
+
+export type RoleKey = (typeof OUTPUT_BUCKET_KEYS)[number];
+
+const roleBindings: Record<string, RoleKey> = {
+  "role-id-1": "daily-japanese",
+  "role-id-2": "daily-japanese",
+  "role-id-3": "indonesian",
 };
 
-export type RoleKey = "pemula" | "pemula-atas" | "menengah" | "mahir";
-
-export function resolveRoleKey(memberRoles: string[]): RoleKey {
-  for (const [roleName, roleKey] of Object.entries(ROLE_MAP)) {
-    if (memberRoles.includes(roleName)) return roleKey;
+export function resolveOutputBucketKey(memberRoleIds: string[]): RoleKey {
+  if (memberRoleIds.some((roleId) => roleBindings[roleId] === "daily-japanese")) {
+    return "daily-japanese";
   }
-  return "pemula"; // デフォルト: 最初のレベル
+  return "indonesian";
 }
 ```
 
-### ロール別説明方針
+### 出力バケット別説明方針
 
 | role_key | 返答スタイル | 使用言語 |
 |----------|------------|---------|
-| `pemula` | 超シンプルな説明 | インドネシア語メイン |
-| `pemula-atas` | 基礎的な説明 | やさしい日本語 + インドネシア語補足 |
-| `menengah` | 日常的な解説 | 日本語 |
-| `mahir` | ありのままの辞書定義 | 日本語（難読さそのまま） |
+| `daily-japanese` | 日常日本語の出力 | 日本語 |
+| `indonesian` | インドネシア語の出力 | インドネシア語 |
+
+詳細は `DOCS/Operations/output-bucket-routing.md` を参照。
 
 ---
 
@@ -415,10 +416,10 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 - 辞書にない意味を追加しないでください
 - 不明な場合は「辞書情報が不足しています」と言ってください
 - Discord で読みやすい短い回答にしてください
-- ユーザーロールに合わせて難易度を調整してください
+- 出力バケットに合わせて出力言語を切り替えてください
 - Reasoning 分離は provider-native fields を使う。`{{query}}` は input variable のまま。出力 marker の扱いは `DOCS/Prompts/prompt-v2.md` に集約する。
 
-ユーザーロール: {{role_key}}
+出力バケット: {{role_key}}
 検索語: {{query}}
 辞書ソース: {{dictionary_name}}
 辞書定義: {{definition_json}}
@@ -649,7 +650,7 @@ Owner / Administrator → 無制限
 CREATE TABLE role_rate_limits (
   id               SERIAL PRIMARY KEY,
   discord_role_id  TEXT NOT NULL UNIQUE,   -- Discord の Role ID (Snowflake)
-  role_label       TEXT,                   -- 管理用ラベル "pemula" 等
+  role_label       TEXT,                   -- 管理用ラベル
   daily_limit      INTEGER NOT NULL,       -- 1日あたりの上限回数 (-1 = 無制限)
   created_at       TIMESTAMPTZ DEFAULT now(),
   updated_at       TIMESTAMPTZ DEFAULT now()

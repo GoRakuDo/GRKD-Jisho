@@ -410,7 +410,7 @@ export const responseCache = pgTable(
       .references(() => dictionaries.id),
     dictionaryEntryId: bigint("dictionary_entry_id", { mode: "bigint" })
       .references(() => dictionaryEntries.id),
-    roleKey: text("role_key").notNull(),           // pemula / pemula-atas / menengah / mahir
+    roleKey: text("role_key").notNull(),           // daily-japanese / indonesian
     promptVersion: text("prompt_version").notNull(), // "v1"
     modelName: text("model_name").notNull(),         // "gemma-4-31b-it"
     responseText: text("response_text").notNull(),
@@ -750,7 +750,7 @@ import { pgTable, serial, text, integer, timestamp } from "drizzle-orm/pg-core";
 export const roleRateLimits = pgTable("role_rate_limits", {
   id: serial("id").primaryKey(),
   discordRoleId: text("discord_role_id").notNull().unique(), // Discord Role ID (Snowflake)
-  roleLabel: text("role_label"),                              // 管理用ラベル "pemula" 等
+  roleLabel: text("role_label"),                              // 管理用ラベル
   dailyLimit: integer("daily_limit").notNull(),               // 1日あたり上限 (-1 = 無制限)
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),

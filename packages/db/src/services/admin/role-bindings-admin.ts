@@ -1,11 +1,11 @@
 /**
  * Role bindings administration services
  *
- * CRUD for Discord role ID → system role key mappings per guild.
+ * CRUD for Discord role ID → output bucket mappings per guild.
  */
 
 import { db } from "../../client";
-import { roleBindings, type RoleBinding } from "../../schema/role-bindings";
+import { roleBindings, type RoleBinding, type OutputBucketKey } from "../../schema/role-bindings";
 import { and, eq, sql } from "drizzle-orm";
 
 /**
@@ -26,14 +26,14 @@ export async function getRoleBindings(guildId: string): Promise<RoleBinding[]> {
 export async function upsertRoleBinding(
   guildId: string,
   discordRoleId: string,
-  systemRoleKey: string,
+  outputBucketKey: OutputBucketKey,
 ): Promise<RoleBinding> {
   const [result] = await db
     .insert(roleBindings)
-    .values({ guildId, discordRoleId, systemRoleKey })
+    .values({ guildId, discordRoleId, outputBucketKey })
     .onConflictDoUpdate({
       target: [roleBindings.guildId, roleBindings.discordRoleId],
-      set: { systemRoleKey, updatedAt: sql`now()` },
+      set: { outputBucketKey, updatedAt: sql`now()` },
     })
     .returning();
   if (!result) throw new Error("Failed to upsert role binding");

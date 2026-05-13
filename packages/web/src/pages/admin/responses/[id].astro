@@ -1,7 +1,7 @@
 ---
 import AdminLayout from "../../../layouts/AdminLayout.astro";
 import { getSession } from "../../../lib/session";
-import { getResponseDetail } from "@grkd-jisho/db";
+import { getResponseDetail, getOutputBucketLabel } from "@grkd-jisho/db";
 import ResponseDetailPanel from "../../../components/admin/ResponseDetailPanel";
 import ResponseEditTimeline from "../../../components/admin/ResponseEditTimeline";
 
@@ -89,7 +89,7 @@ if (session?.isAdmin && id) {
         client:load
         id={detail.id}
         query={detail.query}
-        role={detail.roleKey}
+        outputBucketLabel={getOutputBucketLabel(detail.roleKey)}
         model={detail.modelName}
         promptVersion={detail.promptVersion}
         isOverride={detail.isManualOverride}

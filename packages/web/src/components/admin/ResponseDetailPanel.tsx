@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 export interface ResponseDetailPanelProps {
   id: string;
   query: string;
-  role: string;
+  outputBucketLabel: string;
   model: string;
   promptVersion: string;
   isOverride: boolean;
@@ -13,7 +13,7 @@ export interface ResponseDetailPanelProps {
 export default function ResponseDetailPanel({
   id,
   query,
-  role,
+  outputBucketLabel,
   model,
   promptVersion,
   isOverride,
@@ -192,8 +192,8 @@ export default function ResponseDetailPanel({
           <span style={valueStyle}>{query}</span>
         </div>
         <div style={metaGroupStyle}>
-          <span style={labelStyle}>Role / Model</span>
-          <span style={valueStyle}>{role} &middot; {model}</span>
+          <span style={labelStyle}>Output Bucket / Model</span>
+          <span style={valueStyle}>{outputBucketLabel} &middot; {model}</span>
         </div>
         <div style={metaGroupStyle}>
           <span style={labelStyle}>Prompt</span>

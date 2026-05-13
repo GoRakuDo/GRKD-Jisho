@@ -6,7 +6,7 @@ import {
   getRoleBindings,
   upsertRoleBinding,
   deleteRoleBinding,
-  SYSTEM_ROLE_KEYS,
+  isOutputBucketKey,
 } from "@grkd-jisho/db";
 
 /**
@@ -34,7 +34,7 @@ export const GET: APIRoute = async (context) => {
 /**
  * PUT /api/admin/role-bindings
  * Upsert a role binding.
- * Body: { discordRoleId, systemRoleKey }
+ * Body: { discordRoleId, outputBucketKey }
  */
 export const PUT: APIRoute = async (context) => {
   const session = getSession(context);
@@ -48,23 +48,24 @@ export const PUT: APIRoute = async (context) => {
   }
 
   try {
-    const body = await context.request.json();
-    const { discordRoleId, systemRoleKey } = body;
+    const body = (await context.request.json()) as Record<string, unknown>;
+    const discordRoleId = typeof body.discordRoleId === "string" ? body.discordRoleId.trim() : "";
+    const outputBucketKey = typeof body.outputBucketKey === "string" ? body.outputBucketKey.trim() : "";
 
-    if (!discordRoleId || typeof discordRoleId !== "string") {
+    if (!discordRoleId) {
       return new Response(JSON.stringify({ error: "discordRoleId is required" }), { status: 400 });
     }
     if (!/^\d{17,20}$/.test(discordRoleId)) {
       return new Response(JSON.stringify({ error: "discordRoleId must be a Discord snowflake" }), { status: 400 });
     }
-    if (!systemRoleKey || typeof systemRoleKey !== "string") {
-      return new Response(JSON.stringify({ error: "systemRoleKey is required" }), { status: 400 });
+    if (!outputBucketKey) {
+      return new Response(JSON.stringify({ error: "outputBucketKey is required" }), { status: 400 });
     }
-    if (!SYSTEM_ROLE_KEYS.includes(systemRoleKey as typeof SYSTEM_ROLE_KEYS[number])) {
-      return new Response(JSON.stringify({ error: "Invalid systemRoleKey" }), { status: 400 });
+    if (!isOutputBucketKey(outputBucketKey)) {
+      return new Response(JSON.stringify({ error: "Invalid outputBucketKey" }), { status: 400 });
     }
 
-    const binding = await upsertRoleBinding(session.guildId, discordRoleId, systemRoleKey);
+    const binding = await upsertRoleBinding(session.guildId, discordRoleId, outputBucketKey);
     return new Response(JSON.stringify({ binding }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

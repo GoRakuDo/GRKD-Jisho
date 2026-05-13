@@ -1,6 +1,6 @@
-import type { dictionaries, dictionaryEntries } from "@grkd-jisho/db";
+import type { dictionaries, dictionaryEntries, OutputBucketKey } from "@grkd-jisho/db";
 
-export type RoleKey = "pemula" | "pemula-atas" | "menengah" | "mahir";
+export type RoleKey = OutputBucketKey;
 
 export type LookupMatchType = "term" | "reading";
 

@@ -27,7 +27,7 @@ describe("normalizePromptTemplate", () => {
 describe("generate", () => {
   it("定義が薄いときは LLM を呼ばず不足メッセージを返す", async () => {
     const result = await generate({
-      roleKey: "pemula",
+      roleKey: "daily-japanese",
       query: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
@@ -47,7 +47,7 @@ describe("generate", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await generate({
-      roleKey: "pemula",
+      roleKey: "indonesian",
       query: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
@@ -83,7 +83,7 @@ describe("generate", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await generate({
-      roleKey: "pemula",
+      roleKey: "indonesian",
       query: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
@@ -116,12 +116,12 @@ describe("generate", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await generate({
-      roleKey: "pemula",
+      roleKey: "daily-japanese",
       query: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
       definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
-      promptTemplate: "SYSTEM\nQ={{query}} / {{query}}\nR={{reading}}\nROLE={{role_key}}\nDICT={{dictionary_name}}\nJSON={{definition_json}}\nVER={{prompt_version}}",
+      promptTemplate: "SYSTEM\nQ={{query}} / {{query}}\nR={{reading}}\nBUCKET={{role_key}}\nDICT={{dictionary_name}}\nJSON={{definition_json}}\nVER={{prompt_version}}",
       promptVersion: "v9",
     });
 
@@ -140,7 +140,7 @@ describe("generate", () => {
     const promptText = requestBody.contents[0]?.parts[0]?.text ?? "";
     expect(promptText).toContain("Q=これ / これ");
     expect(promptText).toContain("R=これ");
-    expect(promptText).toContain("ROLE=pemula");
+    expect(promptText).toContain("BUCKET=daily-japanese");
     expect(promptText).toContain("DICT=test dictionary");
     expect(promptText).toContain("VER=v9");
     expect(promptText).not.toContain("ANSWER:");
@@ -168,7 +168,7 @@ describe("generate", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await generate({
-      roleKey: "pemula",
+      roleKey: "indonesian",
       query: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
@@ -203,7 +203,7 @@ describe("generate", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(generate({
-      roleKey: "pemula",
+      roleKey: "indonesian",
       query: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
@@ -223,7 +223,7 @@ describe("generate", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(generate({
-      roleKey: "pemula",
+      roleKey: "indonesian",
       query: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",

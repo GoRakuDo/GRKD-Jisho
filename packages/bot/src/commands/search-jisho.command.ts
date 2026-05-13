@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import type { Command } from "./types.js";
 import { searchResponse } from "../services/response-admin.service.js";
+import { getOutputBucketLabel } from "@grkd-jisho/db";
 
 export const searchJishoCommand: Command = {
   builder: new SlashCommandBuilder()
@@ -26,7 +27,7 @@ export const searchJishoCommand: Command = {
 
     const lines = results.map(
       (r) =>
-        `**#${r.id}** | ${r.roleKey} | ${r.modelName} | v${r.promptVersion}${r.isManualOverride ? " | ✏️手動" : ""} | ${r.updatedAt?.toISOString().slice(0, 10) ?? "---"}\n\`\`\`${r.responseText.slice(0, 80)}...\`\`\``,
+        `**#${r.id}** | ${getOutputBucketLabel(r.roleKey)} | ${r.modelName} | v${r.promptVersion}${r.isManualOverride ? " | ✏️手動" : ""} | ${r.updatedAt?.toISOString().slice(0, 10) ?? "---"}\n\`\`\`${r.responseText.slice(0, 80)}...\`\`\``,
     );
 
     await interaction.reply({

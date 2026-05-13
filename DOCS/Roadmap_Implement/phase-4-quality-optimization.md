@@ -1664,3 +1664,15 @@ Step K 最終検証ログ
 - `packages/bot/src/services/role-mapper.service.ts` と `packages/bot/src/events/messageCreate.ts` を role ID ベースへ切り替えた。
 - `packages/web/src/pages/admin/role-settings.astro` は `Discord Role ID` 入力と表示に変更した。
 - `pnpm astro check` / `pnpm build` / `@code-reviewer` を通過済み。
+
+---
+
+## 21. 追記ログ — 出力バケット 2 分岐へ移行
+
+- `daily-japanese` と `indonesian` の 2 バケットに統合し、`daily-japanese` が当たれば日常日本語、未一致なら `indonesian` を返す形に変えた。
+- `packages/bot/src/services/role-mapper.service.ts` は role binding の in-memory cache をやめ、毎回 DB から読むようにして WebUI 反映の遅延を消した。
+- role binding 読み込み失敗時は silent fallback をやめ、エラーとして表面化するようにした。
+- `packages/web/src/pages/api/admin/role-bindings.ts` は `outputBucketKey` を受けるようにし、`packages/web/src/pages/admin/role-settings.astro` では 2 バケットの選択肢と優先順位説明を出すようにした。
+- `packages/web/src/pages/admin/responses.astro` / `cache.astro` / `ResponseDetailPanel.tsx` は出力バケットラベルを表示するように変えた。
+- `packages/db/scripts/seed-defaults.ts` のデフォルトプロンプトも出力バケット前提に更新した。
+- `pnpm install` → `pnpm --filter @grkd-jisho/db build` → `pnpm --filter @grkd-jisho/web exec astro check` → `pnpm --filter @grkd-jisho/web build` → `pnpm --filter @grkd-jisho/bot test` を通過した。

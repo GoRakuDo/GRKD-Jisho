@@ -3,6 +3,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
 import { generateCsrfToken } from "../../lib/csrf";
 import { Button } from "../../components/admin/Button";
+import { OUTPUT_BUCKET_KEYS, getOutputBucketLabel } from "@grkd-jisho/db";
 
 const session = getSession(Astro);
 const csrfToken = session ? generateCsrfToken(session.discordUserId) : "";
@@ -18,7 +19,7 @@ if (!session?.isAdmin) {
   <div class="page-header">
     <div>
       <h1 class="page-title">Role Settings</h1>
-      <p class="page-description">Configure role bindings, per-role daily search limits, and reset user usage.</p>
+      <p class="page-description">Configure output bucket bindings, per-role daily search limits, and reset user usage.</p>
     </div>
     <Button variant="secondary" id="add-role-btn">
       + Add Role Limit
@@ -88,12 +89,13 @@ if (!session?.isAdmin) {
       </div>
     </div>
   </div>
-  <!-- Role Bindings -->
+  <!-- Output Bucket Bindings -->
   <div class="section-divider"></div>
   <div class="page-header" style="margin-top: 32px;">
     <div>
-      <h2 class="section-title" style="margin: 0;">Role Bindings</h2>
-      <p class="info-text" style="margin: 4px 0 0;">Map Discord role IDs to system role keys for prompt routing.</p>
+      <h2 class="section-title" style="margin: 0;">Output Bucket Bindings</h2>
+      <p class="info-text" style="margin: 4px 0 0;">Map Discord role IDs to output buckets for prompt routing.</p>
+      <p class="info-hint" style="margin: 4px 0 0;">日常日本語の出力が優先。どちらにも当たらない場合はインドネシア語に落ちます。複数の Discord role IDs を同じバケットに紐づけられます。</p>
     </div>
     <Button variant="secondary" id="add-binding-btn">
       + Add Binding
@@ -107,18 +109,17 @@ if (!session?.isAdmin) {
   <!-- Role Binding Editor Modal -->
   <div id="binding-modal" class="modal-overlay hidden">
     <div class="modal-content modal-content-small">
-      <h3 class="editor-title" style="margin-bottom: 16px;">Edit Role Binding</h3>
+      <h3 class="editor-title" style="margin-bottom: 16px;">Edit Output Bucket Binding</h3>
       <div class="field-group">
         <label class="field-label" for="binding-role-id">Discord Role ID</label>
         <input type="text" id="binding-role-id" class="text-input" placeholder="e.g. 123456789012345678" />
       </div>
       <div class="field-group">
-        <label class="field-label" for="binding-system-key">System Role Key</label>
-        <select id="binding-system-key" class="text-input">
-          <option value="pemula">pemula</option>
-          <option value="pemula-atas">pemula-atas</option>
-          <option value="menengah">menengah</option>
-          <option value="mahir">mahir</option>
+        <label class="field-label" for="binding-output-bucket">Output Bucket</label>
+        <select id="binding-output-bucket" class="text-input">
+          {OUTPUT_BUCKET_KEYS.map((value) => (
+            <option value={value}>{getOutputBucketLabel(value)}</option>
+          ))}
         </select>
       </div>
       <div class="editor-footer">
@@ -455,8 +456,27 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
     id: number;
     guildId: string;
     discordRoleId: string;
-    systemRoleKey: string;
+    outputBucketKey: string;
   }> = [];
+
+  const OUTPUT_BUCKET_LABELS: Record<string, string> = {
+    "daily-japanese": "日常日本語の出力",
+    indonesian: "インドネシア語の出力",
+  };
+
+  function formatOutputBucketLabel(value: string): string {
+    return OUTPUT_BUCKET_LABELS[value] ?? `Legacy: ${value}`;
+  }
+
+  function ensureOutputBucketOption(select: HTMLSelectElement, value: string) {
+    const hasOption = Array.from(select.options).some((option) => option.value === value);
+    if (hasOption) return;
+
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = formatOutputBucketLabel(value);
+    select.appendChild(option);
+  }
 
   async function renderBindings() {
     try {
@@ -473,7 +493,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
       if (!container) return;
 
       if (bindingsCache.length === 0) {
-        container.innerHTML = '<div class="empty-state"><p>No custom bindings configured. Add Discord role IDs to map them to system role keys.</p></div>';
+        container.innerHTML = '<div class="empty-state"><p>No custom bindings configured. Add Discord role IDs to map them to output buckets.</p></div>';
         return;
       }
 
@@ -482,7 +502,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
           <thead>
             <tr class="bg-porcelain-150 border-b border-graphite-180">
               <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">Discord Role ID</th>
-              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">System Role Key</th>
+              <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium">Output Bucket</th>
               <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium text-right">Actions</th>
             </tr>
           </thead>
@@ -490,7 +510,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
             ${bindingsCache.map((b) => `
               <tr class="border-b border-graphite-180 last:border-0 hover:bg-porcelain-150 transition-colors">
                 <td class="px-4 py-3 text-[14px] text-graphite-800 font-medium mono">${b.discordRoleId}</td>
-                <td class="px-4 py-3 text-[14px]"><span class="mono text-graphite-650">${b.systemRoleKey}</span></td>
+                <td class="px-4 py-3 text-[14px]"><span class="mono text-graphite-650">${formatOutputBucketLabel(b.outputBucketKey)}</span></td>
                 <td class="px-4 py-3 text-[14px] text-right">
                   <button class="edit-binding-btn btn-ghost" data-id="${b.id}">✎ Edit</button>
                   <button class="delete-binding-btn btn-danger-sm" data-id="${b.id}">Delete</button>
@@ -503,15 +523,16 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
       container.querySelectorAll('.edit-binding-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          const id = Number(btn.getAttribute('data-id'));
-          const binding = bindingsCache.find(b => b.id === id);
-          if (!binding) return;
-           const nameInput = document.getElementById('binding-role-id') as HTMLInputElement | null;
-           const keySelect = document.getElementById('binding-system-key') as HTMLSelectElement | null;
-           if (nameInput && keySelect) {
-            nameInput.value = binding.discordRoleId;
-            keySelect.value = binding.systemRoleKey;
-           }
+            const id = Number(btn.getAttribute('data-id'));
+            const binding = bindingsCache.find(b => b.id === id);
+            if (!binding) return;
+            const nameInput = document.getElementById('binding-role-id') as HTMLInputElement | null;
+            const keySelect = document.getElementById('binding-output-bucket') as HTMLSelectElement | null;
+            if (nameInput && keySelect) {
+             nameInput.value = binding.discordRoleId;
+             ensureOutputBucketOption(keySelect, binding.outputBucketKey);
+             keySelect.value = binding.outputBucketKey;
+            }
           document.getElementById('binding-modal')?.classList.remove('hidden');
         });
       });
@@ -541,9 +562,9 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
   document.getElementById('add-binding-btn')?.addEventListener('click', () => {
     const nameInput = document.getElementById('binding-role-id') as HTMLInputElement | null;
-    const keySelect = document.getElementById('binding-system-key') as HTMLSelectElement | null;
+    const keySelect = document.getElementById('binding-output-bucket') as HTMLSelectElement | null;
     if (nameInput) nameInput.value = '';
-    if (keySelect) keySelect.value = 'pemula';
+    if (keySelect) keySelect.value = 'indonesian';
     document.getElementById('binding-modal')?.classList.remove('hidden');
   });
 
@@ -553,11 +574,11 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
 
   document.getElementById('binding-save-btn')?.addEventListener('click', async () => {
     const nameInput = document.getElementById('binding-role-id') as HTMLInputElement | null;
-    const keySelect = document.getElementById('binding-system-key') as HTMLSelectElement | null;
+    const keySelect = document.getElementById('binding-output-bucket') as HTMLSelectElement | null;
     if (!nameInput || !keySelect) return;
 
     const discordRoleId = nameInput.value.trim();
-    const systemRoleKey = keySelect.value;
+    const outputBucketKey = keySelect.value;
     if (!discordRoleId) { alert('Discord role ID is required.'); return; }
 
     if (!csrfToken) { alert('CSRF token not available.'); return; }
@@ -565,7 +586,7 @@ function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
       const res = await fetch('/api/admin/role-bindings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-        body: JSON.stringify({ discordRoleId, systemRoleKey }),
+        body: JSON.stringify({ discordRoleId, outputBucketKey }),
       });
       if (!res.ok) throw new Error('Save failed');
       document.getElementById('binding-modal')?.classList.add('hidden');

@@ -90,9 +90,11 @@ Phase 5: Deferred Scope               TBA
   - 全辞書でヒットしない場合は `null` を返す
 
 - [ ] **1-4** `RoleMapperService.resolve(memberRoles)` 実装
-  - Discord ロール名 → `role_key` 変換
-  - マッチしない場合はデフォルト `pemula` を返す
-  - ロールマッピングを環境変数または DB で設定可能にする（将来の拡張）
+  - Discord role ID → `role_key`（出力バケット）変換
+  - `daily-japanese` が 1 つでも当たれば日常日本語を優先
+  - マッチしない場合はデフォルト `indonesian` を返す
+  - バインディングは複数 role ID → 同一バケットを許可する
+  - 詳細仕様は `DOCS/Operations/output-bucket-routing.md`
 
 - [ ] **1-5** `ResponseCacheService` 実装
   - `get(params)`: `response_cache` から完全一致検索
@@ -166,7 +168,7 @@ Phase 5: Deferred Scope               TBA
 
 - [ ] **2-2** `/search-jisho <word>` 実装
   - `response_cache` から `query` で検索
-  - 全 `role_key` の回答一覧を Embed で表示
+  - 全 `role_key`（出力バケット）の回答一覧を Embed で表示
   - `is_manual_override` フラグの表示
 
 - [ ] **2-3** `/edit-jisho <response_id>` 実装

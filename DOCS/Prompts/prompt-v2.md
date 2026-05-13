@@ -1,4 +1,4 @@
-# Prompt v2 — Role-aware Dictionary Explanation
+# Prompt v2 — Output-Bucket Dictionary Explanation
 
 > **Status:** Draft (pre-implementation)
 > **Phase:** Phase 4 Step F
@@ -12,10 +12,10 @@
 v2 exists because v1 has three gaps:
 
 1. **L1 negative transfer** warnings are too abstract (just "避けろ") with no concrete Indonesian-language examples.
-2. **Role-based explanation policy** is underspecified (just "難易度を調整").
+2. **Output-bucket explanation policy** is underspecified (just "難易度を調整").
 3. **"Not enough data"** has no objective trigger condition, so the LLM guesses freely.
 
-v2 fixes these by adding structured sections, per-role ground rules, and deterministic output templates.
+v2 fixes these by adding structured sections, per-bucket ground rules, and deterministic output templates.
 
 ---
 
@@ -26,7 +26,7 @@ These carry over because they are architecture-level constraints, not prompt tun
 - Dictionary definitions are the **only** source of truth.
 - The LLM must not add meanings that are not in the dictionary entry.
 - If dictionary data is insufficient, the LLM must say so.
-- The user's Discord role name must not appear verbatim in the prompt (use `roleKey`).
+- The user's Discord role name must not appear verbatim in the prompt (use `roleKey` as the output bucket key).
 - L1 negative transfer guidance must not encourage incorrect Japanese.
 
 ---
@@ -63,7 +63,7 @@ Indonesian has no grammatical inflections for politeness (uses vocabulary choice
 Learners often drop desu/masu or mix plain and polite forms.
 
 **Instruction to LLM:** Always label politeness level (casual / polite / humble) in examples.  
-If the query is from a `pemula` user, default to polite form (です・ます).
+If the query is for the `indonesian` bucket, default to polite form (です・ます) when Japanese example sentences appear.
 
 ### 3-4. Passive Voice
 
@@ -74,25 +74,21 @@ Learners may construct "I was eaten by fish" type errors.
 
 ---
 
-## 4. Role-Based Explanation Policy
+## 4. Output-Bucket Explanation Policy
 
-### 4-1. Role Key Definitions
+### 4-1. Output Bucket Definitions
 
-| RoleKey | Level | Target CEFR | Explanation Style |
+| OutputBucketKey | Target | Explanation Style |
 |---|---|---|---|
-| `pemula` | Beginner | A1 | Full Indonesian explanation. Kanji with furigana. Example sentences with word-by-word breakdown. |
-| `pemula-atas` | Upper Beginner | A2 | Mostly Indonesian, some Japanese example sentences. Vocabulary list for each example. |
-| `menengah` | Intermediate | B1 | Japanese explanation with Indonesian support only for grammar points. Key vocabulary in Japanese. |
-| `mahir` | Advanced | B2+ | All-Japanese explanation. No Indonesian. Use synonyms, not translations. |
+| `daily-japanese` | 日常日本語 | Japanese-only explanation. No Indonesian summary. Keep examples short and natural. |
+| `indonesian` | インドネシア語 | Full Indonesian explanation. Japanese examples may be included with furigana and short notes. |
 
-### 4-2. Per-Role Forbidden Actions
+### 4-2. Per-Bucket Forbidden Actions
 
-| Role | Forbidden |
+| Bucket | Forbidden |
 |------|-----------|
-| `pemula` | Using kanji without furigana. Assuming knowledge of keigo. |
-| `pemula-atas` | Using advanced grammar (conditional, causative, passive) without explanation. |
-| `menengah` | Using literary/archaic forms without annotation. |
-| `mahir` | No additional restrictions beyond the global rules. |
+| `daily-japanese` | Adding Indonesian explanation. Mixing in learner-level CEFR labels. |
+| `indonesian` | Omitting Indonesian explanation. Assuming the user wants Japanese-only output. |
 
 ---
 
@@ -176,12 +172,10 @@ The Indonesian parenthetical is intentionally short. It signals "I know your L1"
 これらの誤りをユーザーがした場合、優しく訂正する。ただし、能動的に教えない。
 
 ## ロール別説明方針
-ロール: {{role_key}}
+Output bucket: {{role_key}}
 
-{pemula: 完全インドネシア語説明。漢字には必ずふりがな。単語ごとの分解。
-pemula-atas: 基本インドネシア語＋日本語例文。各例文に語彙リスト。
-menengah: 日本語説明＋文法ポイントのみインドネシア語補足。
-mahir: 完全日本語説明。同義語を使い、翻訳しない。}
+{daily-japanese: 日常日本語の説明。自然な短文を優先し、インドネシア語は混ぜない。
+indonesian: 完全インドネシア語説明。必要なら日本語例文にふりがなを付ける。}
 
 ## 出力形式（厳守）
 読み: {{reading}}
@@ -212,7 +206,7 @@ mahir: 完全日本語説明。同義語を使い、翻訳しない。}
 | Role policy | "難易度を調整" (vague) | Per-role forbidden actions + language ratio table |
 | Output format | 3 fields (意味, 説明, ニュアンス) | 5 fields + mandatory/optional distinction |
 | "Not enough data" | "辞書情報が不足しています" (no trigger) | Trigger: definition < 20 chars AND no example sentence |
-| Example sentences | Not mentioned | Required for pemula/pemula-atas |
+| Example sentences | Not mentioned | Required for indonesian bucket |
 | Indonesian fallback | Not mentioned | Short fallback phrase for "not enough data" |
 
 ---
