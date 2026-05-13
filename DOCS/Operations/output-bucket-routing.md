@@ -21,6 +21,7 @@ GRKD-Jisho now routes responses through two output buckets:
 
 - Bot role resolution and response cache keys
 - Admin role-settings page
+- Admin prompts page
 - Response / cache / detail labels in Web UI
 - Prompt seed and template variable descriptions
 
@@ -29,3 +30,5 @@ GRKD-Jisho now routes responses through two output buckets:
 - The `role_key` cache column name is kept for compatibility, but its meaning is now output bucket routing.
 - `indonesian` is the default fallback bucket.
 - If role binding rows cannot be loaded from the DB, the bot surfaces an error instead of silently falling back.
+- Prompt admin UI now shows `default`, `daily-japanese`, and `indonesian` scopes separately.
+- Bucket-specific prompts are private overrides; the default prompt remains the public baseline.

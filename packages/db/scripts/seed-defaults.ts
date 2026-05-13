@@ -47,6 +47,7 @@ async function seedDefaults() {
   // デフォルトプロンプト（編集時にタイムスタンプ版が新規作成される）
   await db.insert(prompts)
     .values({
+      scopeKey: "default",
       version: "default",
       content: DEFAULT_PROMPT,
       isActive: true,

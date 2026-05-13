@@ -2,7 +2,6 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
 import { generateCsrfToken } from "../../lib/csrf";
-import { Button } from "../../components/admin/Button";
 
 const session = getSession(Astro);
 const csrfToken = session ? generateCsrfToken(session.discordUserId) : "";
@@ -15,548 +14,1190 @@ if (!session?.isAdmin) {
 <meta name="csrf-token" content={csrfToken} />
 
 <AdminLayout title="Prompts" active="prompts">
-  <div class="page-header">
-    <div>
-      <h1 class="page-title">Prompt Versions</h1>
-      <p class="page-description">Manage the LLM instructions that define how dictionary meanings are explained to learners.</p>
+  <div class="prompt-page">
+    <div class="page-header">
+      <div>
+        <p class="page-kicker">Prompt Library</p>
+        <h1 class="page-title">Scoped prompt control</h1>
+        <p class="page-description">Default prompt plus two private bucket overrides. The default remains the public baseline.</p>
+      </div>
+      <div class="header-actions">
+        <button id="create-version-btn" class="action-btn action-btn-primary" type="button">Create New Version</button>
+      </div>
     </div>
-    <Button variant="secondary" id="create-version-btn">
-      Create New Version
-    </Button>
-  </div>
 
-  <div id="prompts-container" class="table-container">
-    <!-- Table will be hydrated by client-side script -->
-  </div>
+    <div class="prompt-layout">
+      <aside class="scope-rail" aria-label="Prompt scopes">
+        <div class="rail-heading">
+          <p class="card-kicker">Scopes</p>
+          <p class="rail-note">Select one scope to inspect its version history and runtime state.</p>
+        </div>
+        <div id="scope-rail-list" class="scope-list"></div>
+      </aside>
 
-  <!-- Editor modal — fully static SSR HTML, managed by vanilla JS -->
-  <div id="editor-modal" class="modal-overlay hidden">
-    <div class="modal-content">
-      <div class="editor-panel">
-        <div class="editor-header">
-          <h3 id="editor-title" class="editor-title">Edit <span id="editor-version-label" class="editor-version-label"></span></h3>
-          <div class="editor-actions-top">
-            <label class="editor-active-label">
-              <input id="editor-active-checkbox" type="checkbox" class="editor-checkbox" />
-              <span class="editor-checkbox-text">Set as active version</span>
-            </label>
+      <section class="scope-workspace">
+        <header class="workspace-hero">
+          <div>
+            <p class="card-kicker">Selected scope</p>
+            <h2 id="scope-title" class="scope-title">Default Prompt</h2>
+            <p id="scope-description" class="scope-description">Shared baseline prompt used by every bucket unless overridden.</p>
           </div>
+          <div class="scope-hero-meta">
+            <div class="hero-chip" id="scope-resolution-chip">Runtime fallback</div>
+            <div class="hero-chip hero-chip-secondary" id="scope-version-chip">No active version</div>
+          </div>
+        </header>
+
+        <div class="versions-card">
+          <div class="versions-card-header">
+            <div>
+              <p class="card-kicker">Version history</p>
+              <h3 id="versions-title" class="versions-title">Default Prompt</h3>
+            </div>
+            <div class="versions-actions">
+              <button id="scope-reset-btn" class="action-btn action-btn-secondary" type="button">Reset Override</button>
+              <button id="scope-create-btn" class="action-btn action-btn-primary" type="button">Create New Version</button>
+            </div>
+          </div>
+
+          <div id="versions-empty" class="empty-state hidden">
+            <div class="empty-state-body">
+              <p class="empty-title">No override yet</p>
+              <p class="empty-copy">This scope still inherits the default prompt. Create a new version to specialize it.</p>
+              <button id="empty-create-btn" class="action-btn action-btn-primary" type="button">Create Override Version</button>
+            </div>
+          </div>
+
+          <div id="versions-container" class="versions-table-wrap"></div>
+        </div>
+
+        <div class="reference-grid">
+          <details class="reference-card">
+            <summary class="reference-summary">Template variables</summary>
+            <table class="reference-table">
+              <thead>
+                <tr>
+                  <th>Variable</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="reference-code">{'{{role_key}}'}</td>
+                  <td>Output bucket used for routing: <span class="mono">daily-japanese</span> or <span class="mono">indonesian</span></td>
+                </tr>
+                <tr>
+                  <td class="reference-code">{'{{query}}'}</td>
+                  <td>The searched word or phrase</td>
+                </tr>
+                <tr>
+                  <td class="reference-code">{'{{reading}}'}</td>
+                  <td>Reading or pronunciation of the query</td>
+                </tr>
+                <tr>
+                  <td class="reference-code">{'{{dictionary_name}}'}</td>
+                  <td>Name of the dictionary that supplied the entry</td>
+                </tr>
+                <tr>
+                  <td class="reference-code">{'{{definition_json}}'}</td>
+                  <td>Raw dictionary payload as JSON</td>
+                </tr>
+                <tr>
+                  <td class="reference-code">{'{{prompt_version}}'}</td>
+                  <td>Current prompt version label</td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+
+          <details class="reference-card">
+            <summary class="reference-summary">Routing contract</summary>
+            <ul class="reference-list">
+              <li>Default prompt stays public and shared.</li>
+              <li>Bucket override wins when it exists and is active.</li>
+              <li>If a bucket has no override, it inherits the default prompt.</li>
+              <li>Clone/export for general users should use the default scope only.</li>
+            </ul>
+          </details>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="editor-modal" class="editor-modal hidden" aria-hidden="true">
+    <div class="editor-modal-backdrop"></div>
+    <div class="editor-modal-surface" role="dialog" aria-modal="true" aria-labelledby="editor-title">
+      <div class="editor-shell">
+        <div class="editor-header">
+          <div>
+            <p class="card-kicker" id="editor-scope-label">Scope</p>
+            <h3 id="editor-title" class="editor-title">Edit version</h3>
+            <p id="editor-version-hint" class="editor-hint"></p>
+          </div>
+          <label class="editor-active-label">
+            <input id="editor-active-checkbox" type="checkbox" class="editor-checkbox" />
+            <span>Set as active version</span>
+          </label>
         </div>
 
         <div class="editor-grid">
           <div class="editor-col">
-            <label class="editor-col-label">Editor</label>
+            <label class="editor-col-label" for="editor-textarea">Editor</label>
             <textarea id="editor-textarea" class="editor-textarea" spellcheck="false"></textarea>
           </div>
           <div class="editor-col">
-            <label class="editor-col-label">Preview (Read-only)</label>
+            <label class="editor-col-label" for="editor-preview">Preview</label>
             <pre id="editor-preview" class="editor-preview"></pre>
           </div>
         </div>
 
-        <!-- Template variable reference -->
-        <details class="var-reference">
-          <summary class="var-reference-summary">Template variables</summary>
-          <table class="var-table">
-            <thead>
-              <tr>
-                <th class="var-th">Variable</th>
-                <th class="var-th">Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr class="var-tr">
-                <td class="var-td var-code">{'{{role_key}}'}</td>
-                <td class="var-td var-desc">Output bucket used for routing &mdash; <span class="mono text-graphite-600">daily-japanese</span> or <span class="mono text-graphite-600">indonesian</span></td>
-              </tr>
-              <tr class="var-tr">
-                <td class="var-td var-code">{'{{query}}'}</td>
-                <td class="var-td var-desc">The word or phrase the user searched for</td>
-              </tr>
-              <tr class="var-tr">
-                <td class="var-td var-code">{'{{reading}}'}</td>
-                <td class="var-td var-desc">Reading or pronunciation of the queried word</td>
-              </tr>
-              <tr class="var-tr">
-                <td class="var-td var-code">{'{{dictionary_name}}'}</td>
-                <td class="var-td var-desc">Name of the dictionary that provided the definition</td>
-              </tr>
-              <tr class="var-tr">
-                <td class="var-td var-code">{'{{definition_json}}'}</td>
-                <td class="var-td var-desc">Full dictionary entry as JSON &mdash; glosses, readings, parts of speech</td>
-              </tr>
-              <tr class="var-tr">
-                <td class="var-td var-code">{'{{prompt_version}}'}</td>
-                <td class="var-td var-desc">Current prompt version label</td>
-              </tr>
-            </tbody>
-          </table>
-        </details>
-
         <div class="editor-footer">
-          <button id="editor-cancel-btn" class="btn-secondary">Cancel</button>
-          <button id="editor-save-btn" class="btn-primary">Save Changes</button>
+          <button id="editor-cancel-btn" class="action-btn action-btn-secondary" type="button">Cancel</button>
+          <button id="editor-save-btn" class="action-btn action-btn-primary" type="button">Save Changes</button>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    import type { PromptVersion } from '../../lib/prompt-types';
+    import type { PromptScopeView, PromptVersion } from '../../lib/prompt-types';
 
-    let versionsCache: PromptVersion[] = [];
-    /** The id of the version currently being edited, or null for Create New Version */
+    const scopeRailList = document.getElementById('scope-rail-list') as HTMLElement | null;
+    const scopeTitle = document.getElementById('scope-title') as HTMLElement | null;
+    const scopeDescription = document.getElementById('scope-description') as HTMLElement | null;
+    const scopeResolutionChip = document.getElementById('scope-resolution-chip') as HTMLElement | null;
+    const scopeVersionChip = document.getElementById('scope-version-chip') as HTMLElement | null;
+    const versionsTitle = document.getElementById('versions-title') as HTMLElement | null;
+    const versionsContainer = document.getElementById('versions-container') as HTMLElement | null;
+    const versionsEmpty = document.getElementById('versions-empty') as HTMLElement | null;
+    const createVersionBtn = document.getElementById('create-version-btn') as HTMLButtonElement | null;
+    const scopeCreateBtn = document.getElementById('scope-create-btn') as HTMLButtonElement | null;
+    const emptyCreateBtn = document.getElementById('empty-create-btn') as HTMLButtonElement | null;
+    const scopeResetBtn = document.getElementById('scope-reset-btn') as HTMLButtonElement | null;
+    const editorModal = document.getElementById('editor-modal') as HTMLElement | null;
+    const editorScopeLabel = document.getElementById('editor-scope-label') as HTMLElement | null;
+    const editorTitle = document.getElementById('editor-title') as HTMLElement | null;
+    const editorVersionHint = document.getElementById('editor-version-hint') as HTMLElement | null;
+    const editorTextarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
+    const editorPreview = document.getElementById('editor-preview') as HTMLElement | null;
+    const editorActiveCheckbox = document.getElementById('editor-active-checkbox') as HTMLInputElement | null;
+    const editorCancelBtn = document.getElementById('editor-cancel-btn') as HTMLButtonElement | null;
+    const editorSaveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
+
+    let promptScopes: PromptScopeView[] = [];
+    let selectedScopeKey: string = 'default';
     let editingId: string | null = null;
 
-    // ── Render table ──
-    async function renderTable() {
-      try {
-        const res = await fetch('/api/admin/prompts');
-        const data = await res.json();
-        versionsCache = data.versions || [];
+    function escapeHtml(value: string): string {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
 
-        const container = document.getElementById('prompts-container');
-        if (!container) return;
+    function selectedScope(): PromptScopeView | null {
+      return promptScopes.find((scope) => scope.scopeKey === selectedScopeKey) ?? promptScopes[0] ?? null;
+    }
 
-        container.innerHTML = `
-          <table class="data-table w-full text-left border-collapse">
-            <thead>
-              <tr class="bg-porcelain-150 border-b border-graphite-180">
-                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Version</th>
-                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Last Updated</th>
-                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap">Status</th>
-                <th class="px-4 py-3 text-[12px] uppercase text-graphite-500 font-medium whitespace-nowrap text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${versionsCache.map(v => {
-                const isDefault = v.version === 'default';
-                return `
-                  <tr class="border-b border-graphite-180 last:border-0 hover:bg-porcelain-150 transition-colors min-h-[48px]">
-                    <td class="px-4 py-3 text-[14px]"><span class="mono text-graphite-800 font-medium">${v.version}</span></td>
-                    <td class="px-4 py-3 text-[14px] text-graphite-650 text-[13px]">${new Date(v.updatedAt).toLocaleString()}</td>
-                    <td class="px-4 py-3 text-[14px]">${v.isActive ? '<span class="status-badge badge-enabled">Active</span>' : '<span class="status-badge badge-disabled">Inactive</span>'}</td>
-                    <td class="px-4 py-3 text-[14px] text-right flex gap-2 justify-end">
-                      <button class="edit-btn bg-royal-blue-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-royal-blue-700 transition-colors" data-id="${v.id}">Edit</button>
-                      ${!v.isActive ? `<button class="set-active-btn bg-porcelain-200 text-graphite-700 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-porcelain-300 transition-colors border border-graphite-300" data-id="${v.id}">Set Active</button>` : ''}
-                      ${!isDefault ? `<button class="delete-btn bg-danger-600 text-porcelain-50 px-3 py-1.5 rounded-button text-[13px] font-semibold hover:bg-danger-800 transition-colors" data-id="${v.id}">Delete</button>` : ''}
-                    </td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
+    function runtimeStateText(scope: PromptScopeView | null): string {
+      if (!scope) return 'Loading';
+      if (scope.inheritedFromDefault && scope.scopeKey !== 'default') return 'Inherited from default';
+      if (scope.resolvedPrompt) return `Active · ${scope.resolvedPrompt.version}`;
+      return 'No active version';
+    }
+
+    function scopeCardState(scope: PromptScopeView): string {
+      if (scope.scopeKey === 'default') return 'Baseline';
+      return scope.inheritedFromDefault ? 'Inherited' : 'Override active';
+    }
+
+    function renderScopeRail(): void {
+      if (!scopeRailList) return;
+
+      scopeRailList.innerHTML = promptScopes.map((scope) => {
+        const selected = scope.scopeKey === selectedScopeKey;
+        const activeVersion = scope.resolvedPrompt ? escapeHtml(scope.resolvedPrompt.version) : 'No active version';
+        const versionCount = scope.versions.length;
+        const state = scopeCardState(scope);
+
+        return `
+          <button type="button" class="scope-card ${selected ? 'scope-card-selected' : ''}" data-scope-key="${escapeHtml(scope.scopeKey)}">
+            <div class="scope-card-top">
+              <div>
+                <p class="scope-card-label">${escapeHtml(scope.scopeLabel)}</p>
+                <p class="scope-card-description">${escapeHtml(scope.scopeDescription)}</p>
+              </div>
+              <span class="scope-badge ${scope.scopeKey === 'default' ? 'scope-badge-default' : 'scope-badge-override'}">${escapeHtml(state)}</span>
+            </div>
+            <div class="scope-card-meta">
+              <span>${versionCount} version${versionCount === 1 ? '' : 's'}</span>
+              <span>${activeVersion}</span>
+            </div>
+          </button>
         `;
+      }).join('');
 
-        // Bind Edit buttons
-        document.querySelectorAll('.edit-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const id = btn.getAttribute('data-id');
-            const version = versionsCache.find(v => String(v.id) === String(id));
-            if (version) openEditor(version);
-          });
+      scopeRailList.querySelectorAll('[data-scope-key]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const scopeKey = button.getAttribute('data-scope-key');
+          if (!scopeKey) return;
+          selectedScopeKey = scopeKey;
+          renderAll();
         });
+      });
+    }
 
-        // Bind Set Active buttons
-        document.querySelectorAll('.set-active-btn').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const id = btn.getAttribute('data-id');
-            const version = versionsCache.find(v => String(v.id) === String(id));
-            if (!version) return;
-            try {
-              const csrfRes = await fetch('/api/auth/csrf-token');
-              const { token } = await csrfRes.json();
-              const res = await fetch('/api/admin/prompts', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'x-csrf-token': token },
-                body: JSON.stringify({ id, content: version.content, isActive: true }),
-              });
-              if (!res.ok) throw new Error('Set Active failed (' + res.status + ')');
-              await renderTable();
-            } catch (err) {
-              console.error('[Prompts] Set Active failed:', err);
-              alert('Failed to set active version.');
-            }
-          });
-        });
+    function renderWorkspace(): void {
+      const scope = selectedScope();
+      if (!scope) return;
 
-        // Bind Delete buttons
-        document.querySelectorAll('.delete-btn').forEach(btn => {
-          btn.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            const id = btn.getAttribute('data-id');
-            if (!confirm('Delete this prompt version? This cannot be undone.')) return;
-            try {
-              const csrfRes = await fetch('/api/auth/csrf-token');
-              const { token } = await csrfRes.json();
-              const res = await fetch('/api/admin/prompts?id=' + id, {
-                method: 'DELETE',
-                headers: { 'x-csrf-token': token },
-              });
-              if (!res.ok) {
-                const err = await res.json().catch(() => ({ error: 'Delete failed' }));
-                throw new Error(err.error || 'Delete failed (' + res.status + ')');
-              }
-              await renderTable();
-            } catch (err) {
-              console.error('[Prompts] Delete failed:', err);
-              alert(err instanceof Error ? err.message : 'Delete failed.');
-            }
-          });
-        });
-      } catch (err) {
-        console.error('[Prompts] renderTable error:', err);
+      if (scopeTitle) scopeTitle.textContent = scope.scopeLabel;
+      if (scopeDescription) scopeDescription.textContent = scope.scopeDescription;
+      if (scopeResolutionChip) scopeResolutionChip.textContent = runtimeStateText(scope);
+      if (scopeVersionChip) scopeVersionChip.textContent = scope.resolvedPrompt ? `Runtime version ${scope.resolvedPrompt.version}` : 'No resolved prompt';
+      if (versionsTitle) versionsTitle.textContent = `${scope.scopeLabel} versions`;
+      if (scopeResetBtn) scopeResetBtn.hidden = scope.scopeKey === 'default' || scope.versions.length === 0;
+
+      const createLabel = scope.scopeKey === 'default' ? 'Create New Version' : 'Create Override Version';
+      if (createVersionBtn) createVersionBtn.textContent = createLabel;
+      if (scopeCreateBtn) scopeCreateBtn.textContent = createLabel;
+      if (emptyCreateBtn) emptyCreateBtn.textContent = createLabel;
+
+      if (!versionsContainer || !versionsEmpty) return;
+
+      if (scope.versions.length === 0) {
+        versionsEmpty.classList.remove('hidden');
+        versionsContainer.innerHTML = '';
+        return;
       }
+
+      versionsEmpty.classList.add('hidden');
+      versionsContainer.innerHTML = `
+        <table class="versions-table">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Updated</th>
+              <th>Status</th>
+              <th class="versions-table-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${scope.versions.map((version) => {
+              const isDefaultSeed = scope.scopeKey === 'default' && version.version === 'default';
+              const statusLabel = version.isActive ? 'Active' : 'Inactive';
+              return `
+                <tr>
+                  <td>
+                    <div class="version-cell-main">
+                      <span class="version-name">${escapeHtml(version.version)}</span>
+                      <span class="version-scope">${escapeHtml(version.scopeKey)}</span>
+                    </div>
+                  </td>
+                  <td>${new Date(version.updatedAt).toLocaleString()}</td>
+                  <td><span class="row-badge ${version.isActive ? 'row-badge-active' : 'row-badge-inactive'}">${statusLabel}</span></td>
+                  <td class="versions-table-actions">
+                    <button type="button" class="table-btn table-btn-primary" data-action="edit" data-id="${escapeHtml(version.id)}">Edit</button>
+                    <button type="button" class="table-btn table-btn-secondary" data-action="activate" data-id="${escapeHtml(version.id)}" ${version.isActive ? 'disabled' : ''}>Activate</button>
+                    <button type="button" class="table-btn table-btn-danger" data-action="delete" data-id="${escapeHtml(version.id)}" ${isDefaultSeed ? 'disabled' : ''}>Delete</button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+
+      versionsContainer.querySelectorAll('[data-action]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const action = button.getAttribute('data-action');
+          const id = button.getAttribute('data-id');
+          if (!action || !id) return;
+
+          const version = scope.versions.find((item) => item.id === id);
+          if (!version) return;
+
+          if (action === 'edit') {
+            openEditor(version, 'edit');
+          }
+
+          if (action === 'activate') {
+            await activateVersion(version);
+          }
+
+          if (action === 'delete') {
+            await deleteVersion(version);
+          }
+        });
+      });
     }
 
-    // ── Open / close editor ──
-    function openEditor(version: PromptVersion) {
-      editingId = version.id;
-      const modal = document.getElementById('editor-modal');
-      const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
-      const preview = document.getElementById('editor-preview');
-      const titleLabel = document.getElementById('editor-version-label');
-      const checkbox = document.getElementById('editor-active-checkbox') as HTMLInputElement | null;
-      if (!modal || !textarea || !preview || !titleLabel || !checkbox) return;
-
-      titleLabel.textContent = version.version;
-      textarea.value = version.content;
-      preview.textContent = version.content;
-      checkbox.checked = version.isActive;
-
-      modal.classList.remove('hidden');
-      textarea.focus();
+    function renderAll(): void {
+      renderScopeRail();
+      renderWorkspace();
     }
 
-    function closeEditor() {
+    function openEditor(version: PromptVersion | null, mode: 'edit' | 'create' = 'edit'): void {
+      const scope = selectedScope();
+      if (!scope || !editorModal || !editorScopeLabel || !editorTitle || !editorVersionHint || !editorTextarea || !editorPreview || !editorActiveCheckbox) return;
+
+      editingId = version ? version.id : null;
+      const seedVersion = version ?? scope.resolvedPrompt;
+      const scopeLabel = scope.scopeLabel;
+
+      editorScopeLabel.textContent = scopeLabel;
+      editorTitle.textContent = mode === 'create' ? 'Create new prompt version' : 'Edit prompt version';
+      editorVersionHint.textContent = mode === 'create'
+        ? (seedVersion ? `Cloning ${seedVersion.version} into ${scope.scopeKey}` : `New version · ${scope.scopeKey}`)
+        : (seedVersion ? `Version ${seedVersion.version} · ${scope.scopeKey}` : `Version · ${scope.scopeKey}`);
+      editorTextarea.value = seedVersion ? seedVersion.content : '';
+      editorPreview.textContent = editorTextarea.value;
+      editorActiveCheckbox.checked = version ? version.isActive : true;
+
+      editorModal.classList.remove('hidden');
+      editorModal.setAttribute('aria-hidden', 'false');
+      editorTextarea.focus();
+    }
+
+    function closeEditor(): void {
       editingId = null;
-      const modal = document.getElementById('editor-modal');
-      if (modal) modal.classList.add('hidden');
+      if (!editorModal) return;
+      editorModal.classList.add('hidden');
+      editorModal.setAttribute('aria-hidden', 'true');
     }
 
-    // ── Save handler ──
-    async function handleSave() {
-      const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
-      const checkbox = document.getElementById('editor-active-checkbox') as HTMLInputElement | null;
-      const saveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
-      if (!textarea || !checkbox || !saveBtn) return;
+    async function csrfHeaders(): Promise<Record<string, string>> {
+      const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+      return token ? { 'Content-Type': 'application/json', 'x-csrf-token': token } : { 'Content-Type': 'application/json' };
+    }
 
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
+    async function saveEditor(): Promise<void> {
+      const scope = selectedScope();
+      if (!scope || !editorTextarea || !editorActiveCheckbox || !editorSaveBtn) return;
+
+      editorSaveBtn.disabled = true;
+      editorSaveBtn.textContent = 'Saving...';
 
       try {
-        const csrfRes = await fetch('/api/auth/csrf-token');
-        const { token } = await csrfRes.json();
-
         const body: Record<string, unknown> = {
-          content: textarea.value,
-          isActive: checkbox.checked,
+          content: editorTextarea.value,
+          isActive: editorActiveCheckbox.checked,
         };
-        // id present → overwrite; absent → create new version
-        if (editingId) body.id = editingId;
+
+        if (editingId) {
+          body.id = editingId;
+        } else {
+          body.scopeKey = scope.scopeKey;
+        }
 
         const res = await fetch('/api/admin/prompts', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'x-csrf-token': token },
+          headers: await csrfHeaders(),
           body: JSON.stringify(body),
         });
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Save failed' }));
-          throw new Error(err.error || 'Save failed (' + res.status + ')');
+          throw new Error(err.error || `Save failed (${res.status})`);
         }
 
-        await renderTable();
+        await loadPromptScopes();
         closeEditor();
       } catch (err) {
         console.error('[Prompts] Save failed:', err);
-        alert('Failed to save prompt version. Please check the logs.');
+        alert(err instanceof Error ? err.message : 'Failed to save prompt version.');
       } finally {
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save Changes';
+        editorSaveBtn.disabled = false;
+        editorSaveBtn.textContent = 'Save Changes';
       }
     }
 
-    // ── Event listeners ──
-    document.getElementById('create-version-btn')?.addEventListener('click', () => {
-      editingId = null;
-      const modal = document.getElementById('editor-modal');
-      const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
-      const preview = document.getElementById('editor-preview');
-      const titleLabel = document.getElementById('editor-version-label');
-      const checkbox = document.getElementById('editor-active-checkbox') as HTMLInputElement | null;
-      if (!modal || !textarea || !preview || !titleLabel || !checkbox) return;
+    async function deleteVersion(version: PromptVersion): Promise<void> {
+      if (selectedScopeKey === 'default' && version.version === 'default') {
+        alert('The default prompt version cannot be deleted.');
+        return;
+      }
 
-      titleLabel.textContent = '';
-      textarea.value = '';
-      preview.textContent = '';
-      checkbox.checked = true;
+      if (!confirm(`Delete prompt version ${version.version}? This cannot be undone.`)) return;
 
-      modal.classList.remove('hidden');
-      textarea.focus();
+      try {
+        const res = await fetch(`/api/admin/prompts?id=${encodeURIComponent(version.id)}`, {
+          method: 'DELETE',
+          headers: await csrfHeaders(),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Delete failed' }));
+          throw new Error(err.error || `Delete failed (${res.status})`);
+        }
+
+        await loadPromptScopes();
+      } catch (err) {
+        console.error('[Prompts] Delete failed:', err);
+        alert(err instanceof Error ? err.message : 'Failed to delete prompt version.');
+      }
+    }
+
+    async function activateVersion(version: PromptVersion): Promise<void> {
+      try {
+        const res = await fetch('/api/admin/prompts', {
+          method: 'PUT',
+          headers: await csrfHeaders(),
+          body: JSON.stringify({
+            id: version.id,
+            content: version.content,
+            isActive: true,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Activate failed' }));
+          throw new Error(err.error || `Activate failed (${res.status})`);
+        }
+
+        await loadPromptScopes();
+      } catch (err) {
+        console.error('[Prompts] Activate failed:', err);
+        alert(err instanceof Error ? err.message : 'Failed to activate prompt version.');
+      }
+    }
+
+    async function resetOverride(): Promise<void> {
+      const scope = selectedScope();
+      if (!scope || scope.scopeKey === 'default') return;
+
+      if (!confirm(`Reset the ${scope.scopeLabel} override and fall back to the default prompt?`)) return;
+
+      try {
+        const res = await fetch(`/api/admin/prompts?scope=${encodeURIComponent(scope.scopeKey)}`, {
+          method: 'DELETE',
+          headers: await csrfHeaders(),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Reset failed' }));
+          throw new Error(err.error || `Reset failed (${res.status})`);
+        }
+
+        await loadPromptScopes();
+      } catch (err) {
+        console.error('[Prompts] Reset override failed:', err);
+        alert(err instanceof Error ? err.message : 'Failed to reset override.');
+      }
+    }
+
+    async function loadPromptScopes(): Promise<void> {
+      try {
+        const res = await fetch('/api/admin/prompts');
+        const data: { scopes?: PromptScopeView[] } = await res.json();
+        promptScopes = data.scopes ?? [];
+
+        if (promptScopes.length === 0) {
+          throw new Error('No prompt scopes returned');
+        }
+
+        if (!promptScopes.some((scope) => scope.scopeKey === selectedScopeKey)) {
+          selectedScopeKey = 'default';
+        }
+
+        renderAll();
+      } catch (err) {
+        console.error('[Prompts] loadPromptScopes failed:', err);
+        if (scopeRailList) {
+          scopeRailList.innerHTML = `
+            <div class="error-card">
+              <p class="empty-title">Failed to load prompt scopes</p>
+              <p class="empty-copy">Check the admin API and database connection.</p>
+            </div>
+          `;
+        }
+      }
+    }
+
+    createVersionBtn?.addEventListener('click', () => openEditor(null, 'create'));
+    scopeCreateBtn?.addEventListener('click', () => openEditor(null, 'create'));
+    emptyCreateBtn?.addEventListener('click', () => openEditor(null, 'create'));
+    scopeResetBtn?.addEventListener('click', resetOverride);
+    editorCancelBtn?.addEventListener('click', closeEditor);
+    editorSaveBtn?.addEventListener('click', saveEditor);
+
+    editorModal?.addEventListener('click', (event) => {
+      if (event.target === editorModal) closeEditor();
     });
 
-    document.getElementById('editor-cancel-btn')?.addEventListener('click', closeEditor);
-    document.getElementById('editor-save-btn')?.addEventListener('click', handleSave);
-
-    document.getElementById('editor-modal')?.addEventListener('click', (e) => {
-      if (e.target === document.getElementById('editor-modal')) closeEditor();
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeEditor();
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        saveEditor();
+      }
     });
 
-    // Keyboard shortcut: Escape to close, Ctrl+Enter to save
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeEditor();
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') handleSave();
+    editorTextarea?.addEventListener('input', () => {
+      if (editorPreview && editorTextarea) editorPreview.textContent = editorTextarea.value;
     });
 
-    // Update preview on textarea input
-    document.getElementById('editor-textarea')?.addEventListener('input', () => {
-      const textarea = document.getElementById('editor-textarea') as HTMLTextAreaElement | null;
-      const preview = document.getElementById('editor-preview');
-      if (textarea && preview) preview.textContent = textarea.value;
-    });
-
-    // Initial load
-    renderTable();
+    loadPromptScopes();
   </script>
 
   <style>
-    .page-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    .page-title {
-      font-size: 20px;
-      line-height: 1.3;
-      font-weight: 600;
-      color: var(--color-graphite-800);
-      margin: 0;
-    }
-    .page-description {
-      margin: 4px 0 0;
-      font-size: 13px;
-      color: var(--color-graphite-500);
-    }
-    .table-container {
-      background: var(--color-porcelain-100);
-      border: 1px solid var(--color-graphite-180);
-      border-radius: var(--radius-card);
-      overflow: hidden;
-    }
-
-    /* Modal */
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.4);
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-    .modal-content {
-      background: var(--color-porcelain-50);
-      border-radius: var(--radius-panel);
-      max-width: 1100px;
-      width: 100%;
-      max-height: 90vh;
-      overflow-y: auto;
-      padding: 24px;
-      border: 1px solid var(--color-graphite-300);
-    }
-    .hidden { display: none !important; }
-
-    /* Editor */
-    .editor-panel {
+    .prompt-page {
       display: flex;
       flex-direction: column;
       gap: 24px;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+    }
+
+    .page-kicker,
+    .card-kicker {
+      margin: 0 0 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--color-graphite-500);
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: clamp(28px, 3vw, 40px);
+      line-height: 1.05;
+      font-weight: 650;
+      letter-spacing: -0.03em;
+      color: var(--color-graphite-900);
+    }
+
+    .page-description {
+      margin: 8px 0 0;
+      max-width: 68ch;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--color-graphite-600);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .action-btn {
+      border-radius: 999px;
+      padding: 11px 18px;
+      font-size: 14px;
+      font-weight: 650;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .action-btn:active {
+      transform: translateY(0) scale(0.985);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .action-btn-primary {
+      background: var(--color-royal-blue-600);
+      color: var(--color-porcelain-50);
+      border-color: var(--color-royal-blue-700);
+    }
+
+    .action-btn-primary:hover {
+      background: var(--color-royal-blue-700);
+    }
+
+    .action-btn-secondary {
       background: var(--color-porcelain-100);
+      color: var(--color-graphite-800);
+      border-color: var(--color-graphite-300);
+    }
+
+    .action-btn-secondary:hover {
+      background: var(--color-porcelain-150);
+    }
+
+    .prompt-layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .scope-rail,
+    .versions-card,
+    .reference-card,
+    .editor-shell {
+      background: var(--color-porcelain-50);
       border: 1px solid var(--color-graphite-180);
-      border-radius: var(--radius-panel);
+      border-radius: 24px;
+      box-shadow: 0 10px 40px color-mix(in oklch, var(--color-graphite-900) 6%, transparent);
+    }
+
+    .scope-rail {
+      padding: 20px;
+      position: sticky;
+      top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .rail-heading {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .rail-note {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--color-graphite-600);
+    }
+
+    .scope-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .scope-card {
+      width: 100%;
+      text-align: left;
+      padding: 16px;
+      border-radius: 20px;
+      border: 1px solid var(--color-graphite-180);
+      background: var(--color-porcelain-100);
+      cursor: pointer;
+      transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .scope-card:hover {
+      transform: translateY(-1px);
+      border-color: var(--color-graphite-250);
+      background: var(--color-porcelain-150);
+    }
+
+    .scope-card-selected {
+      border-color: var(--color-royal-blue-600);
+      background: color-mix(in oklch, var(--color-royal-blue-100) 65%, var(--color-porcelain-50));
+      box-shadow: inset 0 0 0 1px var(--color-royal-blue-100);
+    }
+
+    .scope-card-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .scope-card-label {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 650;
+      color: var(--color-graphite-900);
+    }
+
+    .scope-card-description {
+      margin: 6px 0 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--color-graphite-600);
+    }
+
+    .scope-badge,
+    .hero-chip,
+    .row-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .scope-badge-default,
+    .hero-chip,
+    .row-badge-active {
+      background: var(--color-royal-blue-100);
+      color: var(--color-royal-blue-700);
+      border: 1px solid var(--color-royal-blue-200);
+    }
+
+    .scope-badge-override,
+    .hero-chip-secondary,
+    .row-badge-inactive {
+      background: var(--color-porcelain-150);
+      color: var(--color-graphite-700);
+      border: 1px solid var(--color-graphite-220);
+    }
+
+    .scope-card-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--color-graphite-550);
+    }
+
+    .scope-workspace {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      min-width: 0;
+    }
+
+    .workspace-hero {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-start;
+      padding: 24px 26px;
+      border-radius: 24px;
+      border: 1px solid var(--color-graphite-180);
+      background: linear-gradient(180deg, var(--color-porcelain-50) 0%, var(--color-porcelain-100) 100%);
+    }
+
+    .scope-title {
+      margin: 0;
+      font-size: clamp(22px, 2.4vw, 32px);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      color: var(--color-graphite-900);
+    }
+
+    .scope-description {
+      margin: 10px 0 0;
+      max-width: 68ch;
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--color-graphite-600);
+    }
+
+    .scope-hero-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-end;
+      min-width: 220px;
+    }
+
+    .versions-card {
       padding: 24px;
     }
+
+    .versions-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .versions-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 650;
+      color: var(--color-graphite-900);
+    }
+
+    .versions-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .versions-table-wrap {
+      overflow: auto;
+      border-radius: 18px;
+      border: 1px solid var(--color-graphite-180);
+      background: var(--color-porcelain-50);
+    }
+
+    .versions-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .versions-table th,
+    .versions-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--color-graphite-160);
+      font-size: 13px;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .versions-table th {
+      position: sticky;
+      top: 0;
+      background: var(--color-porcelain-100);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-graphite-550);
+      z-index: 1;
+    }
+
+    .versions-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .versions-table-actions {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .version-cell-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .version-name {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--color-graphite-900);
+    }
+
+    .version-scope {
+      font-size: 11px;
+      color: var(--color-graphite-550);
+    }
+
+    .table-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 12px;
+      font-weight: 650;
+      cursor: pointer;
+      transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+    }
+
+    .table-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .table-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .table-btn-primary {
+      background: var(--color-royal-blue-600);
+      border-color: var(--color-royal-blue-700);
+      color: var(--color-porcelain-50);
+    }
+
+    .table-btn-secondary {
+      background: var(--color-porcelain-100);
+      border-color: var(--color-graphite-280);
+      color: var(--color-graphite-800);
+    }
+
+    .table-btn-danger {
+      background: var(--color-danger-100);
+      border-color: var(--color-danger-500);
+      color: var(--color-danger-600);
+    }
+
+    .empty-state {
+      border-radius: 18px;
+      border: 1px dashed var(--color-graphite-220);
+      background: var(--color-porcelain-100);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .empty-state-body {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .empty-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 650;
+      color: var(--color-graphite-900);
+    }
+
+    .empty-copy {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--color-graphite-600);
+    }
+
+    .reference-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .reference-card {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .reference-summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 650;
+      color: var(--color-graphite-800);
+      list-style: none;
+    }
+
+    .reference-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .reference-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-top: 1px solid var(--color-graphite-160);
+    }
+
+    .reference-table th,
+    .reference-table td {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--color-graphite-150);
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .reference-table th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-graphite-550);
+      background: var(--color-porcelain-100);
+    }
+
+    .reference-code {
+      font-family: var(--font-mono);
+      color: var(--color-graphite-900);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .reference-list {
+      margin: 0;
+      padding: 14px 20px 18px 36px;
+      color: var(--color-graphite-650);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .editor-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .editor-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: color-mix(in oklch, var(--color-graphite-900) 40%, transparent);
+    }
+
+    .editor-modal-surface {
+      position: relative;
+      width: min(1180px, 100%);
+      max-height: calc(100dvh - 48px);
+      overflow: auto;
+      border-radius: 28px;
+      border: 1px solid var(--color-graphite-180);
+      background: var(--color-porcelain-50);
+      box-shadow: 0 30px 80px color-mix(in oklch, var(--color-graphite-900) 22%, transparent);
+    }
+
+    .editor-shell {
+      padding: 24px;
+    }
+
     .editor-header {
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 18px;
     }
+
     .editor-title {
-      font-size: 20px;
-      font-weight: 600;
-      color: var(--color-graphite-800);
       margin: 0;
-      letter-spacing: -0.01em;
+      font-size: 20px;
+      font-weight: 650;
+      color: var(--color-graphite-900);
     }
-    .editor-version-label {
-      color: var(--color-royal-blue-600);
+
+    .editor-hint {
+      margin: 6px 0 0;
+      font-size: 13px;
+      color: var(--color-graphite-600);
     }
+
     .editor-active-label {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 8px;
-      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-graphite-700);
     }
+
     .editor-checkbox {
       width: 16px;
       height: 16px;
-      border-radius: 4px;
-      border: 1px solid var(--color-graphite-300);
       accent-color: var(--color-royal-blue-600);
     }
-    .editor-checkbox-text {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--color-graphite-650);
-    }
+
     .editor-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      gap: 20px;
+      align-items: start;
     }
+
     .editor-col {
       display: flex;
       flex-direction: column;
       gap: 8px;
     }
+
     .editor-col-label {
-      font-size: 13px;
-      font-weight: 500;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--color-graphite-500);
-      letter-spacing: 0.01em;
+      color: var(--color-graphite-550);
     }
-    .editor-textarea {
-      width: 100%;
-      height: 400px;
-      padding: 16px;
-      border-radius: var(--radius-button);
-      background: var(--color-porcelain-50);
-      border: 1px solid var(--color-graphite-300);
-      color: var(--color-graphite-900);
-      font-family: var(--font-mono);
-      font-size: 13px;
-      line-height: 1.5;
-      resize: none;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-      box-sizing: border-box;
-    }
-    .editor-textarea:focus {
-      border-color: var(--color-royal-blue-600);
-      box-shadow: 0 0 0 2px var(--color-royal-blue-100);
-    }
+
+    .editor-textarea,
     .editor-preview {
       width: 100%;
-      height: 400px;
+      min-height: 420px;
       padding: 16px;
-      border-radius: var(--radius-button);
-      background: var(--color-graphite-900);
-      color: var(--color-porcelain-50);
+      border-radius: 20px;
+      border: 1px solid var(--color-graphite-220);
+      background: var(--color-porcelain-50);
+      box-sizing: border-box;
       font-family: var(--font-mono);
       font-size: 13px;
-      line-height: 1.5;
-      overflow-y: auto;
+      line-height: 1.65;
+      color: var(--color-graphite-900);
+    }
+
+    .editor-textarea {
+      resize: vertical;
+      outline: none;
+    }
+
+    .editor-textarea:focus {
+      border-color: var(--color-royal-blue-600);
+      box-shadow: 0 0 0 3px var(--color-royal-blue-100);
+    }
+
+    .editor-preview {
+      margin: 0;
       white-space: pre-wrap;
       word-break: break-word;
-      margin: 0;
-      box-sizing: border-box;
+      background: var(--color-graphite-900);
+      color: var(--color-porcelain-50);
     }
+
     .editor-footer {
       display: flex;
       justify-content: flex-end;
       gap: 12px;
+      margin-top: 18px;
     }
 
-    /* Template variable reference */
-    .var-reference {
-      border: 1px solid var(--color-graphite-180);
-      border-radius: var(--radius-card);
-      background: var(--color-porcelain-50);
-      overflow: hidden;
+    .hidden {
+      display: none !important;
     }
-    .var-reference-summary {
-      padding: 10px 16px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--color-graphite-650);
-      cursor: pointer;
-      user-select: none;
-      transition: background 0.15s;
-    }
-    .var-reference-summary:hover {
-      background: var(--color-porcelain-150);
-    }
-    .var-table {
-      width: 100%;
-      border-collapse: collapse;
-      border-top: 1px solid var(--color-graphite-180);
-    }
-    .var-th {
-      padding: 8px 16px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      color: var(--color-graphite-500);
-      background: var(--color-porcelain-100);
-      text-align: left;
-      letter-spacing: 0.02em;
-    }
-    .var-tr {
-      border-bottom: 1px solid var(--color-graphite-150);
-    }
-    .var-tr:last-child {
-      border-bottom: none;
-    }
-    .var-td {
-      padding: 8px 16px;
-      font-size: 13px;
-    }
-    .var-code {
+
+    .mono {
       font-family: var(--font-mono);
-      color: var(--color-graphite-800);
-      font-weight: 500;
-      white-space: nowrap;
-    }
-    .var-desc {
-      color: var(--color-graphite-650);
     }
 
-    /* Buttons */
-    .btn-primary {
-      background: var(--color-royal-blue-600);
-      color: var(--color-porcelain-50);
-      padding: 8px 20px;
-      border-radius: var(--radius-button);
-      font-size: 14px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .btn-primary:hover { background: var(--color-royal-blue-700); }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    @media (max-width: 1080px) {
+      .prompt-layout {
+        grid-template-columns: 1fr;
+      }
 
-    .btn-secondary {
-      background: var(--color-porcelain-200);
-      color: var(--color-graphite-700);
-      padding: 8px 20px;
-      border-radius: var(--radius-button);
-      font-size: 14px;
-      font-weight: 600;
-      border: 1px solid var(--color-graphite-300);
-      cursor: pointer;
-      transition: background 0.15s;
+      .scope-rail {
+        position: static;
+      }
+
+      .reference-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .editor-grid {
+        grid-template-columns: 1fr;
+      }
     }
-    .btn-secondary:hover { background: var(--color-porcelain-300); }
+
+    @media (max-width: 768px) {
+      .page-header,
+      .workspace-hero,
+      .versions-card-header,
+      .editor-header {
+        flex-direction: column;
+      }
+
+      .scope-hero-meta,
+      .versions-actions,
+      .header-actions,
+      .editor-footer {
+        width: 100%;
+        align-items: stretch;
+      }
+
+      .action-btn,
+      .table-btn {
+        width: 100%;
+      }
+
+      .versions-table-actions {
+        text-align: left;
+        white-space: normal;
+      }
+    }
   </style>
 </AdminLayout>

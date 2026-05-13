@@ -17,7 +17,7 @@ export const lookupLogs = pgTable("lookup_logs", {
   dictionaryIdUsed: integer("dictionary_id_used")
     .references(() => dictionaries.id),
   responseCacheId: bigint("response_cache_id", { mode: "bigint" })
-    // Cache delete relies on FK cascade; keep in sync with packages/db/drizzle/0013_cache_cascade_delete.sql.
+    // Cache delete relies on FK cascade; keep this in sync with the current DB migration.
     .references(() => responseCache.id, { onDelete: "cascade" }),
   cacheHit: boolean("cache_hit").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),

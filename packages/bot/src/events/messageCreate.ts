@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { type Message } from "discord.js";
-import { getActivePrompt } from "@grkd-jisho/db";
+import { getActivePromptForScope, type PromptScopeKey } from "@grkd-jisho/db";
 import { env } from "../config/env.js";
 import { PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import { lookupWord } from "../services/dictionary.service.js";
@@ -51,8 +51,8 @@ type ActivePromptContext = {
   promptContentHash: string;
 };
 
-async function loadActivePromptContext(message: Message, traceId: string): Promise<ActivePromptContext | null> {
-  const activePrompt = await getActivePrompt();
+async function loadActivePromptContext(message: Message, traceId: string, scopeKey: PromptScopeKey): Promise<ActivePromptContext | null> {
+  const activePrompt = await getActivePromptForScope(scopeKey);
 
   if (!activePrompt) {
     await traceEvent(traceId, "llm.error", "error", { error: "Active prompt missing" });
@@ -167,7 +167,7 @@ async function handleMessage(message: Message): Promise<void> {
       normalizedQuery: result.normalizedQuery,
     });
 
-    const promptContext = await loadActivePromptContext(message, traceId);
+    const promptContext = await loadActivePromptContext(message, traceId, outputBucketKey);
     if (!promptContext) {
       return;
     }
@@ -324,7 +324,7 @@ async function handleMessage(message: Message): Promise<void> {
     normalizedQuery: result.normalizedQuery,
   });
 
-  const promptContext = await loadActivePromptContext(message, traceId);
+  const promptContext = await loadActivePromptContext(message, traceId, outputBucketKey);
   if (!promptContext) {
     return;
   }
