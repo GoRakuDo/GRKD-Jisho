@@ -8,7 +8,7 @@ const { mockUpdateResponse, mockDeleteCacheByQuery, mockGetResponseById } = vi.h
   return {
     mockUpdateResponse: vi.fn<(cacheId: string, newText: string, editorDiscordId: string, reason?: string) => Promise<void>>(),
     mockDeleteCacheByQuery: vi.fn<(normalizedQuery: string, roleKey?: string) => Promise<number>>(),
-    mockGetResponseById: vi.fn<(id: string) => Promise<{ id: string; query: string; roleKey: string; modelName: string; promptVersion: string; isManualOverride: boolean; updatedAt: Date | null; responseText: string } | null>>(),
+    mockGetResponseById: vi.fn<(id: string) => Promise<{ id: string; query: string; roleKey: string; modelName: string; promptVersion: string; isManualOverride: boolean; isDeleteProtected: boolean; updatedAt: Date | null; responseText: string } | null>>(),
   };
 });
 
@@ -30,6 +30,7 @@ const makeResult = (overrides: Partial<SearchResult> = {}): SearchResult => ({
   modelName: PRIMARY_LLM_MODEL,
   promptVersion: "v1",
   isManualOverride: false,
+  isDeleteProtected: false,
   updatedAt: new Date(),
   responseText: "answer",
   ...overrides,
