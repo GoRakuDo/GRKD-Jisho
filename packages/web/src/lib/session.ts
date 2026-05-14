@@ -3,7 +3,7 @@ import type { APIContext } from "astro";
 
 const SESSION_COOKIE = "grkd_session";
 const STATE_COOKIE = "grkd_oauth_state";
-export const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000; // 8 hours
+export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 export const OAUTH_STATE_MAX_AGE_SEC = 300;
 
 // One-time warning guard to avoid repeated insecure-cookie logs.
