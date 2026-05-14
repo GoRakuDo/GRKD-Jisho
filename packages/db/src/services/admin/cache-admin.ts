@@ -94,6 +94,15 @@ export async function bulkDeleteCache(ids: string[], forceDeleteProtected = fals
 
     const deletableIds = deletableRows.map((row) => row.id);
 
+    // Delete children first (FK safety — no cascade dependency)
+    await tx
+      .delete(schema.lookupLogs)
+      .where(inArray(schema.lookupLogs.responseCacheId, deletableIds));
+
+    await tx
+      .delete(schema.responseEdits)
+      .where(inArray(schema.responseEdits.responseCacheId, deletableIds));
+
     return tx
       .delete(schema.responseCache)
       .where(inArray(schema.responseCache.id, deletableIds))

@@ -115,8 +115,9 @@ export const DELETE: APIRoute = async (context) => {
       });
     }
 
-    // Pre-filter: exclude delete-protected entries
-    logStep("pre-filter.numeric", "ok", `Received ${body.ids.length} ids`);
+    // Pre-filter: exclude delete-protected entries (unless forced)
+    const force = body.forceDeleteProtected === true;
+    logStep("pre-filter.numeric", "ok", `Received ${body.ids.length} ids, force=${force}`);
     const numericIds = body.ids
       .filter((id) => /^\d+$/.test(id))
       .map((id) => BigInt(id));
@@ -129,39 +130,54 @@ export const DELETE: APIRoute = async (context) => {
       });
     }
 
-    // Fetch entries to check delete-protection status
-    logStep("pre-filter.delete-protection", "ok", "Loading selected entries");
-    const existing = await db
-      .select({ id: schema.responseCache.id, isDeleteProtected: schema.responseCache.isDeleteProtected })
-      .from(schema.responseCache)
-      .where(inArray(schema.responseCache.id, numericIds));
+    // When forcing, skip the delete-protection pre-filter — let the DB function handle it
+    let deleteIds: string[];
+    if (force) {
+      deleteIds = body.ids.filter((id) => /^\d+$/.test(id));
+      logStep("pre-filter.force", "ok", `Bypassing delete-protection check, passing ${deleteIds.length} ids`);
+    } else {
+      logStep("pre-filter.delete-protection", "ok", "Loading selected entries");
+      const existing = await db
+        .select({
+          id: schema.responseCache.id,
+          isDeleteProtected: schema.responseCache.isDeleteProtected,
+        })
+        .from(schema.responseCache)
+        .where(inArray(schema.responseCache.id, numericIds));
 
-    const deletableIds = existing
-      .filter((e) => !e.isDeleteProtected)
-      .map((e) => String(e.id));
+      deleteIds = existing
+        .filter((e) => !e.isDeleteProtected)
+        .map((e) => String(e.id));
 
-    logStep(
-      "pre-filter.delete-protection",
-      deletableIds.length > 0 ? "ok" : "error",
-      `${deletableIds.length} deletable / ${existing.length} selected`,
-    );
+      logStep(
+        "pre-filter.delete-protection",
+        deleteIds.length > 0 ? "ok" : "error",
+        `${deleteIds.length} deletable / ${existing.length} selected`,
+      );
 
-    if (deletableIds.length === 0) {
-      return new Response(JSON.stringify({ success: true, deleted: 0, traceId, stage: "pre-filter.delete-protection", flow }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      if (deleteIds.length === 0) {
+        return new Response(
+          JSON.stringify({
+            success: true,
+            deleted: 0,
+            traceId,
+            stage: "pre-filter.delete-protection",
+            flow,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
     }
 
-    logStep("bulk-delete", "ok", `Deleting ${deletableIds.length} entries`);
-    const deleted = await bulkDeleteCache(deletableIds, body.forceDeleteProtected === true);
+    logStep("bulk-delete", "ok", `Deleting ${deleteIds.length} entries`);
+    const deleted = await bulkDeleteCache(deleteIds, force);
     logStep("bulk-delete", "ok", `Deleted ${deleted} entries`);
 
     logStep("audit.log", "ok", "Writing admin audit event");
     await adminAuditEvent("admin.cache_deleted", {
         requestedIds: body.ids.length,
-        skippedDeleteProtected: body.ids.length - deletableIds.length,
-        forceDeleteProtected: body.forceDeleteProtected === true,
+        skippedDeleteProtected: body.ids.length - deleteIds.length,
+        forceDeleteProtected: force,
         deletedCount: deleted,
         operator: session.discordUserId,
       });
