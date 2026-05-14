@@ -74,7 +74,7 @@ export async function getResponseById(
       responseText: schema.responseCache.responseText,
     })
     .from(schema.responseCache)
-    .where(eq(schema.responseCache.id, BigInt(numericId)))
+    .where(eq(schema.responseCache.id, numericId))
     .limit(1);
 
   if (!row) return null;
