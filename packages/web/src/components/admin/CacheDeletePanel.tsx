@@ -30,9 +30,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [showForceConfirm, setShowForceConfirm] = useState(false);
-
-  const deletableIds = useMemo(() => entries.filter((e) => !e.isDeleteProtected).map((e) => e.id), [entries]);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   const lockedSelectedCount = useMemo(
     () => entries.filter((e) => selectedIds.has(e.id) && e.isDeleteProtected).length,
@@ -51,12 +49,8 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
     });
   };
 
-  const selectDeletable = () => {
-    setSelectedIds(new Set(deletableIds));
-  };
-
   const executeDelete = async (force: boolean) => {
-    setShowForceConfirm(false);
+    setShowConfirmDelete(false);
     setDeleting(true);
     setError(null);
 
@@ -94,38 +88,21 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
 
   const handleDeleteClick = () => {
     if (selectedIds.size === 0) return;
-    if (lockedSelectedCount > 0) {
-      setShowForceConfirm(true);
-    } else {
-      executeDelete(false);
-    }
+    setShowConfirmDelete(true);
   };
 
   const deletableCount = entries.filter((e) => !e.isDeleteProtected).length;
-  const hasDeletable = deletableCount > 0;
 
   return (
     <>
     <section className="mt-6 rounded-[20px] border border-graphite-180 bg-porcelain-100 p-5 shadow-[0_1px_0_oklch(78%_0.012_255_/_0.35)]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-graphite-500">
-            Cache delete preview
-          </p>
-          <p className="mt-1 text-[14px] text-graphite-650">
-            {deletableCount} of {entries.length} entries can be deleted. Delete-protected rows stay locked.
-          </p>
-        </div>
-        {hasDeletable && (
-          <button
-            type="button"
-            onClick={selectDeletable}
-            disabled={deleting}
-            className="rounded-[10px] border border-graphite-300 bg-porcelain-50 px-4 py-2 text-[14px] font-semibold text-graphite-800 transition-colors hover:bg-porcelain-150 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Select deletable
-          </button>
-        )}
+      <div>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-graphite-500">
+          Cache delete preview
+        </p>
+        <p className="mt-1 text-[14px] text-graphite-650">
+          {deletableCount} of {entries.length} entries can be deleted. Locked rows stay protected.
+        </p>
       </div>
 
       {error && (
@@ -142,9 +119,57 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
           type="button"
           onClick={handleDeleteClick}
           disabled={selectedIds.size === 0 || deleting}
-          className="rounded-[10px] border border-danger-600/30 bg-danger-100 px-4 py-2 text-[14px] font-semibold text-danger-600 transition-colors hover:bg-danger-100/80 disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label={`Delete ${selectedIds.size} selected entries`}
+          title="Delete selected"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            padding: "6px 14px 6px 12px",
+            border: "1px solid var(--color-danger-600)",
+            borderRadius: "999px",
+            background: "var(--color-danger-100)",
+            color: "var(--color-danger-600)",
+            cursor: selectedIds.size === 0 || deleting ? "not-allowed" : "pointer",
+            opacity: selectedIds.size === 0 || deleting ? 0.6 : 1,
+            transition: "all 0.12s",
+            fontSize: "14px",
+            fontWeight: 600,
+          }}
+          onMouseEnter={(e) => {
+            if (selectedIds.size > 0 && !deleting) {
+              e.currentTarget.style.background = "var(--color-danger-100)";
+              e.currentTarget.style.borderColor = "var(--color-danger-600)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "var(--color-danger-100)";
+            e.currentTarget.style.borderColor = "var(--color-danger-600)";
+          }}
         >
-          {deleting ? "Deleting..." : `Delete selected (${selectedIds.size})`}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18" />
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
+          </svg>
+          <span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minWidth: "18px",
+            height: "18px",
+            borderRadius: "999px",
+            background: "var(--color-danger-600)",
+            color: "oklch(99% 0.002 90)",
+            fontSize: "11px",
+            fontWeight: 700,
+            lineHeight: 1,
+            padding: "0 5px",
+          }}>
+            {deleting ? "..." : selectedIds.size}
+          </span>
         </button>
       </div>
 
@@ -166,7 +191,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
                       setSelectedIds(new Set());
                     }
                   }}
-                  disabled={!hasDeletable}
+                  disabled={deletableCount === 0}
                   aria-label="Select all deletable entries"
                   className="h-4 w-4 rounded border-graphite-300 text-royal-blue-600 focus-visible:ring-royal-blue-100"
                 />
@@ -269,32 +294,36 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
       </div>
     </section>
 
-      {showForceConfirm && (
+      {showConfirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-graphite-900/40"
-            onClick={() => setShowForceConfirm(false)}
+            onClick={() => setShowConfirmDelete(false)}
           />
           <div className="relative z-10 mx-4 w-full max-w-md rounded-[20px] border border-graphite-180 bg-porcelain-50 p-6 shadow-[0_2px_12px_oklch(25%_0.02_255_/_0.25)]">
-            <p className="text-[14px] font-semibold text-graphite-800">Delete locked rows?</p>
+            <p className="text-[14px] font-semibold text-graphite-800">
+              Delete {selectedIds.size} {selectedIds.size === 1 ? "entry" : "entries"}?
+            </p>
             <p className="mt-2 text-[13px] leading-relaxed text-graphite-600">
-              {lockedSelectedCount} of {selectedIds.size} selected {selectedIds.size === 1 ? "entry is" : "entries are"} delete-protected.{" "}
-              These will be permanently removed. This cannot be undone.
+              {lockedSelectedCount > 0
+                ? `${lockedSelectedCount} of ${selectedIds.size} selected ${lockedSelectedCount === 1 ? "entry is" : "entries are"} delete-protected. `
+                : ""}
+              This cannot be undone.
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setShowForceConfirm(false)}
+                onClick={() => setShowConfirmDelete(false)}
                 className="rounded-[10px] border border-graphite-300 bg-porcelain-50 px-4 py-2 text-[14px] font-semibold text-graphite-800 transition-colors hover:bg-porcelain-150"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={() => executeDelete(true)}
+                onClick={() => executeDelete(lockedSelectedCount > 0)}
                 className="rounded-[10px] border border-danger-600/30 bg-danger-100 px-4 py-2 text-[14px] font-semibold text-danger-600 transition-colors hover:bg-danger-100/80"
               >
-                Delete anyway
+                Delete
               </button>
             </div>
           </div>
