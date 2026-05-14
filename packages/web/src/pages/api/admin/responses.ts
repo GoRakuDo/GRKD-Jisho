@@ -9,6 +9,27 @@ import {
 } from "@grkd-jisho/db";
 import { validateCsrfRequest } from "../../../lib/csrf";
 import { adminAuditEvent } from "@grkd-jisho/db";
+import type { ResponseDetailResult } from "@grkd-jisho/db";
+
+/** JSON.stringify の BigInt エラーを防ぐため、detail の BigInt/Date フィールドを string に変換 */
+function serializeResponseDetail(raw: ResponseDetailResult) {
+  return {
+    ...raw,
+    updatedAt: raw.updatedAt?.toISOString() ?? null,
+    edits: raw.edits.map((e) => ({
+      ...e,
+      id: String(e.id),
+      responseCacheId: String(e.responseCacheId),
+      createdAt: e.createdAt?.toISOString() ?? null,
+    })),
+    source: raw.source.map((s) => ({
+      ...s,
+      dictionaryId: s.dictionaryId ?? null,
+      cacheId: s.cacheId != null ? String(s.cacheId) : null,
+      createdAt: s.createdAt?.toISOString() ?? null,
+    })),
+  };
+}
 
 export const GET: APIRoute = async (context) => {
   const session = getSession(context);
@@ -32,8 +53,9 @@ export const GET: APIRoute = async (context) => {
           headers: { "Content-Type": "application/json" },
         });
       }
+      const serialized = serializeResponseDetail(detail);
       return new Response(
-        JSON.stringify({ response: detail, source: detail.source, edits: detail.edits }),
+        JSON.stringify({ response: serialized }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     }
