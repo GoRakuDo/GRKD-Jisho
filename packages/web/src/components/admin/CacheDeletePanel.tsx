@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import CacheEditModal from "./CacheEditModal";
 
 interface CacheEntry {
   id: string;
@@ -27,6 +28,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const deletableIds = useMemo(() => entries.filter((e) => !e.isManualOverride).map((e) => e.id), [entries]);
 
@@ -87,6 +89,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
   const hasDeletable = deletableCount > 0;
 
   return (
+    <>
     <section className="mt-6 rounded-[20px] border border-graphite-180 bg-porcelain-100 p-5 shadow-[0_1px_0_oklch(78%_0.012_255_/_0.35)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -156,6 +159,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
               <th className="px-4 py-3">Query</th>
               <th className="px-4 py-3">Manual</th>
               <th className="px-4 py-3">Updated</th>
+              <th className="w-14 px-4 py-3 text-center">Edit</th>
             </tr>
           </thead>
           <tbody>
@@ -195,6 +199,42 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
                       ? new Date(entry.updatedAt).toLocaleString("en-US", { timeZone: "Asia/Jakarta" })
                       : "-"}
                   </td>
+                  <td className="px-4 py-3 text-center align-top">
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(entry.id)}
+                      aria-label={`Edit response for ${entry.query}`}
+                      title="Edit"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: "32px",
+                        height: "32px",
+                        border: "1px solid transparent",
+                        borderRadius: "8px",
+                        background: "transparent",
+                        color: "var(--color-graphite-400)",
+                        cursor: "pointer",
+                        transition: "all 0.12s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "var(--color-royal-blue-100)";
+                        e.currentTarget.style.color = "var(--color-royal-blue-600)";
+                        e.currentTarget.style.borderColor = "var(--color-royal-blue-100)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = "var(--color-graphite-400)";
+                        e.currentTarget.style.borderColor = "transparent";
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                      </svg>
+                    </button>
+                  </td>
                 </tr>
               );
             })}
@@ -202,5 +242,15 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
         </table>
       </div>
     </section>
+
+      {editingId && (
+        <CacheEditModal
+          entryId={editingId}
+          queryLabel={entries.find((e) => e.id === editingId)?.query ?? ""}
+          csrfToken={csrfToken}
+          onClose={() => setEditingId(null)}
+        />
+      )}
+    </>
   );
 };

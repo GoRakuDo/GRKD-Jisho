@@ -60,7 +60,7 @@ export const GET: APIRoute = async (context) => {
   }
 };
 
-export const putResponse: APIRoute = async (context) => {
+export const PUT: APIRoute = async (context) => {
   const session = getSession(context);
   if (!session || !getIsAuthenticated(context)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
@@ -116,7 +116,7 @@ export const putResponse: APIRoute = async (context) => {
   }
 };
 
-export const deleteResponse: APIRoute = async (context) => {
+export const DELETE: APIRoute = async (context) => {
   const session = getSession(context);
   if (!session || !getIsAuthenticated(context)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
