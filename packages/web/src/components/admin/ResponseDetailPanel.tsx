@@ -18,7 +18,7 @@ export default function ResponseDetailPanel({
   model,
   promptVersion,
   isOverride,
-  isDeleteProtected,
+  isDeleteProtected: initialDeleteProtected,
   text: initialText,
 }: ResponseDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -31,6 +31,7 @@ export default function ResponseDetailPanel({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editReason, setEditReason] = useState('');
   const [csrfToken, setCsrfToken] = useState('');
+  const [isDeleteProtected, setIsDeleteProtected] = useState(initialDeleteProtected);
 
   useEffect(() => {
     fetch('/api/auth/csrf-token')
@@ -48,6 +49,10 @@ export default function ResponseDetailPanel({
     setText(initialText);
     setEditedText(initialText);
   }, [initialText]);
+
+  useEffect(() => {
+    setIsDeleteProtected(initialDeleteProtected);
+  }, [initialDeleteProtected]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -70,6 +75,7 @@ export default function ResponseDetailPanel({
       setIsEditing(false);
       setEditedText(editedText);
       setEditReason('');
+      setIsDeleteProtected(false);
     } catch (error) {
       setSaveError('Network error');
     } finally {
