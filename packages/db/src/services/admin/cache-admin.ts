@@ -73,7 +73,7 @@ export async function searchCacheEntries(
   return rows.map((r) => ({ ...r, id: String(r.id) }));
 }
 
-export async function bulkDeleteCache(ids: string[]): Promise<number> {
+export async function bulkDeleteCache(ids: string[], forceDeleteProtected = false): Promise<number> {
   const numericIds = ids
     .filter((id) => /^\d+$/.test(id))
     .map((id) => BigInt(id));
@@ -85,7 +85,9 @@ export async function bulkDeleteCache(ids: string[]): Promise<number> {
       .select({ id: schema.responseCache.id })
       .from(schema.responseCache)
       .where(
-        and(inArray(schema.responseCache.id, numericIds), eq(schema.responseCache.isDeleteProtected, false)),
+        forceDeleteProtected
+          ? inArray(schema.responseCache.id, numericIds)
+          : and(inArray(schema.responseCache.id, numericIds), eq(schema.responseCache.isDeleteProtected, false)),
       );
 
     if (deletableRows.length === 0) return [] as { id: bigint }[];

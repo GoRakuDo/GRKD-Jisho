@@ -106,7 +106,7 @@ export const DELETE: APIRoute = async (context) => {
 
   try {
     logStep("body.parse", "ok", "Parsing selected cache ids");
-    const body = (await context.request.json()) as { ids: string[] };
+    const body = (await context.request.json()) as { ids: string[]; forceDeleteProtected?: boolean };
     if (!Array.isArray(body.ids) || body.ids.length === 0) {
       logStep("body.validate", "error", "ids missing or empty");
       return new Response(JSON.stringify({ error: "invalid request", traceId, stage: "body.validate", flow }), {
@@ -154,13 +154,14 @@ export const DELETE: APIRoute = async (context) => {
     }
 
     logStep("bulk-delete", "ok", `Deleting ${deletableIds.length} entries`);
-    const deleted = await bulkDeleteCache(deletableIds);
+    const deleted = await bulkDeleteCache(deletableIds, body.forceDeleteProtected === true);
     logStep("bulk-delete", "ok", `Deleted ${deleted} entries`);
 
     logStep("audit.log", "ok", "Writing admin audit event");
     await adminAuditEvent("admin.cache_deleted", {
         requestedIds: body.ids.length,
         skippedDeleteProtected: body.ids.length - deletableIds.length,
+        forceDeleteProtected: body.forceDeleteProtected === true,
         deletedCount: deleted,
         operator: session.discordUserId,
       });

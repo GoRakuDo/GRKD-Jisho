@@ -30,6 +30,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [forceDeleteProtected, setForceDeleteProtected] = useState(false);
 
   const deletableIds = useMemo(() => entries.filter((e) => !e.isDeleteProtected).map((e) => e.id), [entries]);
 
@@ -61,7 +62,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
           "Content-Type": "application/json",
           "x-csrf-token": csrfToken,
         },
-        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+        body: JSON.stringify({ ids: Array.from(selectedIds), forceDeleteProtected }),
       });
 
       const responseText = await res.text();
@@ -123,6 +124,15 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
         <p className="text-[13px] text-graphite-500">
           Selected <span className="font-semibold text-graphite-800">{selectedIds.size}</span>
         </p>
+        <label className="flex items-center gap-2 text-[13px] text-graphite-600">
+          <input
+            type="checkbox"
+            checked={forceDeleteProtected}
+            onChange={(e) => setForceDeleteProtected(e.target.checked)}
+            className="h-4 w-4 rounded border-graphite-300 text-royal-blue-600 focus-visible:ring-royal-blue-100"
+          />
+          Force delete locked rows
+        </label>
         <button
           type="button"
           onClick={handleDelete}
@@ -166,19 +176,17 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
           </thead>
           <tbody>
             {entries.map((entry) => {
-              const isDeletable = !entry.isDeleteProtected;
               const isSelected = selectedIds.has(entry.id);
               return (
                 <tr
                   key={entry.id}
-                  className={`border-t border-graphite-180 ${isSelected ? "bg-royal-blue-50" : "bg-transparent"} ${!isDeletable ? "opacity-70" : ""}`}
+                  className={`border-t border-graphite-180 ${isSelected ? "bg-royal-blue-50" : "bg-transparent"} ${entry.isDeleteProtected ? "opacity-70" : ""}`}
                 >
                   <td className="px-4 py-3 align-top">
                     <input
                       type="checkbox"
                       checked={isSelected}
-                      onChange={() => isDeletable && toggleSelect(entry.id)}
-                      disabled={!isDeletable}
+                      onChange={() => toggleSelect(entry.id)}
                       aria-label={`Select ${entry.query}`}
                       className="h-4 w-4 rounded border-graphite-300 text-royal-blue-600 focus-visible:ring-royal-blue-100"
                     />
