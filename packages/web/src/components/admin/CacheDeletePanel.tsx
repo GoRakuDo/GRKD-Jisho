@@ -30,9 +30,14 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [forceDeleteProtected, setForceDeleteProtected] = useState(false);
+  const [showForceConfirm, setShowForceConfirm] = useState(false);
 
   const deletableIds = useMemo(() => entries.filter((e) => !e.isDeleteProtected).map((e) => e.id), [entries]);
+
+  const lockedSelectedCount = useMemo(
+    () => entries.filter((e) => selectedIds.has(e.id) && e.isDeleteProtected).length,
+    [entries, selectedIds],
+  );
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -50,8 +55,8 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
     setSelectedIds(new Set(deletableIds));
   };
 
-  const handleDelete = async () => {
-    if (selectedIds.size === 0) return;
+  const executeDelete = async (force: boolean) => {
+    setShowForceConfirm(false);
     setDeleting(true);
     setError(null);
 
@@ -62,7 +67,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
           "Content-Type": "application/json",
           "x-csrf-token": csrfToken,
         },
-        body: JSON.stringify({ ids: Array.from(selectedIds), forceDeleteProtected }),
+        body: JSON.stringify({ ids: Array.from(selectedIds), forceDeleteProtected: force }),
       });
 
       const responseText = await res.text();
@@ -84,6 +89,15 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
       setError(msg);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleDeleteClick = () => {
+    if (selectedIds.size === 0) return;
+    if (lockedSelectedCount > 0) {
+      setShowForceConfirm(true);
+    } else {
+      executeDelete(false);
     }
   };
 
@@ -124,18 +138,9 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
         <p className="text-[13px] text-graphite-500">
           Selected <span className="font-semibold text-graphite-800">{selectedIds.size}</span>
         </p>
-        <label className="flex items-center gap-2 text-[13px] text-graphite-600">
-          <input
-            type="checkbox"
-            checked={forceDeleteProtected}
-            onChange={(e) => setForceDeleteProtected(e.target.checked)}
-            className="h-4 w-4 rounded border-graphite-300 text-royal-blue-600 focus-visible:ring-royal-blue-100"
-          />
-          Force delete locked rows
-        </label>
         <button
           type="button"
-          onClick={handleDelete}
+          onClick={handleDeleteClick}
           disabled={selectedIds.size === 0 || deleting}
           className="rounded-[10px] border border-danger-600/30 bg-danger-100 px-4 py-2 text-[14px] font-semibold text-danger-600 transition-colors hover:bg-danger-100/80 disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -263,6 +268,38 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
         </table>
       </div>
     </section>
+
+      {showForceConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-graphite-900/40"
+            onClick={() => setShowForceConfirm(false)}
+          />
+          <div className="relative z-10 mx-4 w-full max-w-md rounded-[20px] border border-graphite-180 bg-porcelain-50 p-6 shadow-[0_2px_12px_oklch(25%_0.02_255_/_0.25)]">
+            <p className="text-[14px] font-semibold text-graphite-800">Delete locked rows?</p>
+            <p className="mt-2 text-[13px] leading-relaxed text-graphite-600">
+              {lockedSelectedCount} of {selectedIds.size} selected {selectedIds.size === 1 ? "entry is" : "entries are"} delete-protected.{" "}
+              These will be permanently removed. This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowForceConfirm(false)}
+                className="rounded-[10px] border border-graphite-300 bg-porcelain-50 px-4 py-2 text-[14px] font-semibold text-graphite-800 transition-colors hover:bg-porcelain-150"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => executeDelete(true)}
+                className="rounded-[10px] border border-danger-600/30 bg-danger-100 px-4 py-2 text-[14px] font-semibold text-danger-600 transition-colors hover:bg-danger-100/80"
+              >
+                Delete anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingId && (
         <CacheEditModal
