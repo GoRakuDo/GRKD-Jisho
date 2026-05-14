@@ -474,6 +474,8 @@ Phase 2 では priority の変更はしない。
 4. `is_manual_override = true`
 5. `response_edits` に履歴保存
 
+> 注: 削除保護は `is_delete_protected` 別フラグで扱う。`is_manual_override` は優先順位用。
+
 ### 注意
 
 Discord の command option は長文編集に向かない。

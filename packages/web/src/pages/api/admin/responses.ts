@@ -168,7 +168,7 @@ export const DELETE: APIRoute = async (context) => {
     const deleted = await deleteDbResponse(id);
 
     if (deleted === 0) {
-      return new Response(JSON.stringify({ error: "response not found or is manually overridden" }), {
+      return new Response(JSON.stringify({ error: "response not found or is delete-protected" }), {
         status: 404,
         headers: { "Content-Type": "application/json" },
       });

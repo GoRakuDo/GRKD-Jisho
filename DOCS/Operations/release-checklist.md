@@ -99,7 +99,7 @@ not tested = 未確認。release note に既知の未検証領域として残す
 | MCP Level 3 boundary | `ops_jobs` + `mcp_audit_logs` 経由。直接DB変更しない | not tested |  |
 | MCP Level 4 boundary | human approval 必須 | not tested |  |
 | Wipe safety | `wipe_enabled=true` のチャンネルのみ、pin保持、24時間範囲、権限チェックあり | not tested |  |
-| Manual override protection | `is_manual_override=true` を LLM / refresh / bulk delete で上書き・削除しない | not tested |  |
+| Delete protection | `is_delete_protected=true` を refresh / bulk delete で削除しない | not tested |  |
 | Pattern scan | `as any`, `eslint-disable`, `Asia/Bangkok`, `@grkd/`, `grkd.`, pure black/white がコードに残らない | pass | コード/設定ファイル限定scanで全0件。`Asia/Bangkok` は旧timezone残骸検出用 |
 | code-reviewer | BLOCKER/HIGH 0件 | pass | R-1 verification review approved. R-2 release prep review approved |
 

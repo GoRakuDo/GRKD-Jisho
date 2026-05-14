@@ -162,6 +162,11 @@ export async function getCacheStats() {
     .from(schema.responseCache)
     .where(eq(schema.responseCache.isManualOverride, true));
 
+  const [deleteProtectedRow] = await db
+    .select({ count: sql<number>`cast(count(*) as int)` })
+    .from(schema.responseCache)
+    .where(eq(schema.responseCache.isDeleteProtected, true));
+
   const byPromptVersion = await db
     .select({
       promptVersion: schema.responseCache.promptVersion,
@@ -188,6 +193,7 @@ export async function getCacheStats() {
   return {
     totalResponseCache: totalRow?.count ?? 0,
     manualOverrideCount: manualOverrideRow?.count ?? 0,
+    deleteProtectedCount: deleteProtectedRow?.count ?? 0,
     byPromptVersion,
     byModelName,
     recentCreatedCount7d: recentCreatedRow?.count ?? 0,

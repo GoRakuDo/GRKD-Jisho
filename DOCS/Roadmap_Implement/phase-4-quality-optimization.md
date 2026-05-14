@@ -1315,7 +1315,7 @@ grkd.
 | request_rate_limit_change | MCP | ops_jobs + audit | no | 必須 | Web承認後Bot実行 |
 | request_toggle_wipe | MCP | ops_jobs + audit | no | 必須 | 即時wipeではない |
 | request_wipe_now | MCP | ops_jobs + audit | no | 必須 | Level 4。Phase 4後半でも慎重 |
-| bulk_cache_delete | MCP/Web | yes | no | 必須 | manual override保護必須 |
+| bulk_cache_delete | MCP/Web | yes | no | 必須 | delete protection必須 |
 | prompt_version_rotate | MCP/Web | ops_jobs + audit | no | 必須 | Phase 4では設計/dry-run優先。実行はLevel 4 |
 
 ---

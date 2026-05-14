@@ -7,6 +7,7 @@ export interface ResponseDetailPanelProps {
   model: string;
   promptVersion: string;
   isOverride: boolean;
+  isDeleteProtected: boolean;
   text: string;
 }
 
@@ -17,6 +18,7 @@ export default function ResponseDetailPanel({
   model,
   promptVersion,
   isOverride,
+  isDeleteProtected,
   text: initialText,
 }: ResponseDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -156,6 +158,18 @@ export default function ResponseDetailPanel({
     width: 'fit-content',
   };
 
+  const deleteBadgeStyle: React.CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '2px 8px',
+    borderRadius: '12px',
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    backgroundColor: isDeleteProtected ? 'var(--color-danger-100)' : 'var(--color-success-100)',
+    color: isDeleteProtected ? 'var(--color-danger-600)' : 'var(--color-success-600)',
+    width: 'fit-content',
+  };
+
   const btnBaseStyle: React.CSSProperties = {
     padding: '8px 16px',
     borderRadius: 'var(--radius-button)',
@@ -202,6 +216,10 @@ export default function ResponseDetailPanel({
         <div style={metaGroupStyle}>
           <span style={labelStyle}>Status</span>
           <span style={badgeStyle}>{isOverride ? 'Overridden' : 'Generated'}</span>
+        </div>
+        <div style={metaGroupStyle}>
+          <span style={labelStyle}>Delete</span>
+          <span style={deleteBadgeStyle}>{isDeleteProtected ? 'Locked' : 'Open'}</span>
         </div>
       </div>
 
@@ -330,7 +348,7 @@ export default function ResponseDetailPanel({
                 >
                   Edit Response
                 </button>
-                {!isOverride && (
+                {!isDeleteProtected && (
                   <>
                     {showDeleteConfirm ? (
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

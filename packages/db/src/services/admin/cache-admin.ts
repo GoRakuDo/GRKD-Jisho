@@ -5,7 +5,7 @@ import * as schema from "../../schema";
 export interface CacheStats {
   total: number;
   manualOverride: number;
-  deletable: number; // non-manual, can be refreshed
+  deletable: number; // non-delete-protected, can be refreshed
 }
 
 export async function getCacheStats(): Promise<CacheStats> {
@@ -26,10 +26,19 @@ export async function getCacheStats(): Promise<CacheStats> {
 
   const manual = manualRow ? Number(manualRow.count) : 0;
 
+  const [protectedRow] = await db
+    .select({
+      count: count(schema.responseCache.id),
+    })
+    .from(schema.responseCache)
+    .where(eq(schema.responseCache.isDeleteProtected, true));
+
+  const protectedCount = protectedRow ? Number(protectedRow.count) : 0;
+
   return {
     total,
     manualOverride: manual,
-    deletable: total - manual,
+    deletable: total - protectedCount,
   };
 }
 
@@ -43,6 +52,7 @@ export async function searchCacheEntries(
     roleKey: string;
     modelName: string;
     isManualOverride: boolean;
+    isDeleteProtected: boolean;
     updatedAt: Date | null;
   }[]
 > {
@@ -53,6 +63,7 @@ export async function searchCacheEntries(
       roleKey: schema.responseCache.roleKey,
       modelName: schema.responseCache.modelName,
       isManualOverride: schema.responseCache.isManualOverride,
+      isDeleteProtected: schema.responseCache.isDeleteProtected,
       updatedAt: schema.responseCache.updatedAt,
     })
     .from(schema.responseCache)
@@ -74,7 +85,7 @@ export async function bulkDeleteCache(ids: string[]): Promise<number> {
       .select({ id: schema.responseCache.id })
       .from(schema.responseCache)
       .where(
-        and(inArray(schema.responseCache.id, numericIds), eq(schema.responseCache.isManualOverride, false)),
+        and(inArray(schema.responseCache.id, numericIds), eq(schema.responseCache.isDeleteProtected, false)),
       );
 
     if (deletableRows.length === 0) return [] as { id: bigint }[];

@@ -21,6 +21,7 @@ export const responseCache = pgTable(
     modelName: text("model_name").notNull(),
     responseText: text("response_text").notNull(),
     isManualOverride: boolean("is_manual_override").notNull().default(false),
+    isDeleteProtected: boolean("is_delete_protected").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },

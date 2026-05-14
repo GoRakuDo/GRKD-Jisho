@@ -237,7 +237,7 @@ CREATE TABLE response_cache (
 );
 ```
 
-> **設計ポイント:** `is_manual_override = true` は LLM 回答より必ず優先。`UNIQUE` 制約でキャッシュの重複を DB レベルで防ぐ。
+> **設計ポイント:** `is_manual_override = true` は LLM 回答より必ず優先。削除可否は別フラグ `is_delete_protected` で管理する。`UNIQUE` 制約でキャッシュの重複を DB レベルで防ぐ。
 
 ---
 
@@ -1184,7 +1184,7 @@ Pre-Release = 公開前の最後の品質ゲート
 | R-1 Release verification | Step K の手動検証を実行する。Bot検索、cache hit/miss、manual override、Web OAuth2、CSRF、MCP L1/L2/L3、ops job実行を確認する。詳細項目は `DOCS/Roadmap_Implement/pre-release-v0.1.0-public-release.md` を正とする。 | 手動検証結果を `DOCS/Operations/release-checklist.md` に残す。 |
 | R-2 GitHub / Docker release | `v0.1.0` release note、Docker build、deploy-precheck、env sample を確認する。 | GitHub Release に必要な成果物と手順が揃う。 |
 | R-3 NPM公開判断 | `@grkd-jisho/db` / `@grkd-jisho/mcp` を公開するか判断する。公開する場合だけ `private: false`、`main/types/exports/files`、declaration出力、publishConfigを整える。 | NPM公開する package と公開しない app package の境界が明文化される。公開しない判断も許容する。 |
-| R-4 Security release gate | secret混入、MCP read-only default、Level 4 human approval、wipe safety、manual override保護を再確認する。 | BLOCKER/HIGHなしで code-reviewer 承認。 |
+| R-4 Security release gate | secret混入、MCP read-only default、Level 4 human approval、wipe safety、delete protectionを再確認する。 | BLOCKER/HIGHなしで code-reviewer 承認。 |
 | R-5 Deferred scope note | Phase 5（TBA）へ後倒しした複数Guild対応などを release note に明記する。 | 公開版が single guild 前提の場合、制限として明記される。 |
 
 ### 19-3. NPM公開方針

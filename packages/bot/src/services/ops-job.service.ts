@@ -180,7 +180,7 @@ async function executeCacheRefresh(
 
   // 対象件数を再計算
   const conditions = and(
-    eq(schema.responseCache.isManualOverride, false),
+    eq(schema.responseCache.isDeleteProtected, false),
     eq(schema.responseCache.normalizedQuery, args.normalizedQuery),
     ...(args.roleKey !== undefined
       ? [eq(schema.responseCache.roleKey, args.roleKey)]

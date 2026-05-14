@@ -18,13 +18,15 @@ async function checkCacheRefreshLimit(
     .select({
       total: sql<number>`cast(count(*) as int)`,
       manual: sql<number>`cast(sum(case when ${schema.responseCache.isManualOverride} then 1 else 0 end) as int)`,
+      deleteProtected: sql<number>`cast(sum(case when ${schema.responseCache.isDeleteProtected} then 1 else 0 end) as int)`,
     })
     .from(schema.responseCache)
     .where(whereClause);
 
   const total = counts?.total ?? 0;
   const manual = counts?.manual ?? 0;
-  const deletable = Math.max(0, total - manual);
+  const deleteProtected = counts?.deleteProtected ?? 0;
+  const deletable = Math.max(0, total - deleteProtected);
   const max = env.maxCacheRefreshRows;
 
   return {

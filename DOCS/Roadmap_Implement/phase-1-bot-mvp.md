@@ -434,6 +434,7 @@ export function getOutputBucketLabel(outputBucketKey: RoleKey): string {
 **責務:**
 - 複合キャッシュキーで `response_cache` を検索
 - `is_manual_override = true` のレコードを最優先
+- 削除保護は別フラグ `is_delete_protected` で管理
 - キャッシュミス時に新規 INSERT
 
 ```typescript

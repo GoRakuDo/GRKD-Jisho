@@ -52,7 +52,7 @@ export const GET: APIRoute = async (context) => {
     if (query) {
       const entries = await searchCacheEntries(query, 20);
       if (preview === "true") {
-        const deletable = entries.filter((e) => !e.isManualOverride).length;
+        const deletable = entries.filter((e) => !e.isDeleteProtected).length;
         return new Response(
           JSON.stringify({
             total: entries.length,
@@ -115,7 +115,7 @@ export const DELETE: APIRoute = async (context) => {
       });
     }
 
-    // Pre-filter: exclude manual override entries
+    // Pre-filter: exclude delete-protected entries
     logStep("pre-filter.numeric", "ok", `Received ${body.ids.length} ids`);
     const numericIds = body.ids
       .filter((id) => /^\d+$/.test(id))
@@ -129,25 +129,25 @@ export const DELETE: APIRoute = async (context) => {
       });
     }
 
-    // Fetch entries to check manual override status
-    logStep("pre-filter.manual-override", "ok", "Loading selected entries");
+    // Fetch entries to check delete-protection status
+    logStep("pre-filter.delete-protection", "ok", "Loading selected entries");
     const existing = await db
-      .select({ id: schema.responseCache.id, isManualOverride: schema.responseCache.isManualOverride })
+      .select({ id: schema.responseCache.id, isDeleteProtected: schema.responseCache.isDeleteProtected })
       .from(schema.responseCache)
       .where(inArray(schema.responseCache.id, numericIds));
 
     const deletableIds = existing
-      .filter((e) => !e.isManualOverride)
+      .filter((e) => !e.isDeleteProtected)
       .map((e) => String(e.id));
 
     logStep(
-      "pre-filter.manual-override",
+      "pre-filter.delete-protection",
       deletableIds.length > 0 ? "ok" : "error",
       `${deletableIds.length} deletable / ${existing.length} selected`,
     );
 
     if (deletableIds.length === 0) {
-      return new Response(JSON.stringify({ success: true, deleted: 0, traceId, stage: "pre-filter.manual-override", flow }), {
+      return new Response(JSON.stringify({ success: true, deleted: 0, traceId, stage: "pre-filter.delete-protection", flow }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
@@ -159,11 +159,11 @@ export const DELETE: APIRoute = async (context) => {
 
     logStep("audit.log", "ok", "Writing admin audit event");
     await adminAuditEvent("admin.cache_deleted", {
-      requestedIds: body.ids.length,
-      skippedManual: body.ids.length - deletableIds.length,
-      deletedCount: deleted,
-      operator: session.discordUserId,
-    });
+        requestedIds: body.ids.length,
+        skippedDeleteProtected: body.ids.length - deletableIds.length,
+        deletedCount: deleted,
+        operator: session.discordUserId,
+      });
     logStep("audit.log", "ok", "Audit event saved");
 
     return new Response(

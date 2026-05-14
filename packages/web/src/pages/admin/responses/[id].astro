@@ -19,6 +19,7 @@ interface ResponseDetailData {
   modelName: string;
   promptVersion: string;
   isManualOverride: boolean;
+  isDeleteProtected: boolean;
   updatedAt: string | null;
   responseText: string;
   edits: Array<{
@@ -85,16 +86,17 @@ if (session?.isAdmin && id) {
 
   {detail && (
     <div class="detail-layout">
-      <ResponseDetailPanel
-        client:load
-        id={detail.id}
-        query={detail.query}
-        outputBucketLabel={getOutputBucketLabel(detail.roleKey)}
-        model={detail.modelName}
-        promptVersion={detail.promptVersion}
-        isOverride={detail.isManualOverride}
-        text={detail.responseText}
-      />
+        <ResponseDetailPanel
+          client:load
+          id={detail.id}
+          query={detail.query}
+          outputBucketLabel={getOutputBucketLabel(detail.roleKey)}
+          model={detail.modelName}
+          promptVersion={detail.promptVersion}
+          isOverride={detail.isManualOverride}
+          isDeleteProtected={detail.isDeleteProtected}
+          text={detail.responseText}
+        />
 
       <div class="source-section">
         <h2 class="section-title">Dictionary Source</h2>

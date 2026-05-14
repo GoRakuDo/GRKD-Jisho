@@ -12,6 +12,7 @@ export interface SearchResult {
   modelName: string;
   promptVersion: string;
   isManualOverride: boolean;
+  isDeleteProtected: boolean;
   updatedAt: Date | null;
   responseText: string;
 }
@@ -38,6 +39,7 @@ export async function searchResponse(
       modelName: schema.responseCache.modelName,
       promptVersion: schema.responseCache.promptVersion,
       isManualOverride: schema.responseCache.isManualOverride,
+      isDeleteProtected: schema.responseCache.isDeleteProtected,
       updatedAt: schema.responseCache.updatedAt,
       responseText: schema.responseCache.responseText,
     })
@@ -70,6 +72,7 @@ export async function getResponseById(
       modelName: schema.responseCache.modelName,
       promptVersion: schema.responseCache.promptVersion,
       isManualOverride: schema.responseCache.isManualOverride,
+      isDeleteProtected: schema.responseCache.isDeleteProtected,
       updatedAt: schema.responseCache.updatedAt,
       responseText: schema.responseCache.responseText,
     })
@@ -136,6 +139,8 @@ export async function updateResponse(
       .set({
         responseText: newText,
         isManualOverride: true,
+        // Editing should make the response manually curated, but keep it deletable.
+        isDeleteProtected: false,
         updatedAt: sql`now()`,
       })
       .where(eq(schema.responseCache.id, numericId));
@@ -157,16 +162,16 @@ export async function deleteResponse(cacheId: string): Promise<number> {
 
   const numericId = BigInt(cacheId);
 
-  // Only delete if not manually overridden
+  // Only delete if not delete-protected
   const result = await db
     .delete(schema.responseCache)
-    .where(and(eq(schema.responseCache.id, numericId), eq(schema.responseCache.isManualOverride, false)))
+    .where(and(eq(schema.responseCache.id, numericId), eq(schema.responseCache.isDeleteProtected, false)))
     .returning({ id: schema.responseCache.id });
 
   return result.length;
 }
 
-// ── Delete cache (skip manual override) ──
+// ── Delete cache (skip delete-protected rows) ──
 
 export async function deleteCacheByQuery(
   normalizedQuery: string,
@@ -174,7 +179,7 @@ export async function deleteCacheByQuery(
 ): Promise<number> {
   const conditions = [
     eq(schema.responseCache.normalizedQuery, normalizedQuery),
-    eq(schema.responseCache.isManualOverride, false),
+    eq(schema.responseCache.isDeleteProtected, false),
   ];
   if (roleKey) {
     conditions.push(eq(schema.responseCache.roleKey, roleKey));

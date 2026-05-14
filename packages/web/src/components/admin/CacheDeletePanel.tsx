@@ -5,6 +5,7 @@ interface CacheEntry {
   id: string;
   query: string;
   isManualOverride: boolean;
+  isDeleteProtected: boolean;
   updatedAt?: Date | null;
 }
 
@@ -30,7 +31,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const deletableIds = useMemo(() => entries.filter((e) => !e.isManualOverride).map((e) => e.id), [entries]);
+  const deletableIds = useMemo(() => entries.filter((e) => !e.isDeleteProtected).map((e) => e.id), [entries]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -85,7 +86,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
     }
   };
 
-  const deletableCount = entries.filter((e) => !e.isManualOverride).length;
+  const deletableCount = entries.filter((e) => !e.isDeleteProtected).length;
   const hasDeletable = deletableCount > 0;
 
   return (
@@ -97,7 +98,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
             Cache delete preview
           </p>
           <p className="mt-1 text-[14px] text-graphite-650">
-            {deletableCount} of {entries.length} entries can be deleted. Manual overrides stay protected.
+            {deletableCount} of {entries.length} entries can be deleted. Delete-protected rows stay locked.
           </p>
         </div>
         {hasDeletable && (
@@ -143,7 +144,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
                     if (e.target.checked) {
                       const deletable = new Set<string>();
                       entries.forEach((entry) => {
-                        if (!entry.isManualOverride) deletable.add(entry.id);
+                        if (!entry.isDeleteProtected) deletable.add(entry.id);
                       });
                       setSelectedIds(deletable);
                     } else {
@@ -158,13 +159,14 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
               <th className="px-4 py-3">ID</th>
               <th className="px-4 py-3">Query</th>
               <th className="px-4 py-3">Manual</th>
+              <th className="px-4 py-3">Delete</th>
               <th className="px-4 py-3">Updated</th>
               <th className="w-14 px-4 py-3 text-center">Edit</th>
             </tr>
           </thead>
           <tbody>
             {entries.map((entry) => {
-              const isDeletable = !entry.isManualOverride;
+              const isDeletable = !entry.isDeleteProtected;
               const isSelected = selectedIds.has(entry.id);
               return (
                 <tr
@@ -191,6 +193,17 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
                     ) : (
                       <span className="inline-flex rounded-full bg-porcelain-150 px-2.5 py-1 text-[12px] font-semibold text-graphite-650">
                         auto
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {entry.isDeleteProtected ? (
+                      <span className="inline-flex rounded-full bg-danger-100 px-2.5 py-1 text-[12px] font-semibold text-danger-700">
+                        locked
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[12px] font-semibold text-emerald-700">
+                        open
                       </span>
                     )}
                   </td>
