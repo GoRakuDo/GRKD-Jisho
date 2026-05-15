@@ -18,6 +18,7 @@
     "discord.js": "^14.18.0",
     "drizzle-orm": "^0.41.0",
     "node-cron": "^4.2.1",
+    "sql.js": "^1.13.0",
     "zod": "^3.24.3"
   },
   "devDependencies": {

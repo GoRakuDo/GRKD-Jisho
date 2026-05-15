@@ -9,6 +9,7 @@ import { recordHeartbeat } from "./services/observability.service.js";
 import { wipeChannel } from "./services/channel-wipe.service.js";
 import { pollAndExecuteJobs } from "./services/ops-job.service.js";
 import { purgeOldLogs } from "./services/log-purge.service.js";
+import { aggregateHourly } from "./services/analytics.service.js";
 
 const client = new Client({
   intents: [
@@ -79,6 +80,24 @@ client.once("ready", () => {
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         console.error(`[LogPurge] Failed: ${reason} → Check DB connection and LOG_RETENTION_DAYS`);
+      }
+    },
+    {
+      timezone: "Asia/Jakarta",
+    },
+  );
+
+  // Analytics 集計スケジューラ: 3時間おき（00:00, 03:00, 06:00, ... GMT+7）
+  cron.schedule(
+    "0 */3 * * *",
+    async () => {
+      console.log("[Analytics] Starting hourly aggregation...");
+      try {
+        await aggregateHourly();
+        console.log("[Analytics] Aggregation complete");
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        console.error(`[Analytics] Aggregation failed: ${reason} → Check PostgreSQL connection and lookup_logs table`);
       }
     },
     {

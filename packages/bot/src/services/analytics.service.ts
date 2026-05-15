@@ -1,0 +1,160 @@
+import { resolve, dirname } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import initSqlJs, { type Database as SqlJsDatabase } from "sql.js";
+import { gte, sql, count } from "drizzle-orm";
+import { db, schema } from "@grkd-jisho/db";
+
+/** SQLite ファイルの保存場所（repo root/analytics/stats.db） */
+const DB_PATH = resolve(process.cwd(), "analytics", "stats.db");
+
+/* ─── Types ──────────────────────────────────────────── */
+
+export interface HourlyStatRow {
+  hour: string;
+  bucketKey: string;
+  totalLookups: number;
+  cacheHits: number;
+  cacheMisses: number;
+  llmGemini: number;
+  llmOpenrouter: number;
+}
+
+/* ─── SQLite init（sql.js の WASM ロードは 1 回だけ） ─── */
+
+let _SQL: Awaited<ReturnType<typeof initSqlJs>> | null = null;
+let _db: SqlJsDatabase | null = null;
+
+async function getDb(): Promise<SqlJsDatabase> {
+  if (!_SQL) {
+    _SQL = await initSqlJs();
+  }
+
+  if (!_db) {
+    const dir = dirname(DB_PATH);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    // 既存 DB があれば読み込む、なければ空の DB を作成
+    if (existsSync(DB_PATH)) {
+      const buffer = readFileSync(DB_PATH);
+      _db = new _SQL.Database(buffer);
+    } else {
+      _db = new _SQL.Database();
+    }
+
+    // WAL モードは sql.js では不要（メモリ内 + 手動 export）
+    _db.run("PRAGMA journal_mode = MEMORY");
+
+    _db.run(`
+      CREATE TABLE IF NOT EXISTS hourly_stats (
+        hour              TEXT NOT NULL,
+        bucket_key        TEXT NOT NULL DEFAULT '',
+        total_lookups     INTEGER NOT NULL DEFAULT 0,
+        cache_hits        INTEGER NOT NULL DEFAULT 0,
+        cache_misses      INTEGER NOT NULL DEFAULT 0,
+        llm_gemini        INTEGER NOT NULL DEFAULT 0,
+        llm_openrouter    INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (hour, bucket_key)
+      );
+    `);
+  }
+
+  return _db;
+}
+
+/** 現在の DB をディスクに書き出す */
+function saveDb(): void {
+  if (!_db) return;
+  const dir = dirname(DB_PATH);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(DB_PATH, Buffer.from(_db.export()));
+}
+
+/* ─── 集計（3時間分） ──────────────────────────────────── */
+export async function aggregateHourly(): Promise<void> {
+  const since = sql`date_trunc('hour', now()) - interval '3 hours'`;
+
+  const rows = await db
+    .select({
+      hour: sql<string>`date_trunc('hour', ${schema.lookupLogs.createdAt})`,
+      bucketKey: schema.lookupLogs.outputBucketKey,
+      lookups: count(schema.lookupLogs.id),
+      cacheHits:
+        sql`count(*) filter (where ${schema.lookupLogs.cacheHit} = true)`,
+      cacheMisses:
+        sql`count(*) filter (where ${schema.lookupLogs.cacheHit} = false)`,
+      llmGemini:
+        sql`count(*) filter (where ${schema.lookupLogs.llmSource} = 'gemini')`,
+      llmOpenrouter:
+        sql`count(*) filter (where ${schema.lookupLogs.llmSource} = 'openrouter')`,
+    })
+    .from(schema.lookupLogs)
+    .where(gte(schema.lookupLogs.createdAt, since))
+    .groupBy(sql`1`, schema.lookupLogs.outputBucketKey)
+    .orderBy(sql`1`);
+
+  const db2 = await getDb();
+  const stmt = db2.prepare(`
+    INSERT OR REPLACE INTO hourly_stats (hour, bucket_key, total_lookups, cache_hits, cache_misses, llm_gemini, llm_openrouter)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const row of rows) {
+    stmt.run([
+      new Date(row.hour).toISOString(),
+      row.bucketKey || "unknown",
+      Number(row.lookups),
+      Number(row.cacheHits),
+      Number(row.cacheMisses),
+      Number(row.llmGemini),
+      Number(row.llmOpenrouter),
+    ]);
+  }
+  stmt.free();
+
+  saveDb();
+  console.log(`[Analytics] Aggregated ${rows.length} hourly stat rows`);
+}
+
+/* ─── クエリ（指定日数分） ────────────────────────────── */
+export async function queryAnalytics(days: number): Promise<HourlyStatRow[]> {
+  const db2 = await getDb();
+  const since = new Date(
+    Date.now() - days * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  const stmt = db2.prepare(
+    `SELECT * FROM hourly_stats
+     WHERE hour >= ?
+     ORDER BY hour ASC, bucket_key ASC`,
+  );
+  stmt.bind([since]);
+
+  const results: HourlyStatRow[] = [];
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as {
+      hour: string;
+      bucket_key: string;
+      total_lookups: number;
+      cache_hits: number;
+      cache_misses: number;
+      llm_gemini: number;
+      llm_openrouter: number;
+    };
+    results.push({
+      hour: row.hour,
+      bucketKey: row.bucket_key,
+      totalLookups: row.total_lookups,
+      cacheHits: row.cache_hits,
+      cacheMisses: row.cache_misses,
+      llmGemini: row.llm_gemini,
+      llmOpenrouter: row.llm_openrouter,
+    });
+  }
+  stmt.free();
+
+  return results;
+}
