@@ -1,0 +1,397 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout title="Analytics" active="analytics">
+  <div class="analytics-page">
+    <!-- Period toggle buttons — rendered by JS -->
+    <div id="analytics-periods" class="analytics-periods"></div>
+
+    <!-- Metric cards — rendered by JS -->
+    <div id="analytics-metrics" class="analytics-metrics"></div>
+
+    <!-- Request Rate chart -->
+    <div class="analytics-chart-card">
+      <div class="analytics-chart-header">
+        <h2 class="analytics-chart-title">Request Rate</h2>
+        <span class="analytics-chart-sub">requests / hour — lookups vs cache misses</span>
+      </div>
+      <div id="analytics-chart-reqrate" class="analytics-chart-container"></div>
+    </div>
+
+    <!-- Cache Hit Rate chart -->
+    <div class="analytics-chart-card">
+      <div class="analytics-chart-header">
+        <h2 class="analytics-chart-title">Cache Hit Rate</h2>
+        <span class="analytics-chart-sub">percentage of lookups served from cache</span>
+      </div>
+      <div id="analytics-chart-cacherate" class="analytics-chart-container"></div>
+    </div>
+
+    <!-- Two-column tables -->
+    <div class="analytics-tables-row">
+      <div id="analytics-queries" class="analytics-table-col"></div>
+      <div id="analytics-dicthits" class="analytics-table-col"></div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  import { initAnalyticsPage } from "../../scripts/analytics-charts";
+
+  const els = {
+    periodBtn: document.getElementById("analytics-periods"),
+    metrics: document.getElementById("analytics-metrics"),
+    reqRate: document.getElementById("analytics-chart-reqrate"),
+    cacheRate: document.getElementById("analytics-chart-cacherate"),
+    queries: document.getElementById("analytics-queries"),
+    dictHits: document.getElementById("analytics-dicthits"),
+  };
+
+  if (
+    els.periodBtn &&
+    els.metrics &&
+    els.reqRate &&
+    els.cacheRate &&
+    els.queries &&
+    els.dictHits
+  ) {
+    initAnalyticsPage(
+      els.periodBtn,
+      els.metrics,
+      els.reqRate,
+      els.cacheRate,
+      els.queries,
+      els.dictHits,
+    ).catch((err) => {
+      console.error(
+        `[Analytics] init failed: ${err instanceof Error ? err.message : String(err)} → Check API availability`,
+      );
+    });
+  }
+</script>
+
+<style>
+  /* ─── Page layout ─── */
+  .analytics-page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ─── Period buttons ─── */
+  .analytics-periods {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  :global(.analytics-period-btn) {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 14px;
+    border: 1px solid var(--color-graphite-300);
+    border-radius: var(--radius-button);
+    background: var(--color-porcelain-100);
+    color: var(--color-graphite-650);
+    font-family: var(--font-grkd-sans);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+
+  :global(.analytics-period-btn:hover) {
+    background: var(--color-porcelain-150);
+    border-color: var(--color-graphite-300);
+  }
+
+  :global(.analytics-period-btn.is-active) {
+    background: var(--color-royal-blue-600);
+    border-color: var(--color-royal-blue-700);
+    color: var(--color-porcelain-50);
+  }
+
+  :global(.analytics-period-btn.is-active:hover) {
+    background: var(--color-royal-blue-700);
+  }
+
+  /* ─── Metric cards ─── */
+  .analytics-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+  }
+
+  :global(.analytics-metric-card) {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  :global(.analytics-metric-label) {
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    color: var(--color-graphite-500);
+    font-family: var(--font-grkd-sans);
+  }
+
+  :global(.analytics-metric-value) {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--color-graphite-900);
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+    font-family: var(--font-grkd-sans);
+  }
+
+  /* ─── Chart cards ─── */
+  .analytics-chart-card {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-panel);
+    overflow: hidden;
+  }
+
+  .analytics-chart-header {
+    padding: 16px 20px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .analytics-chart-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+    font-family: var(--font-grkd-sans);
+    letter-spacing: -0.01em;
+  }
+
+  .analytics-chart-sub {
+    font-size: 12px;
+    color: var(--color-graphite-500);
+    font-family: var(--font-grkd-sans);
+  }
+
+  .analytics-chart-container {
+    padding: 8px 0 0;
+    min-height: 300px;
+  }
+
+  /* ─── Tables row (2-column) ─── */
+  .analytics-tables-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .analytics-table-col {
+    min-width: 0;
+  }
+
+  /* ─── Panel (for table / bar-list containers) ─── */
+  :global(.analytics-panel) {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-panel);
+    overflow: hidden;
+    height: 100%;
+  }
+
+  :global(.analytics-panel-title) {
+    margin: 0;
+    padding: 14px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+    font-family: var(--font-grkd-sans);
+    background: var(--color-porcelain-150);
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  /* ─── Table ─── */
+  :global(.analytics-table) {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-grkd-sans);
+  }
+
+  :global(.analytics-table thead) {
+    background: var(--color-porcelain-150);
+  }
+
+  :global(.analytics-th) {
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-graphite-500);
+    text-align: left;
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  :global(.analytics-th.rank) {
+    width: 48px;
+    text-align: center;
+  }
+
+  :global(.analytics-th.count) {
+    width: 80px;
+    text-align: right;
+  }
+
+  :global(.analytics-tr) {
+    border-bottom: 1px solid var(--color-graphite-180);
+    transition: background 0.12s ease;
+  }
+
+  :global(.analytics-tr:last-child) {
+    border-bottom: none;
+  }
+
+  :global(.analytics-tr:hover) {
+    background: var(--color-porcelain-150);
+  }
+
+  :global(.analytics-td) {
+    padding: 10px 16px;
+    font-size: 14px;
+    color: var(--color-graphite-800);
+    vertical-align: middle;
+  }
+
+  :global(.analytics-td.rank) {
+    text-align: center;
+    color: var(--color-graphite-500);
+    font-size: 13px;
+  }
+
+  :global(.analytics-td.count) {
+    text-align: right;
+    font-family: var(--font-grkd-mono);
+    font-size: 13px;
+    color: var(--color-graphite-800);
+    tabular-nums: true;
+  }
+
+  :global(.analytics-td.mono) {
+    font-family: var(--font-grkd-mono);
+    font-size: 13px;
+  }
+
+  :global(.analytics-empty) {
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--color-graphite-500);
+    font-size: 14px;
+    font-family: var(--font-grkd-sans);
+  }
+
+  /* ─── Bar ranking (Dictionary Hits) ─── */
+  :global(.analytics-bar-list) {
+    padding: 8px 0;
+  }
+
+  :global(.analytics-bar-row) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 20px;
+    transition: background 0.12s ease;
+  }
+
+  :global(.analytics-bar-row:hover) {
+    background: var(--color-porcelain-150);
+  }
+
+  :global(.analytics-bar-rank) {
+    width: 24px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-graphite-500);
+    font-family: var(--font-grkd-sans);
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  :global(.analytics-bar-name) {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    color: var(--color-graphite-800);
+    font-family: var(--font-grkd-sans);
+  }
+
+  :global(.analytics-bar-track) {
+    flex: 2;
+    height: 8px;
+    background: var(--color-porcelain-150);
+    border-radius: 999px;
+    overflow: hidden;
+    min-width: 60px;
+  }
+
+  :global(.analytics-bar-fill) {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--color-royal-blue-600);
+    transition: width 0.3s ease;
+    min-width: 4px;
+  }
+
+  :global(.analytics-bar-count) {
+    width: 60px;
+    text-align: right;
+    font-size: 13px;
+    font-family: var(--font-grkd-mono);
+    color: var(--color-graphite-650);
+    tabular-nums: true;
+    flex-shrink: 0;
+  }
+
+  /* ─── uPlot overrides ─── */
+  :global(.u-title) {
+    font-family: var(--font-grkd-sans) !important;
+  }
+
+  :global(.u-legend) {
+    font-family: var(--font-grkd-sans) !important;
+    font-size: 12px !important;
+  }
+
+  :global(.u-select) {
+    background: var(--color-royal-blue-100) !important;
+  }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 860px) {
+    .analytics-tables-row {
+      grid-template-columns: 1fr;
+    }
+
+    .analytics-metrics {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 520px) {
+    .analytics-metrics {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

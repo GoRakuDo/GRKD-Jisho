@@ -20,6 +20,10 @@ export const lookupLogs = pgTable("lookup_logs", {
     // Cache delete relies on FK cascade; keep this in sync with the current DB migration.
     .references(() => responseCache.id, { onDelete: "cascade" }),
   cacheHit: boolean("cache_hit").notNull().default(false),
+  // Analytics: どのバケット（daily-japanese / indonesian）にルーティングされたか
+  outputBucketKey: text("output_bucket_key").notNull().default(""),
+  // LLM 呼出時のみ gemini or openrouter（cache hit / dictionary miss は null）
+  llmSource: text("llm_source"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 

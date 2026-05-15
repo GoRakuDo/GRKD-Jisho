@@ -27,6 +27,7 @@
     "react-dom": "^19.2.5",
     "speakeasy": "^2.0.0",
     "tailwindcss": "^4.2.4",
+    "uplot": "^1.6.30",
     "zod": "^4.4.3"
   },
   "devDependencies": {

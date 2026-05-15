@@ -36,7 +36,8 @@ describe("generate", () => {
       promptVersion: "v1",
     });
 
-    expect(result).toBe("【これ】\n辞書情報が不足しています。別の単語を調べてみてください。");
+    expect(result.text).toBe("【これ】\n辞書情報が不足しています。別の単語を調べてみてください。");
+    expect(result.source).toBeNull();
   });
 
   it.each([
@@ -56,7 +57,8 @@ describe("generate", () => {
       promptVersion: "v1",
     });
 
-    expect(result).toBe("【これ】\n辞書情報が不足しています。別の単語を調べてみてください。");
+    expect(result.text).toBe("【これ】\n辞書情報が不足しています。別の単語を調べてみてください。");
+    expect(result.source).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -92,7 +94,8 @@ describe("generate", () => {
       promptVersion: "v1",
     });
 
-    expect(result).toBe("【これ】\n意味:\nこれはテストです");
+    expect(result.text).toBe("【これ】\n意味:\nこれはテストです");
+    expect(result.source).toBe("gemini");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -125,7 +128,8 @@ describe("generate", () => {
       promptVersion: "v9",
     });
 
-    expect(result).toBe("【これ】\n意味:\nこれはテストです");
+    expect(result.text).toBe("【これ】\n意味:\nこれはテストです");
+    expect(result.source).toBe("gemini");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const firstCall = fetchMock.mock.calls[0] as unknown as [RequestInfo | URL, RequestInit?];
@@ -177,7 +181,8 @@ describe("generate", () => {
       promptVersion: "v9",
     });
 
-    expect(result).toBe("【これ】\n意味:\nこれはテストです");
+    expect(result.text).toBe("【これ】\n意味:\nこれはテストです");
+    expect(result.source).toBe("openrouter");
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     const secondCall = fetchMock.mock.calls[1] as unknown as [RequestInfo | URL, RequestInit?];

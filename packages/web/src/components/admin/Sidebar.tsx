@@ -7,6 +7,7 @@ type SidebarProps = {
 
 const ITEMS = [
   { label: 'Dashboard', href: '/admin', slug: 'dashboard' },
+  { label: 'Analytics', href: '/admin/analytics', slug: 'analytics' },
   { label: 'Responses', href: '/admin/responses', slug: 'responses' },
   { label: 'Dictionaries', href: '/admin/dictionaries', slug: 'dictionaries' },
   { label: 'Prompts', href: '/admin/prompts', slug: 'prompts' },
@@ -16,6 +17,11 @@ const ITEMS = [
   { label: 'Traces', href: '/admin/traces', slug: 'traces' },
   { label: 'Ops Jobs', href: '/admin/ops-jobs', slug: 'ops-jobs' },
 ];
+
+// Simple inline SVG icons
+const NAV_ICONS: Record<string, string> = {
+  analytics: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="10" width="3" height="4"/><rect x="6.5" y="6" width="3" height="8"/><rect x="11" y="2" width="3" height="12"/></svg>`,
+};
 
 export const Sidebar: React.FC<SidebarProps> = ({ active }) => {
   return (
@@ -27,13 +33,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ active }) => {
         {ITEMS.map((item) => {
           // A bit of logic to handle 'dashboard' active state since its route is just /admin
           const isActive = active === item.slug || (active === 'admin' && item.slug === 'dashboard');
+          const iconSvg = NAV_ICONS[item.slug];
           
           return (
             <a
               key={item.slug}
               href={item.href}
               className={`
-                relative flex items-center px-3 h-10 rounded-button text-[14px] font-medium transition-colors
+                relative flex items-center gap-2.5 px-3 h-10 rounded-button text-[14px] font-medium transition-colors
                 ${isActive 
                   ? 'bg-royal-blue-100 text-royal-blue-700' 
                   : 'bg-transparent text-graphite-650 hover:bg-porcelain-150'
@@ -43,6 +50,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ active }) => {
               {isActive && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[20px] bg-royal-blue-600 rounded-r-full" />
               )}
+              {iconSvg ? (
+                <span className="w-4 h-4 flex items-center justify-center shrink-0" dangerouslySetInnerHTML={{ __html: iconSvg }} />
+              ) : null}
               {item.label}
             </a>
           );

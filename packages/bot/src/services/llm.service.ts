@@ -112,21 +112,30 @@ function extractOpenRouterAnswer(data: OpenRouterResponse): string {
   return answerText;
 }
 
-export async function generate(params: GenerateParams): Promise<string> {
+export interface GenerateResult {
+  text: string;
+  /** null = insufficient data fallback (no LLM called) */
+  source: "gemini" | "openrouter" | null;
+}
+
+export async function generate(params: GenerateParams): Promise<GenerateResult> {
   if (shouldUseInsufficientDataFallback(params.definitionJson)) {
-    return buildInsufficientDataReply(params.query);
+    return { text: buildInsufficientDataReply(params.query), source: null };
   }
 
   const prompt = renderPromptTemplate(params.promptTemplate, params);
 
   try {
     console.log(`[LLM] Gemini started → model=${PRIMARY_LLM_MODEL}`);
-    return await callGemini(prompt);
+    const text = await callGemini(prompt);
+    console.log(`[LLM] Gemini success → model=${PRIMARY_LLM_MODEL}`);
+    return { text, source: "gemini" };
   } catch (err) {
     console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY or Gemma 4 model access, falling back to OpenRouter`);
     try {
-      console.log(`[LLM] OpenRouter started → model=${FALLBACK_LLM_MODEL}`);
-      return await callOpenRouter(prompt);
+      const text = await callOpenRouter(prompt);
+      console.log(`[LLM] OpenRouter success → model=${FALLBACK_LLM_MODEL}`);
+      return { text, source: "openrouter" };
     } catch (openRouterErr) {
       console.error(`[LLM] OpenRouter failed: ${openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr)} → Check OPENROUTER_API_KEY or OpenRouter model access`);
       throw openRouterErr;

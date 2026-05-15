@@ -25,6 +25,8 @@ async function finalizeLookup(
     dictionaryIdUsed: number | null;
     responseCacheId: bigint | null;
     cacheHit: boolean;
+    outputBucketKey: string;
+    llmSource?: string | null;
     normalizedQueryOverride?: string;
     guildIdOverride?: string;
   },
@@ -41,6 +43,8 @@ async function finalizeLookup(
     dictionaryIdUsed: params.dictionaryIdUsed,
     responseCacheId: params.responseCacheId,
     cacheHit: params.cacheHit,
+    outputBucketKey: params.outputBucketKey,
+    llmSource: params.llmSource ?? null,
   });
   await incrementUsage({ userId: message.author.id, guildId });
 }
@@ -159,6 +163,7 @@ async function handleMessage(message: Message): Promise<void> {
         dictionaryIdUsed: null,
         responseCacheId: null,
         cacheHit: false,
+        outputBucketKey,
         guildIdOverride: guildContextId,
       });
       return;
@@ -197,6 +202,7 @@ async function handleMessage(message: Message): Promise<void> {
         dictionaryIdUsed: result.dictionary.id,
         responseCacheId: cached.id,
         cacheHit: true,
+        outputBucketKey,
         normalizedQueryOverride: cacheKey.normalizedQuery,
         guildIdOverride: guildContextId,
       });
@@ -213,7 +219,7 @@ async function handleMessage(message: Message): Promise<void> {
     console.log(`[Lookup] trace=${traceId} llm.generate.started`);
 
     try {
-      const responseText = await generate({
+      const { text: responseText, source: llmSource } = await generate({
         roleKey: outputBucketKey,
         query,
         reading: result.entry.reading,
@@ -222,7 +228,7 @@ async function handleMessage(message: Message): Promise<void> {
         promptTemplate: promptContext.promptTemplate,
         promptVersion: promptContext.promptVersion,
       });
-      console.log(`[Lookup] trace=${traceId} llm.generate.success`);
+      console.log(`[Lookup] trace=${traceId} llm.generate.success source=${llmSource ?? "fallback"}`);
       await traceEvent(traceId, "llm.generated", "info", {});
 
       const saved = await saveResponse({ ...cacheKey, responseText });
@@ -234,6 +240,8 @@ async function handleMessage(message: Message): Promise<void> {
           dictionaryIdUsed: result.dictionary.id,
           responseCacheId: null,
           cacheHit: false,
+          outputBucketKey,
+          llmSource,
           normalizedQueryOverride: cacheKey.normalizedQuery,
           guildIdOverride: guildContextId,
         });
@@ -255,6 +263,8 @@ async function handleMessage(message: Message): Promise<void> {
         dictionaryIdUsed: result.dictionary.id,
         responseCacheId: saved.id,
         cacheHit: false,
+        outputBucketKey,
+        llmSource,
         normalizedQueryOverride: cacheKey.normalizedQuery,
         guildIdOverride: guildContextId,
       });
@@ -316,6 +326,7 @@ async function handleMessage(message: Message): Promise<void> {
       dictionaryIdUsed: null,
       responseCacheId: null,
       cacheHit: false,
+      outputBucketKey,
       guildIdOverride: guildContextId,
     });
     return;
@@ -353,6 +364,7 @@ async function handleMessage(message: Message): Promise<void> {
       dictionaryIdUsed: result.dictionary.id,
       responseCacheId: cached.id,
       cacheHit: true,
+      outputBucketKey,
       normalizedQueryOverride: cacheKey.normalizedQuery,
       guildIdOverride: guildContextId,
     });
@@ -367,7 +379,7 @@ async function handleMessage(message: Message): Promise<void> {
   });
   console.log(`[Lookup] trace=${traceId} llm.generate.started`);
   try {
-    const responseText = await generate({
+    const { text: responseText, source: llmSource } = await generate({
       roleKey: outputBucketKey,
       query,
       reading: result.entry.reading,
@@ -376,7 +388,7 @@ async function handleMessage(message: Message): Promise<void> {
       promptTemplate: promptContext.promptTemplate,
       promptVersion: promptContext.promptVersion,
     });
-    console.log(`[Lookup] trace=${traceId} llm.generate.success`);
+    console.log(`[Lookup] trace=${traceId} llm.generate.success source=${llmSource ?? "fallback"}`);
     await traceEvent(traceId, "llm.generated", "info", {});
 
     const saved = await saveResponse({ ...cacheKey, responseText });
@@ -389,6 +401,8 @@ async function handleMessage(message: Message): Promise<void> {
         dictionaryIdUsed: result.dictionary.id,
         responseCacheId: null,
         cacheHit: false,
+        outputBucketKey,
+        llmSource,
         normalizedQueryOverride: cacheKey.normalizedQuery,
         guildIdOverride: guildContextId,
       });
@@ -410,6 +424,8 @@ async function handleMessage(message: Message): Promise<void> {
       dictionaryIdUsed: result.dictionary.id,
       responseCacheId: saved.id,
       cacheHit: false,
+      outputBucketKey,
+      llmSource,
       normalizedQueryOverride: cacheKey.normalizedQuery,
       guildIdOverride: guildContextId,
     });
