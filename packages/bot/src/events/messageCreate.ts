@@ -3,7 +3,7 @@ import { type Message } from "discord.js";
 import { getActivePromptForScope, type PromptScopeKey } from "@grkd-jisho/db";
 import { env } from "../config/env.js";
 import { PRIMARY_LLM_MODEL } from "../config/llm-model.js";
-import { lookupWord } from "../services/dictionary.service.js";
+import { extractFirstTerm } from "../services/extract-first-term.js";
 import { resolveOutputBucketKey } from "../services/role-mapper.service.js";
 import { getCachedResponse, saveResponse } from "../services/response-cache.service.js";
 import { generate, normalizePromptTemplate } from "../services/llm.service.js";
@@ -130,13 +130,18 @@ async function handleMessage(message: Message): Promise<void> {
     await traceEvent(traceId, "channel.allowed", "info", {});
   }
 
-  const query = message.content.replace(/<@!?\d+>/g, "").trim();
-  if (!query) {
+  const rawText = message.content.replace(/<@!?\d+>/g, "").trim();
+  if (!rawText) {
     await message.reply("検索語を入力してください。例: `@grkd-jisho 可憐`");
     return;
   }
-  console.log(`[Lookup] trace=${traceId} query="${query}"`);
-  await traceEvent(traceId, "query.extracted", "info", { query });
+
+  // 文の先頭から最長一致で辞書語を抽出
+  const extracted = await extractFirstTerm(rawText);
+  const query = extracted?.term ?? rawText;
+  const result = extracted?.result ?? null;
+  console.log(`[Lookup] trace=${traceId} raw="${rawText}" query="${query}"`);
+  await traceEvent(traceId, "query.extracted", "info", { raw: rawText, query });
 
   const guildContextId = message.guildId ?? env.DISCORD_GUILD_ID;
 
@@ -144,7 +149,6 @@ async function handleMessage(message: Message): Promise<void> {
     const outputBucketKey = await resolveOutputBucketKey([], guildContextId);
     console.log(`[Lookup] trace=${traceId} DM owner path → outputBucketKey=${outputBucketKey}`);
 
-    const result = await lookupWord(query);
     if (!result) {
       console.log(`[Lookup] trace=${traceId} dictionary miss`);
       await message.reply(formatNotFound(query));
@@ -302,7 +306,6 @@ async function handleMessage(message: Message): Promise<void> {
   const outputBucketKey = await resolveOutputBucketKey(roleIds, guildContextId);
   console.log(`[Lookup] trace=${traceId} output bucket resolved → ${outputBucketKey}`);
 
-  const result = await lookupWord(query);
   if (!result) {
     console.log(`[Lookup] trace=${traceId} dictionary miss`);
     await message.reply(formatNotFound(query));

@@ -2,15 +2,19 @@ import type { dictionaries, dictionaryEntries, OutputBucketKey } from "@grkd-jis
 
 export type RoleKey = OutputBucketKey;
 
-export type LookupMatchType = "term" | "reading";
+export type LookupMatchType = "term" | "reading" | "deinflected";
 
 export interface LookupResult {
   dictionary: typeof dictionaries.$inferSelect;
   entry: typeof dictionaryEntries.$inferSelect;
-  /** 一致したカラム種別: "term" か "reading" */
+  /** 一致したカラム種別 */
   matchedBy: LookupMatchType;
   /** 実際に使用した検索クエリ（正規化後） */
   normalizedQuery: string;
+  /** deinflect で見つかった場合の元の活用形 */
+  originalInflected?: string;
+  /** deinflect で見つかった場合の辞書形 */
+  deinflectedFrom?: string;
 }
 
 export interface CacheKey {

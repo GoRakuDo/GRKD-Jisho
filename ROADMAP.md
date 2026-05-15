@@ -349,6 +349,14 @@ Phase 5: Deferred Scope               TBA
   - 例: 「かれん」で検索 → `term` にない場合 `reading` から「可憐」を見つける
 
 - [x] **4-7** 複数 Guild 対応（Optional調査のみ）
+
+- [x] **4-8** 活用逆変換 + 先頭単語抽出
+  - Yomitan の deinflection engine から日本語活用ルールのみを抽出（~100ルール）
+  - BFS + depth limit 5 でチェーン適用（思ってた→思って→思う）
+  - `extractFirstTerm()` で文の先頭から最長一致 greedy scan
+  - `lookupWord()` に deinflect 統合（完全一致 → deinflect fallback）
+  - `matchedBy: "deinflected"` で検出元を追跡
+  - 設計文書: `DOCS/Design/deinflection-system.md`
   - Phase 4 Step J で影響範囲を調査済み
   - 実装は Phase 5 Deferred Scope（TBA）へ後倒し
   - この項目では Phase 5 の詳細実装計画を定義しない

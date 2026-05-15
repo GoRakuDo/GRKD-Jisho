@@ -52,10 +52,12 @@ Discord Guild
 ┌─────────────────────────────────────────────────┐
 │  Bot Service  (packages/bot)                    │
 │                                                 │
-│  messageCreate → extract query                  │
-│  └→ channel guard (許可チャンネルのみ)           │
-│  └→ DictionaryService.lookup(query)             │
-│       └→ dict_1 → dict_2 → dict_3 フォールバック│
+  │  messageCreate → extract raw text               │
+  │  └→ extractFirstTerm() — greedy scan + deinflect│
+  │  └→ channel guard (許可チャンネルののみ)           │
+  │  └→ DictionaryService.lookup(query)             │
+  │       └→ exact match → deinflect fallback       │
+  │       └→ dict_1 → dict_2 → dict_3 フォールバック│
 │  └→ RoleMapper.resolve(member.roles)            │
 │  └→ ResponseCacheService.get(cacheKey)          │
 │       ├─ Hit  → Discord に送信                  │
@@ -348,6 +350,10 @@ export async function lookupWord(query: string): Promise<LookupResult | null> {
 ```
 
 > **設計ポイント:** 辞書の優先順位は `dictionaries.priority` が決定する。辞書の追加・削除・入れ替えはレコード更新だけで完結し、コード変更が不要。
+>
+> **活用逆変換 (deinflection):** 完全一致で見つからない場合、日本語活用ルール（~100ルール）を用いて BFS で活用形→辞書形の逆変換を試みる。
+>   例: 「思って」→「思う」、「食べなかった」→「食べる」（3段階チェーン）。
+>   詳細は `DOCS/Design/deinflection-system.md` を参照。
 
 ---
 
