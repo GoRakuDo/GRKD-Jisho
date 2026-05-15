@@ -4,6 +4,20 @@ import { getSession } from "../../../lib/session";
 import { eq, gte, sql, count, and } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 
+interface BucketResponse {
+  totalLookups: number;
+  cacheHitRate: number;
+  llmUsage: { gemini: number; openrouter: number };
+  hourly: Array<{
+    hour: string;
+    lookups: number;
+    cacheHits: number;
+    cacheMisses: number;
+    llmGemini: number;
+    llmOpenrouter: number;
+  }>;
+}
+
 /**
  * GET /api/admin/analytics?period=7d
  *
@@ -109,7 +123,7 @@ export const GET: APIRoute = async (context) => {
       if (row.llmSource === "openrouter") h.llmOpenrouter += hourLookups;
     }
 
-    const buckets: Record<string, unknown> = {};
+    const buckets: Record<string, BucketResponse> = {};
     for (const [bk, b] of bucketMap) {
       const sortedHours = [...b.hourly.values()].sort(
         (a, b2) => new Date(a.hour).getTime() - new Date(b2.hour).getTime(),
@@ -123,7 +137,7 @@ export const GET: APIRoute = async (context) => {
         llmUsage: { gemini: b.gemini, openrouter: b.openrouter },
         hourly: sortedHours.map((h) => ({
           ...h,
-          hour: new Date(h.hour + "Z").toISOString(),
+          hour: new Date(h.hour).toISOString(),
         })),
       };
     }

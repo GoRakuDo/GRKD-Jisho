@@ -287,7 +287,7 @@ export function renderMetrics(
   // Sum across all buckets
   const bucketKeys = Object.keys(data.buckets);
   let totalLookups = 0;
-  let totalHits = 0;
+  let totalLlmCalls = 0;
   let totalMisses = 0;
   let totalGemini = 0;
   let totalOpenrouter = 0;
@@ -296,7 +296,7 @@ export function renderMetrics(
     const b = data.buckets[key];
     if (!b) continue;
     totalLookups += b.totalLookups;
-    totalHits += b.llmUsage.gemini + b.llmUsage.openrouter;
+    totalLlmCalls += b.llmUsage.gemini + b.llmUsage.openrouter;
     totalMisses += b.hourly.reduce((s, h) => s + h.cacheMisses, 0);
     totalGemini += b.llmUsage.gemini;
     totalOpenrouter += b.llmUsage.openrouter;
@@ -306,7 +306,7 @@ export function renderMetrics(
     totalLookups > 0
       ? (((totalLookups - totalMisses) / totalLookups) * 100).toFixed(1)
       : "0.0";
-  const llmTotal = totalGemini + totalOpenrouter;
+  const llmTotal = totalLlmCalls;
 
   const cards = [
     { label: `Lookups (${data.period})`, value: totalLookups.toLocaleString() },
@@ -418,7 +418,7 @@ export function renderDictionaryHits(
 export async function fetchAnalytics(
   period: Period,
 ): Promise<AnalyticsData> {
-  const res = await fetch(`/api/admin/analytics?period=${period}`);
+  const res = await fetch(`/api/admin/analytics?period=${period}`, { credentials: "same-origin" });
   if (!res.ok) {
     throw new Error(`Analytics API returned ${res.status}`);
   }
@@ -440,6 +440,16 @@ export async function initAnalyticsPage(
   queriesContainer: HTMLElement,
   dictHitsContainer: HTMLElement,
 ): Promise<void> {
+  // uPlot はリサイズを自動追尾しないので ResizeObserver で監視
+  const resizeObserver = new ResizeObserver(() => {
+    const rw = reqRateContainer.clientWidth;
+    const cw = cacheRateContainer.clientWidth;
+    if (requestRateChart && rw > 0) requestRateChart.setSize({ width: rw, height: 300 });
+    if (cacheRateChart && cw > 0) cacheRateChart.setSize({ width: cw, height: 300 });
+  });
+  resizeObserver.observe(reqRateContainer);
+  resizeObserver.observe(cacheRateContainer);
+
   const loadData = async (period: Period) => {
     const data = await fetchAnalytics(period);
 
