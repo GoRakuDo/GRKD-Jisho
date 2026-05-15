@@ -121,15 +121,20 @@ if (!session?.isAdmin) {
           </label>
         </div>
 
-        <div class="editor-grid">
-          <div class="editor-col">
-            <label class="editor-col-label" for="editor-textarea">{promptsUi.page.editorLabel}</label>
-            <textarea id="editor-textarea" class="editor-textarea" spellcheck="false"></textarea>
-          </div>
-          <div class="editor-col">
-            <label class="editor-col-label" for="editor-preview">{promptsUi.page.previewLabel}</label>
-            <pre id="editor-preview" class="editor-preview"></pre>
-          </div>
+        <div class="editor-toolbar">
+          <button id="editor-edit-btn" class="editor-toolbar-btn active" type="button">
+            <svg class="editor-toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+            <span>Edit</span>
+          </button>
+          <button id="editor-preview-btn" class="editor-toolbar-btn" type="button">
+            <svg class="editor-toolbar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>Preview</span>
+          </button>
+        </div>
+        <div class="editor-content">
+          <label class="editor-col-label" for="editor-textarea">{promptsUi.page.editorLabel}</label>
+          <textarea id="editor-textarea" class="editor-textarea" spellcheck="false"></textarea>
+          <div id="editor-preview" class="editor-preview" hidden></div>
         </div>
 
         <div class="editor-footer">
@@ -167,6 +172,8 @@ if (!session?.isAdmin) {
     const editorActiveCheckbox = document.getElementById('editor-active-checkbox') as HTMLInputElement | null;
     const editorCancelBtn = document.getElementById('editor-cancel-btn') as HTMLButtonElement | null;
     const editorSaveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
+    const editorEditBtn = document.getElementById('editor-edit-btn') as HTMLButtonElement | null;
+    const editorPreviewBtn = document.getElementById('editor-preview-btn') as HTMLButtonElement | null;
 
     let promptScopes: PromptScopeView[] = [];
     let selectedScopeKey: string = '';
@@ -352,7 +359,7 @@ if (!session?.isAdmin) {
 
     function openEditor(version: PromptVersion | null, mode: 'edit' | 'create' = 'edit'): void {
       const scope = selectedScope();
-      if (!scope || !editorModal || !editorScopeLabel || !editorTitle || !editorVersionHint || !editorTextarea || !editorPreview || !editorActiveCheckbox) return;
+      if (!scope || !editorModal || !editorScopeLabel || !editorTitle || !editorVersionHint || !editorTextarea || !editorPreview || !editorActiveCheckbox || !editorEditBtn || !editorPreviewBtn) return;
 
       lastFocusedTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       editingId = version ? version.id : null;
@@ -365,12 +372,26 @@ if (!session?.isAdmin) {
         ? (seedVersion ? `Cloning ${seedVersion.version} into ${scope.scopeKey}` : `New version · ${scope.scopeKey}`)
         : (seedVersion ? `Version ${seedVersion.version} · ${scope.scopeKey}` : `Version · ${scope.scopeKey}`);
       editorTextarea.value = seedVersion ? seedVersion.content : '';
-      editorPreview.textContent = editorTextarea.value;
+      editorPreview.textContent = escapeHtml(editorTextarea.value);
       editorActiveCheckbox.checked = version ? version.isActive : true;
+
+      // Set to edit mode by default
+      setEditorMode('edit');
 
       editorModal.classList.remove('hidden');
       editorModal.setAttribute('aria-hidden', 'false');
       editorTextarea.focus();
+    }
+
+    function setEditorMode(mode: 'edit' | 'preview'): void {
+      if (!editorTextarea || !editorPreview || !editorEditBtn || !editorPreviewBtn) return;
+
+      const isEdit = mode === 'edit';
+      editorTextarea.hidden = !isEdit;
+      editorPreview.hidden = isEdit;
+
+      editorEditBtn.classList.toggle('active', isEdit);
+      editorPreviewBtn.classList.toggle('active', !isEdit);
     }
 
     function closeEditor(): void {
@@ -533,21 +554,11 @@ if (!session?.isAdmin) {
     scopeResetBtn?.addEventListener('click', resetOverride);
     editorCancelBtn?.addEventListener('click', closeEditor);
     editorSaveBtn?.addEventListener('click', saveEditor);
+    editorBackdrop?.addEventListener('click', closeEditor);
 
-    editorModal?.addEventListener('click', (event) => {
-      if (event.target === editorBackdrop) closeEditor();
-    });
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeEditor();
-      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-        saveEditor();
-      }
-    });
-
-    editorTextarea?.addEventListener('input', () => {
-      if (editorPreview && editorTextarea) editorPreview.textContent = editorTextarea.value;
-    });
+    // Toolbar toggle
+    editorEditBtn?.addEventListener('click', () => setEditorMode('edit'));
+    editorPreviewBtn?.addEventListener('click', () => setEditorMode('preview'));
 
     loadPromptScopes();
   </script>
@@ -1208,14 +1219,67 @@ if (!session?.isAdmin) {
       color: var(--color-graphite-900);
     }
 
+    .editor-content {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
     .editor-textarea {
       resize: vertical;
       outline: none;
+      flex: 1;
+      min-height: 400px;
     }
 
     .editor-textarea:focus {
       border-color: var(--color-royal-blue-600);
       box-shadow: 0 0 0 3px var(--color-royal-blue-100);
+    }
+
+    /* Editor Toolbar */
+    .editor-toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--color-graphite-180);
+    }
+
+    .editor-toolbar-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--color-graphite-220);
+      background: var(--color-porcelain-100);
+      color: var(--color-graphite-700);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .editor-toolbar-btn:hover {
+      background: var(--color-porcelain-150);
+      border-color: var(--color-graphite-280);
+    }
+
+    .editor-toolbar-btn.active {
+      background: var(--color-royal-blue-600);
+      border-color: var(--color-royal-blue-700);
+      color: var(--color-porcelain-50);
+    }
+
+    .editor-toolbar-btn.active:hover {
+      background: var(--color-royal-blue-700);
+    }
+
+    .editor-toolbar-icon {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
     }
 
     .editor-preview {
@@ -1224,6 +1288,11 @@ if (!session?.isAdmin) {
       word-break: break-word;
       background: var(--color-graphite-900);
       color: var(--color-porcelain-50);
+      padding: 20px;
+      border-radius: 16px;
+      line-height: 1.7;
+      font-size: 14px;
+      border: 1px solid var(--color-graphite-700);
     }
 
     .editor-footer {
@@ -1256,6 +1325,10 @@ if (!session?.isAdmin) {
 
       .editor-grid {
         grid-template-columns: 1fr;
+      }
+
+      .editor-content {
+        min-height: 350px;
       }
     }
 
