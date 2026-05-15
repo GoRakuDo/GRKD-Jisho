@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import type { APIRoute } from "astro";
 import { getIsAuthenticated } from "../../../lib/locals";
 import { getSession } from "../../../lib/session";
-import { eq, gte, sql, count, and } from "drizzle-orm";
+import { eq, gte, sql, count, and, lt } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 
 /* ─── Types ──────────────────────────────────────────── */
@@ -178,81 +178,28 @@ export const GET: APIRoute = async (context) => {
 
     // ── Fallback: PostgreSQL direct query ──
     const since = sql`now() - ${days}::int * interval '1 day'`;
+    const until = sql`date_trunc('hour', now())`;
 
     const hourlyRaw = await db
       .select({
         hour: sql<string>`date_trunc('hour', ${schema.lookupLogs.createdAt})`,
         bucketKey: schema.lookupLogs.outputBucketKey,
-        lookups: count(schema.lookupLogs.id),
+        totalLookups: sql<number>`count(${schema.lookupLogs.id})`,
         cacheHits:
-          sql`count(*) filter (where ${schema.lookupLogs.cacheHit} = true)`,
+          sql<number>`count(*) filter (where ${schema.lookupLogs.cacheHit} = true)`,
         cacheMisses:
-          sql`count(*) filter (where ${schema.lookupLogs.cacheHit} = false)`,
-        llmSource: schema.lookupLogs.llmSource,
+          sql<number>`count(*) filter (where ${schema.lookupLogs.cacheHit} = false and ${schema.lookupLogs.responseCacheId} is not null)`,
+        llmGemini:
+          sql<number>`count(*) filter (where ${schema.lookupLogs.llmSource} = 'gemini')`,
+        llmOpenrouter:
+          sql<number>`count(*) filter (where ${schema.lookupLogs.llmSource} = 'openrouter')`,
       })
       .from(schema.lookupLogs)
-      .where(gte(schema.lookupLogs.createdAt, since))
-      .groupBy(sql`1, ${schema.lookupLogs.outputBucketKey}, ${schema.lookupLogs.llmSource}`)
+      .where(and(gte(schema.lookupLogs.createdAt, since), lt(schema.lookupLogs.createdAt, until)))
+      .groupBy(sql`1`, schema.lookupLogs.outputBucketKey)
       .orderBy(sql`1`);
 
-    const bucketMap = new Map<string, {
-      totalLookups: number; totalHits: number; totalMisses: number;
-      gemini: number; openrouter: number;
-      hourly: Map<string, {
-        hour: string; lookups: number; cacheHits: number; cacheMisses: number;
-        llmGemini: number; llmOpenrouter: number;
-      }>;
-    }>();
-
-    for (const row of hourlyRaw) {
-      const bk = row.bucketKey || "unknown";
-      if (!bucketMap.has(bk)) {
-        bucketMap.set(bk, {
-          totalLookups: 0, totalHits: 0, totalMisses: 0,
-          gemini: 0, openrouter: 0,
-          hourly: new Map(),
-        });
-      }
-      const bucket = bucketMap.get(bk)!;
-      const hourLookups = Number(row.lookups);
-      bucket.totalLookups += hourLookups;
-      bucket.totalHits += Number(row.cacheHits);
-      bucket.totalMisses += Number(row.cacheMisses);
-      if (row.llmSource === "gemini") bucket.gemini += hourLookups;
-      if (row.llmSource === "openrouter") bucket.openrouter += hourLookups;
-
-      if (!bucket.hourly.has(row.hour)) {
-        bucket.hourly.set(row.hour, {
-          hour: row.hour, lookups: 0, cacheHits: 0, cacheMisses: 0,
-          llmGemini: 0, llmOpenrouter: 0,
-        });
-      }
-      const h = bucket.hourly.get(row.hour)!;
-      h.lookups += hourLookups;
-      h.cacheHits += Number(row.cacheHits);
-      h.cacheMisses += Number(row.cacheMisses);
-      if (row.llmSource === "gemini") h.llmGemini += hourLookups;
-      if (row.llmSource === "openrouter") h.llmOpenrouter += hourLookups;
-    }
-
-    const buckets: Record<string, BucketResponse> = {};
-    for (const [bk, b] of bucketMap) {
-      const sortedHours = [...b.hourly.values()].sort(
-        (a, b2) => new Date(a.hour).getTime() - new Date(b2.hour).getTime(),
-      );
-      buckets[bk] = {
-        totalLookups: b.totalLookups,
-        cacheHitRate: b.totalLookups > 0
-          ? +(b.totalHits / b.totalLookups).toFixed(4)
-          : 0,
-        llmUsage: { gemini: b.gemini, openrouter: b.openrouter },
-        hourly: sortedHours.map((h) => ({
-          ...h, hour: new Date(h.hour).toISOString(),
-        })),
-      };
-    }
-
-    return respond(period, buckets, days);
+    return respond(period, buildBucketsFromRows(hourlyRaw), days);
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[AnalyticsAPI] Query failed: ${reason} → Check analytics DB and lookup_logs`);

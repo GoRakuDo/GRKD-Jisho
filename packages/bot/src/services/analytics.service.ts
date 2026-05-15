@@ -1,23 +1,17 @@
 import { resolve, dirname } from "node:path";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import initSqlJs, { type Database as SqlJsDatabase } from "sql.js";
-import { gte, sql, count } from "drizzle-orm";
+import { gte, sql, lt, and } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 
 /** SQLite ファイルの保存場所（repo root/analytics/stats.db） */
 const DB_PATH = resolve(process.cwd(), "analytics", "stats.db");
-
-/* ─── Types ──────────────────────────────────────────── */
-
-export interface HourlyStatRow {
-  hour: string;
-  bucketKey: string;
-  totalLookups: number;
-  cacheHits: number;
-  cacheMisses: number;
-  llmGemini: number;
-  llmOpenrouter: number;
-}
 
 /* ─── SQLite init（sql.js の WASM ロードは 1 回だけ） ─── */
 
@@ -70,29 +64,32 @@ function saveDb(): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
-  writeFileSync(DB_PATH, Buffer.from(_db.export()));
+  const tmpPath = `${DB_PATH}.tmp`;
+  writeFileSync(tmpPath, Buffer.from(_db.export()));
+  renameSync(tmpPath, DB_PATH);
 }
 
 /* ─── 集計（3時間分） ──────────────────────────────────── */
 export async function aggregateHourly(): Promise<void> {
   const since = sql`date_trunc('hour', now()) - interval '3 hours'`;
+  const until = sql`date_trunc('hour', now())`;
 
   const rows = await db
     .select({
       hour: sql<string>`date_trunc('hour', ${schema.lookupLogs.createdAt})`,
       bucketKey: schema.lookupLogs.outputBucketKey,
-      lookups: count(schema.lookupLogs.id),
+      lookups: sql<number>`count(${schema.lookupLogs.id})`,
       cacheHits:
-        sql`count(*) filter (where ${schema.lookupLogs.cacheHit} = true)`,
+        sql<number>`count(*) filter (where ${schema.lookupLogs.cacheHit} = true)`,
       cacheMisses:
-        sql`count(*) filter (where ${schema.lookupLogs.cacheHit} = false)`,
+        sql<number>`count(*) filter (where ${schema.lookupLogs.cacheHit} = false and ${schema.lookupLogs.responseCacheId} is not null)`,
       llmGemini:
-        sql`count(*) filter (where ${schema.lookupLogs.llmSource} = 'gemini')`,
+        sql<number>`count(*) filter (where ${schema.lookupLogs.llmSource} = 'gemini')`,
       llmOpenrouter:
-        sql`count(*) filter (where ${schema.lookupLogs.llmSource} = 'openrouter')`,
+        sql<number>`count(*) filter (where ${schema.lookupLogs.llmSource} = 'openrouter')`,
     })
     .from(schema.lookupLogs)
-    .where(gte(schema.lookupLogs.createdAt, since))
+    .where(and(gte(schema.lookupLogs.createdAt, since), lt(schema.lookupLogs.createdAt, until)))
     .groupBy(sql`1`, schema.lookupLogs.outputBucketKey)
     .orderBy(sql`1`);
 
@@ -117,44 +114,4 @@ export async function aggregateHourly(): Promise<void> {
 
   saveDb();
   console.log(`[Analytics] Aggregated ${rows.length} hourly stat rows`);
-}
-
-/* ─── クエリ（指定日数分） ────────────────────────────── */
-export async function queryAnalytics(days: number): Promise<HourlyStatRow[]> {
-  const db2 = await getDb();
-  const since = new Date(
-    Date.now() - days * 24 * 60 * 60 * 1000,
-  ).toISOString();
-
-  const stmt = db2.prepare(
-    `SELECT * FROM hourly_stats
-     WHERE hour >= ?
-     ORDER BY hour ASC, bucket_key ASC`,
-  );
-  stmt.bind([since]);
-
-  const results: HourlyStatRow[] = [];
-  while (stmt.step()) {
-    const row = stmt.getAsObject() as {
-      hour: string;
-      bucket_key: string;
-      total_lookups: number;
-      cache_hits: number;
-      cache_misses: number;
-      llm_gemini: number;
-      llm_openrouter: number;
-    };
-    results.push({
-      hour: row.hour,
-      bucketKey: row.bucket_key,
-      totalLookups: row.total_lookups,
-      cacheHits: row.cache_hits,
-      cacheMisses: row.cache_misses,
-      llmGemini: row.llm_gemini,
-      llmOpenrouter: row.llm_openrouter,
-    });
-  }
-  stmt.free();
-
-  return results;
 }

@@ -9,8 +9,8 @@ Bot の使用状況を時系列で可視化する Analytics ページを専用 S
 | 要件 | JSON ファイル | SQLite |
 |------|---------------|--------|
 | 追記 | ファイル全体読込→書戻し | `INSERT` 1行 |
-| 破損リスク | 書込中停電→全滅 | WAL モード→直前 TX まで保証 |
-| 並行アクセス | cron 書込中に WebUI 読込→壊れる | WAL で同時 RW 可能 |
+| 破損リスク | 書込中停電→全滅 | atomic rename → 直前 export まで保証 |
+| 並行アクセス | cron 書込中に WebUI 読込→壊れる | atomic rename → partial read 防止 |
 | 10年運用 | 700KB JSON → 読書が重い | 700K行でも余裕 |
 | インフラ増加 | ゼロ（ファイル1つ） | ゼロ（ファイル1つ） |
 
@@ -64,7 +64,7 @@ cron 式: `0 */3 * * *`（Asia/Jakarta）
 messageCreate.ts で設定された output_bucket_key と llm_source が
 lookup_logs に記録される
 
-↓ 毎時00分 に cron が発火
+↓ 3時間おきの00分に cron が発火
 
 SELECT
   date_trunc('hour', created_at) AS hour,
@@ -87,13 +87,14 @@ VALUES (...)
 
 ### 3. SQLite ファイル
 
-- パス: `packages/bot/analytics/stats.db`
-- WAL モード有効化
-- cron は bot プロセス内で `node:child_process` または cron 内関数として実行
+- パス: `analytics/stats.db`（repo root。bot / web の両方が `process.cwd()` 基準で参照）
+- 実装は `sql.js` を使用
+- 永続化は WAL ではなく「メモリ DB を読み込み → 集計 → `export()` で書き戻し」方式
+- cron は bot プロセス内の `node-cron` で実行
 
 ### 4. タイムフレームのクエリ
 
-WebUI からは指定タイムフレームの範囲で SQLite を SELECT するだけ:
+WebUI からは原則 SQLite を読む。SQLite が空 / 未生成なら PostgreSQL `lookup_logs` を直接集計して fallback する:
 
 ```sql
 -- 1日の例
@@ -161,16 +162,16 @@ Dashboard からは削除する。
 ### 表示するグラフ
 
 1. **Request Rate（リクエスト数/時間）**
-   - 折れ線グラフ、バケツ2系列（daily-japanese / indonesian）
+   - 折れ線グラフ、Lookups と Cache Misses の 2 系列
    - X軸: 時間、Y軸: リクエスト数
 
 2. **Cache Hit Rate（キャッシュ当たり率）**
-   - 折れ線グラフ、バケツ2系列
+   - 折れ線グラフ、全バケツ合算の 1 系列
    - X軸: 時間、Y軸: %
 
 3. **Model Usage（LLM呼出回数）**
-   - 積み上げ面グラフ（gemini / openrouter）
-   - バケツ横に並べる or 片面グラフ
+   - サマリーカードで表示（Gemini / OpenRouter 合計と内訳）
+   - 時系列グラフを追加するなら別 Step に分離する
 
 ### ページレイアウト
 
@@ -193,6 +194,17 @@ Dashboard からは削除する。
 │  (TOP 20)        │  (バー or ランキング)        │
 └──────────────────┴──────────────────────────────┘
 ```
+
+## 実装状況
+
+| Step | 状態 | Note |
+|------|------|------|
+| Step 1: lookup_logs にカラム追加 | ✅ Done | `output_bucket_key` + `llm_source` |
+| Step 2: Analytics サービス作成 | ✅ Done | `packages/bot/src/services/analytics.service.ts`（sql.js） |
+| Step 3: Cron 登録 | ✅ Done | `0 */3 * * *` Asia/Jakarta（index.ts） |
+| Step 4: API エンドポイント | ✅ Done | SQLite 優先 + PostgreSQL fallback |
+| Step 5: WebUI Analytics ページ | ✅ Done | uPlot グラフ + period 選択 + テーブル |
+| Step 6: Dashboard からのコンポーネント削除 | ✅ Done | PopularQueries / DictionaryHits を Analytics に移動 |
 
 ## 実装手順
 
@@ -217,7 +229,7 @@ Dashboard からは削除する。
 
 - `packages/web/src/pages/api/admin/analytics.ts`
 - CSRF + admin guard + session 認証
-- SQLite ファイル読み取り（`packages/web/analytics/stats.db`）
+  - SQLite ファイル読み取り（`analytics/stats.db`）
 
 ### Step 5: WebUI Analytics ページ
 
@@ -235,16 +247,16 @@ Dashboard からは削除する。
 
 | パッケージ | 依存 |
 |------------|------|
-| `packages/bot` | `better-sqlite3` + `@types/better-sqlite3` |
-| `packages/web` | `uplot` |
+| `packages/bot` | `sql.js` |
+| `packages/web` | `sql.js`, `uplot` |
 | `@grkd-jisho/db` | 変更なし |
 
-`better-sqlite3` はネイティブモジュールだが、Docker ビルドで Linux 用バイナリを自動取得する。
+`sql.js` は Pure JS の SQLite 実装。ネイティブビルド不要。
 
 ## レガシーな考慮点
 
 - Kasou の `lookup_logs` に既存データがあるが、`output_bucket_key` のデフォルト値は空文字
-- 過去データは output_bucket_key = '' となる → Analytics にはカウントされない
+- 過去データは `unknown` バケットとして集計される。不要なら手動バックフィルする
 - 新規データから徐々に蓄積される
 - 手動バックフィルしたい場合は以下を Kasou で実行:
   ```sql
