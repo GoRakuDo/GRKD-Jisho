@@ -120,9 +120,6 @@ function fmtTime(tsSec: number): string {
   }).format(new Date(tsSec * 1000));
 }
 
-/** Format short time label (hour only) */
-
-
 /* ─── UPLOT OPTIONS ──────────────────────────────────── */
 
 function reqRateOptions(container: HTMLElement): uPlot.Options {
