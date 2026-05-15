@@ -74,8 +74,11 @@ export const GET: APIRoute = async (context) => {
       });
     }
 
-    const scopes = await getPromptScopeViews();
-    return new Response(JSON.stringify({ scopes }), {
+    const [scopes, defaultBaseline] = await Promise.all([
+      getPromptScopeViews(),
+      getActivePromptForScope("default"),
+    ]);
+    return new Response(JSON.stringify({ scopes, defaultBaseline }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

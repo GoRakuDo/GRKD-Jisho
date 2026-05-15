@@ -37,8 +37,8 @@ if (!session?.isAdmin) {
         <header class="workspace-hero">
           <div>
             <p class="card-kicker">{promptsUi.page.selectedScopeLabel}</p>
-            <h2 id="scope-title" class="scope-title">{promptsUi.page.defaultScopeTitle}</h2>
-            <p id="scope-description" class="scope-description">{promptsUi.page.defaultScopeDescription}</p>
+            <h2 id="scope-title" class="scope-title">{promptsUi.page.baselineLabel}</h2>
+            <p id="scope-description" class="scope-description">{promptsUi.page.baselineVersionName}</p>
           </div>
           <div class="scope-hero-meta">
             <div class="hero-chip" id="scope-resolution-chip">{promptsUi.page.runtimeFallback}</div>
@@ -50,7 +50,7 @@ if (!session?.isAdmin) {
           <div class="versions-card-header">
             <div>
               <p class="card-kicker">{promptsUi.page.versionHistoryLabel}</p>
-              <h3 id="versions-title" class="versions-title">{promptsUi.page.defaultScopeTitle}</h3>
+              <h3 id="versions-title" class="versions-title">{promptsUi.page.baselineLabel}</h3>
             </div>
             <div class="versions-actions">
               <button id="scope-reset-btn" class="action-btn action-btn-secondary" type="button">{promptsUi.page.resetOverride}</button>
@@ -62,7 +62,7 @@ if (!session?.isAdmin) {
             <div class="empty-state-body">
               <p class="empty-title">{promptsUi.page.noOverride}</p>
               <p class="empty-copy">{promptsUi.page.noOverrideCopy}</p>
-              <button id="empty-create-btn" class="action-btn action-btn-primary" type="button">{promptsUi.page.createOverride}</button>
+              <button id="empty-create-btn" class="action-btn action-btn-primary" type="button">{promptsUi.page.createOverrideVersion}</button>
             </div>
           </div>
 
@@ -169,7 +169,8 @@ if (!session?.isAdmin) {
     const editorSaveBtn = document.getElementById('editor-save-btn') as HTMLButtonElement | null;
 
     let promptScopes: PromptScopeView[] = [];
-    let selectedScopeKey: string = 'default';
+    let selectedScopeKey: string = '';
+    let defaultBaseline: PromptVersion | null = null;
     let editingId: string | null = null;
     let lastFocusedTrigger: HTMLElement | null = null;
 
@@ -188,13 +189,12 @@ if (!session?.isAdmin) {
 
     function runtimeStateText(scope: PromptScopeView | null): string {
       if (!scope) return promptsUi.page.loading;
-      if (scope.inheritedFromDefault && scope.scopeKey !== 'default') return promptsUi.page.inheritedFromDefault;
+      if (scope.inheritedFromDefault) return promptsUi.page.inheritedFromDefault;
       if (scope.resolvedPrompt) return `${promptsUi.page.activeVersionPrefix}${scope.resolvedPrompt.version}`;
       return promptsUi.page.noActiveVersion;
     }
 
     function scopeCardState(scope: PromptScopeView): string {
-      if (scope.scopeKey === 'default') return promptsUi.page.scopeCardBaseline;
       return scope.inheritedFromDefault ? promptsUi.page.scopeCardInherited : promptsUi.page.scopeCardOverrideActive;
     }
 
@@ -206,7 +206,7 @@ if (!session?.isAdmin) {
         const activeVersion = scope.resolvedPrompt ? escapeHtml(scope.resolvedPrompt.version) : promptsUi.page.noActiveVersion;
         const versionCount = scope.versions.length;
         const state = scopeCardState(scope);
-        const accentClass = scope.scopeKey === 'default' ? 'scope-card-accent-default' : 'scope-card-accent-override';
+        const accentClass = scope.inheritedFromDefault ? 'scope-card-accent-default' : 'scope-card-accent-override';
 
         return `
           <button type="button" class="scope-card ${selected ? 'scope-card-selected' : ''}" data-scope-key="${escapeHtml(scope.scopeKey)}" ${selected ? 'aria-current="true"' : ''}>
@@ -217,7 +217,7 @@ if (!session?.isAdmin) {
                   <p class="scope-card-label">${escapeHtml(scope.scopeLabel)}</p>
                   <p class="scope-card-description">${escapeHtml(scope.scopeDescription)}</p>
                 </div>
-                <span class="scope-badge ${scope.scopeKey === 'default' ? 'scope-badge-default' : 'scope-badge-override'}">${escapeHtml(state)}</span>
+                <span class="scope-badge ${scope.inheritedFromDefault ? 'scope-badge-default' : 'scope-badge-override'}">${escapeHtml(state)}</span>
               </div>
               <div class="scope-card-footer">
                 <span class="scope-card-count">${versionCount} version${versionCount === 1 ? '' : 's'}</span>
@@ -245,13 +245,20 @@ if (!session?.isAdmin) {
       if (scopeTitle) scopeTitle.textContent = scope.scopeLabel;
       if (scopeDescription) scopeDescription.textContent = scope.scopeDescription;
       if (scopeResolutionChip) scopeResolutionChip.textContent = runtimeStateText(scope);
-      if (scopeVersionChip) scopeVersionChip.textContent = scope.resolvedPrompt ? `${promptsUi.page.runtimeVersionPrefix}${scope.resolvedPrompt.version}` : promptsUi.page.noResolvedPrompt;
+      if (scopeVersionChip) {
+        if (scope.inheritedFromDefault && scope.resolvedPrompt) {
+          scopeVersionChip.textContent = `${promptsUi.page.inheritedFromDefault} · ${promptsUi.page.runtimeVersionPrefix}${scope.resolvedPrompt.version}`;
+        } else if (scope.resolvedPrompt) {
+          scopeVersionChip.textContent = `${promptsUi.page.runtimeVersionPrefix}${scope.resolvedPrompt.version}`;
+        } else {
+          scopeVersionChip.textContent = promptsUi.page.noActiveVersion;
+        }
+      }
       if (versionsTitle) versionsTitle.textContent = `${scope.scopeLabel} versions`;
-      if (scopeResetBtn) scopeResetBtn.hidden = scope.scopeKey === 'default' || scope.versions.length === 0;
+      if (scopeResetBtn) scopeResetBtn.hidden = scope.versions.length === 0;
 
-      const createLabel = scope.scopeKey === 'default' ? promptsUi.page.createNewScopeVersion : promptsUi.page.createOverrideVersion;
-      if (scopeCreateBtn) scopeCreateBtn.textContent = createLabel;
-      if (emptyCreateBtn) emptyCreateBtn.textContent = createLabel;
+      if (scopeCreateBtn) scopeCreateBtn.textContent = promptsUi.page.createOverrideVersion;
+      if (emptyCreateBtn) emptyCreateBtn.textContent = promptsUi.page.createOverrideVersion;
 
       if (!versionsContainer || !versionsEmpty) return;
 
@@ -262,10 +269,30 @@ if (!session?.isAdmin) {
       }
 
       versionsEmpty.classList.add('hidden');
-      versionsContainer.innerHTML = `
+      const baselineRow = defaultBaseline ? `
+        <article class="version-card version-card-baseline">
+          <div class="version-card-mark version-card-mark-baseline">BL</div>
+          <div class="version-card-main">
+            <div class="version-card-head">
+              <span class="version-name">${escapeHtml(defaultBaseline.version)}</span>
+              <span class="version-scope">${escapeHtml(promptsUi.page.baselineVersionName)}</span>
+            </div>
+            <p class="version-card-updated">${new Date(defaultBaseline.updatedAt).toLocaleString()}</p>
+          </div>
+          <div class="version-card-side">
+            <div class="version-card-status">
+              <span class="row-badge row-badge-active">${escapeHtml(promptsUi.page.baselineLabel)}</span>
+            </div>
+            <div class="version-card-actions">
+              <span class="version-card-baseline-note">${escapeHtml(promptsUi.page.inheritedFromDefault)}</span>
+            </div>
+          </div>
+        </article>
+      ` : '';
+
+      versionsContainer.innerHTML = baselineRow + `
         <div class="version-list">
           ${scope.versions.map((version, index) => {
-            const isDefaultSeed = scope.scopeKey === 'default' && version.version === 'default';
             const statusLabel = version.isActive ? promptsUi.page.status.active : promptsUi.page.status.inactive;
             const versionNumber = String(index + 1).padStart(2, '0');
             return `
@@ -285,7 +312,7 @@ if (!session?.isAdmin) {
                   <div class="version-card-actions">
                     <button type="button" class="table-btn table-btn-primary" data-action="edit" data-id="${escapeHtml(version.id)}">${promptsUi.page.edit}</button>
                     <button type="button" class="table-btn table-btn-secondary" data-action="activate" data-id="${escapeHtml(version.id)}" ${version.isActive ? 'disabled' : ''}>${promptsUi.page.activate}</button>
-                    <button type="button" class="table-btn table-btn-danger" data-action="delete" data-id="${escapeHtml(version.id)}" ${isDefaultSeed ? 'disabled' : ''}>${promptsUi.page.delete}</button>
+                    <button type="button" class="table-btn table-btn-danger" data-action="delete" data-id="${escapeHtml(version.id)}">${promptsUi.page.delete}</button>
                   </div>
                 </div>
               </article>
@@ -403,11 +430,6 @@ if (!session?.isAdmin) {
     }
 
     async function deleteVersion(version: PromptVersion): Promise<void> {
-      if (selectedScopeKey === 'default' && version.version === 'default') {
-        alert(promptsUi.page.deleteDefaultWarning);
-        return;
-      }
-
       if (!confirm(`${promptsUi.page.deleteConfirmPrefix}${version.version}${promptsUi.page.deleteConfirmSuffix}`)) return;
 
       try {
@@ -454,7 +476,7 @@ if (!session?.isAdmin) {
 
     async function resetOverride(): Promise<void> {
       const scope = selectedScope();
-      if (!scope || scope.scopeKey === 'default') return;
+      if (!scope) return;
 
       if (!confirm(`${promptsUi.page.resetOverrideConfirmPrefix}${scope.scopeLabel}${promptsUi.page.resetOverrideConfirmSuffix}`)) return;
 
@@ -479,15 +501,17 @@ if (!session?.isAdmin) {
     async function loadPromptScopes(): Promise<void> {
       try {
         const res = await fetch('/api/admin/prompts');
-        const data: { scopes?: PromptScopeView[] } = await res.json();
-        promptScopes = data.scopes ?? [];
+        const data: { scopes?: PromptScopeView[]; defaultBaseline?: PromptVersion | null } = await res.json();
+        const allScopes = data.scopes ?? [];
+        promptScopes = allScopes.filter((scope) => scope.scopeKey !== 'default');
+        defaultBaseline = data.defaultBaseline ?? null;
 
         if (promptScopes.length === 0) {
           throw new Error('No prompt scopes returned');
         }
 
         if (!promptScopes.some((scope) => scope.scopeKey === selectedScopeKey)) {
-          selectedScopeKey = 'default';
+          selectedScopeKey = promptScopes[0]!.scopeKey;
         }
 
         renderAll();
@@ -1446,6 +1470,25 @@ if (!session?.isAdmin) {
     .prompt-page .version-card-active {
       border-color: var(--color-royal-blue-200);
       background: color-mix(in oklch, var(--color-royal-blue-50) 72%, var(--color-porcelain-50));
+    }
+
+    .prompt-page .version-card-baseline {
+      border-color: var(--color-graphite-220);
+      border-style: dashed;
+      background: var(--color-porcelain-100);
+      opacity: 0.85;
+      margin-bottom: 4px;
+    }
+
+    .prompt-page .version-card-mark-baseline {
+      background: linear-gradient(180deg, var(--color-graphite-450), var(--color-graphite-600));
+      font-size: 10px;
+    }
+
+    .prompt-page .version-card-baseline-note {
+      font-size: 11px;
+      color: var(--color-graphite-500);
+      font-style: italic;
     }
 
     .prompt-page .version-card-main {
