@@ -7,7 +7,7 @@ import { validateCsrfRequest } from "../../../../lib/csrf";
 import { adminAuditEvent, importYomitanDictionaryFromBuffer } from "@grkd-jisho/db";
 
 const MAX_COMPRESSED_SIZE = 300 * 1024 * 1024;
-const MAX_UNCOMPRESSED_PER_ENTRY = 100 * 1024 * 1024;
+const MAX_UNCOMPRESSED_PER_ENTRY = 300 * 1024 * 1024;
 const MAX_TOTAL_UNCOMPRESSED = 1536 * 1024 * 1024;
 
 export const POST: APIRoute = async (context) => {
@@ -94,7 +94,7 @@ export const POST: APIRoute = async (context) => {
 
       const uncompressedSize = entry.header.size;
       if (uncompressedSize > MAX_UNCOMPRESSED_PER_ENTRY) {
-        return new Response(JSON.stringify({ error: "Entry too large (max 100MB uncompressed)" }), {
+        return new Response(JSON.stringify({ error: "Entry too large (max 300MB uncompressed)" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });

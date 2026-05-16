@@ -64,7 +64,7 @@ export const POST: APIRoute = async (context) => {
     const zip = new AdmZip(buffer);
 
     // 安全制約: path traversal / absolute path / decompression bomb をまとめてチェック
-    const MAX_UNCOMPRESSED_PER_ENTRY = 100 * 1024 * 1024; // 100MB per entry
+    const MAX_UNCOMPRESSED_PER_ENTRY = 300 * 1024 * 1024; // 300MB per entry
     let totalUncompressed = 0;
     const zipEntries = zip.getEntries();
     for (const entry of zipEntries) {
@@ -89,7 +89,7 @@ export const POST: APIRoute = async (context) => {
       // 解凍後サイズ上限チェック (zip bomb / decompression bomb 対策)
       const uncompressedSize = entry.header.size;
       if (uncompressedSize > MAX_UNCOMPRESSED_PER_ENTRY) {
-        return new Response(JSON.stringify({ error: "Entry too large (max 100MB uncompressed)" }), {
+        return new Response(JSON.stringify({ error: "Entry too large (max 300MB uncompressed)" }), {
           status: 400,
           headers: { "Content-Type": "application/json" },
         });
