@@ -179,7 +179,7 @@ Dashboard からは削除する。
 ┌─────────────────────────────────────────────────┐
 │  [1d] [3d] [7d] [2w] [3w] [1m] [3m]            │  ← タイムフレーム選択
 ├─────────────────────────────────────────────────┤
-│  MetricCard: Lookups (7d)  │ Cache Rate │ ...  │  ← サマリー
+│  MetricCard: Lookups (7d)  │ Cache Hit Rate │ ...  │  ← サマリー
 ├─────────────────────────────────────────────────┤
 │  ┌─── Request Rate ─────────────────────────┐   │
 │  │  📈 uPlot 折れ線グラフ                   │   │
@@ -237,6 +237,7 @@ Dashboard からは削除する。
 - uPlot を使ったグラフ表示
 - Popular Queries / Dictionary Hits コンポーネントを Dashboard から移動
 - Sidebar に Analytics リンク追加
+- サマリーの Cache Hit Rate は `cacheHits / totalLookups` で 0〜100% に収める
 
 ### Step 6: Dashboard から旧コンポーネント削除
 

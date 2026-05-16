@@ -103,8 +103,9 @@ function buildCacheRateData(hourly: HourlyPoint[]): uPlot.AlignedData {
   const rates: number[] = [];
   for (const pt of hourly) {
     t.push(new Date(pt.hour).getTime() / 1000);
-    const total = pt.cacheHits + pt.cacheMisses;
-    rates.push(total > 0 ? +((pt.cacheHits / total) * 100).toFixed(1) : 0);
+    // Cache Hit Rate は全 lookup を母数にする。
+    // cacheMisses は「レスポンスが作れた失敗分」だけなので、母数にするとズレる。
+    rates.push(pt.lookups > 0 ? +((pt.cacheHits / pt.lookups) * 100).toFixed(1) : 0);
   }
   return [t, rates];
 }
@@ -284,8 +285,8 @@ export function renderMetrics(
   // Sum across all buckets
   const bucketKeys = Object.keys(data.buckets);
   let totalLookups = 0;
+  let totalCacheHits = 0;
   let totalLlmCalls = 0;
-  let totalMisses = 0;
   let totalGemini = 0;
   let totalOpenrouter = 0;
 
@@ -293,21 +294,21 @@ export function renderMetrics(
     const b = data.buckets[key];
     if (!b) continue;
     totalLookups += b.totalLookups;
+    totalCacheHits += b.hourly.reduce((s, h) => s + h.cacheHits, 0);
     totalLlmCalls += b.llmUsage.gemini + b.llmUsage.openrouter;
-    totalMisses += b.hourly.reduce((s, h) => s + h.cacheMisses, 0);
     totalGemini += b.llmUsage.gemini;
     totalOpenrouter += b.llmUsage.openrouter;
   }
 
   const cacheRate =
     totalLookups > 0
-      ? (((totalLookups - totalMisses) / totalLookups) * 100).toFixed(1)
+      ? Math.max(0, Math.min(100, (totalCacheHits / totalLookups) * 100)).toFixed(1)
       : "0.0";
   const llmTotal = totalLlmCalls;
 
   const cards = [
     { label: `Lookups (${data.period})`, value: totalLookups.toLocaleString() },
-    { label: "Cache Rate", value: `${cacheRate}%` },
+    { label: "Cache Hit Rate", value: `${cacheRate}%` },
     { label: "LLM Calls", value: llmTotal.toLocaleString() },
     { label: "Gemini / OpenRouter", value: `${totalGemini} / ${totalOpenrouter}` },
   ];
@@ -316,8 +317,8 @@ export function renderMetrics(
     .map(
       (c) => `
       <div class="analytics-metric-card">
-        <span class="analytics-metric-label">${c.label}</span>
-        <span class="analytics-metric-value">${c.value}</span>
+        <span class="analytics-metric-label">${escHtml(c.label)}</span>
+        <span class="analytics-metric-value">${escHtml(c.value)}</span>
       </div>`,
     )
     .join("");
