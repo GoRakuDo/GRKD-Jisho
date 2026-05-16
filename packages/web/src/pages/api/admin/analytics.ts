@@ -35,7 +35,7 @@ interface SqlJsStatement {
   bind(params?: unknown[]): boolean;
   step(): boolean;
   getAsObject(params?: unknown[]): Record<string, unknown>;
-  free(): boolean;
+  free(): void;
 }
 
 interface SqlJsDatabase {
@@ -117,6 +117,12 @@ function buildBucketsFromRows(rows: HourlyStatRow[]): Record<string, BucketRespo
 
   for (const row of rows) {
     const bk = row.bucketKey || "unknown";
+    const totalLookups = Number(row.totalLookups ?? 0);
+    const cacheHits = Number(row.cacheHits ?? 0);
+    const cacheMisses = Number(row.cacheMisses ?? 0);
+    const llmGemini = Number(row.llmGemini ?? 0);
+    const llmOpenrouter = Number(row.llmOpenrouter ?? 0);
+
     if (!bucketMap.has(bk)) {
       bucketMap.set(bk, {
         totalLookups: 0, totalHits: 0, totalMisses: 0,
@@ -125,13 +131,13 @@ function buildBucketsFromRows(rows: HourlyStatRow[]): Record<string, BucketRespo
       });
     }
     const bucket = bucketMap.get(bk)!;
-    bucket.totalLookups += row.totalLookups;
-    bucket.totalHits += row.cacheHits;
+    bucket.totalLookups += totalLookups;
+    bucket.totalHits += cacheHits;
     // cacheMisses は「キャッシュ外だったが応答が生成された」行だけ数える。
     // LLM エラー行は lookup_logs に残さない設計なので、総 lookup と分母を揃える。
-    bucket.totalMisses += row.cacheMisses;
-    bucket.gemini += row.llmGemini;
-    bucket.openrouter += row.llmOpenrouter;
+    bucket.totalMisses += cacheMisses;
+    bucket.gemini += llmGemini;
+    bucket.openrouter += llmOpenrouter;
 
     if (!bucket.hourly.has(row.hour)) {
       bucket.hourly.set(row.hour, {
@@ -141,11 +147,11 @@ function buildBucketsFromRows(rows: HourlyStatRow[]): Record<string, BucketRespo
       });
     }
     const h = bucket.hourly.get(row.hour)!;
-    h.lookups += row.totalLookups;
-    h.cacheHits += row.cacheHits;
-    h.cacheMisses += row.cacheMisses;
-    h.llmGemini += row.llmGemini;
-    h.llmOpenrouter += row.llmOpenrouter;
+    h.lookups += totalLookups;
+    h.cacheHits += cacheHits;
+    h.cacheMisses += cacheMisses;
+    h.llmGemini += llmGemini;
+    h.llmOpenrouter += llmOpenrouter;
   }
 
   const buckets: Record<string, BucketResponse> = {};
