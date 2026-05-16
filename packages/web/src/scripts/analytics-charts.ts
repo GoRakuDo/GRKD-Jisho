@@ -416,7 +416,10 @@ export function renderDictionaryHits(
 export async function fetchAnalytics(
   period: Period,
 ): Promise<AnalyticsData> {
-  const res = await fetch(`/api/admin/analytics?period=${period}`, { credentials: "same-origin" });
+  const res = await fetch(`/api/admin/analytics?period=${period}`, {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
   if (!res.ok) {
     throw new Error(`Analytics API returned ${res.status}`);
   }

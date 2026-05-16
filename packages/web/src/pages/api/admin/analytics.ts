@@ -1,10 +1,9 @@
-import { resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import type { APIRoute } from "astro";
 import { getIsAuthenticated } from "../../../lib/locals";
 import { getSession } from "../../../lib/session";
 import { eq, gte, sql, count, and, lt } from "drizzle-orm";
-import { db, schema } from "@grkd-jisho/db";
+import { ANALYTICS_DB_PATH, db, schema } from "@grkd-jisho/db";
 
 /* ─── Types ──────────────────────────────────────────── */
 
@@ -34,7 +33,7 @@ interface HourlyStatRow {
 
 /* ─── SQLite reader ───────────────────────────────────── */
 
-const SQLITE_PATH = resolve(process.cwd(), "analytics", "stats.db");
+const SQLITE_PATH = ANALYTICS_DB_PATH;
 
 async function querySqlite(days: number): Promise<HourlyStatRow[] | null> {
   if (!existsSync(SQLITE_PATH)) return null;
@@ -73,7 +72,9 @@ async function querySqlite(days: number): Promise<HourlyStatRow[] | null> {
     db2.close();
 
     return results.length > 0 ? results : null;
-  } catch {
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(`[AnalyticsAPI] SQLite read failed: ${reason} → Falling back to PostgreSQL`);
     return null;
   }
 }
@@ -127,16 +128,16 @@ function buildBucketsFromRows(rows: HourlyStatRow[]): Record<string, BucketRespo
   }
 
   const buckets: Record<string, BucketResponse> = {};
-  for (const [bk, b] of bucketMap) {
-    const sortedHours = [...b.hourly.values()].sort(
-      (a, b2) => new Date(a.hour).getTime() - new Date(b2.hour).getTime(),
+  for (const [bk, bucket] of bucketMap) {
+    const sortedHours = [...bucket.hourly.values()].sort(
+      (a, b) => new Date(a.hour).getTime() - new Date(b.hour).getTime(),
     );
     buckets[bk] = {
-      totalLookups: b.totalLookups,
-      cacheHitRate: b.totalLookups > 0
-        ? +(b.totalHits / b.totalLookups).toFixed(4)
+      totalLookups: bucket.totalLookups,
+      cacheHitRate: bucket.totalLookups > 0
+        ? +(bucket.totalHits / bucket.totalLookups).toFixed(4)
         : 0,
-      llmUsage: { gemini: b.gemini, openrouter: b.openrouter },
+      llmUsage: { gemini: bucket.gemini, openrouter: bucket.openrouter },
       hourly: sortedHours,
     };
   }
@@ -155,7 +156,7 @@ export const GET: APIRoute = async (context) => {
   if (!session || !getIsAuthenticated(context)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   }
 
@@ -164,7 +165,7 @@ export const GET: APIRoute = async (context) => {
   if (days === null) {
     return new Response(JSON.stringify({ error: `Invalid period: ${period}` }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   }
 
@@ -205,7 +206,7 @@ export const GET: APIRoute = async (context) => {
     console.error(`[AnalyticsAPI] Query failed: ${reason} → Check analytics DB and lookup_logs`);
     return new Response(JSON.stringify({ error: "internal error" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
     });
   }
 };
@@ -262,7 +263,7 @@ async function respond(
         hitCount: Number(r.hitCount),
       })),
     }),
-    { status: 200, headers: { "Content-Type": "application/json" } },
+    { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } },
   );
 }
 

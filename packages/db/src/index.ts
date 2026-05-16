@@ -2,6 +2,7 @@ export { db } from "./client";
 export * from "./schema/index";
 import * as schema from "./schema/index";
 export { schema };
+export { ANALYTICS_DB_PATH } from "./config/analytics-path";
 
 // Admin services — shared between bot and web
 export * from "./services/date-utils";

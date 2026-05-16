@@ -1,4 +1,4 @@
-import { resolve, dirname } from "node:path";
+import { dirname } from "node:path";
 import {
   existsSync,
   mkdirSync,
@@ -8,10 +8,10 @@ import {
 } from "node:fs";
 import initSqlJs, { type Database as SqlJsDatabase } from "sql.js";
 import { gte, sql, lt, and } from "drizzle-orm";
-import { db, schema } from "@grkd-jisho/db";
+import { ANALYTICS_DB_PATH, db, schema } from "@grkd-jisho/db";
 
 /** SQLite ファイルの保存場所（repo root/analytics/stats.db） */
-const DB_PATH = resolve(process.cwd(), "analytics", "stats.db");
+const DB_PATH = ANALYTICS_DB_PATH;
 
 /* ─── SQLite init（sql.js の WASM ロードは 1 回だけ） ─── */
 

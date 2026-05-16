@@ -87,9 +87,10 @@ VALUES (...)
 
 ### 3. SQLite ファイル
 
-- パス: `analytics/stats.db`（repo root。bot / web の両方が `process.cwd()` 基準で参照）
+- パス: `analytics/stats.db`（repo root）
+- bot / web の両方が `ANALYTICS_DB_PATH`（`process.cwd()/../../analytics/stats.db`）を参照する
 - 実装は `sql.js` を使用
-- 永続化は WAL ではなく「メモリ DB を読み込み → 集計 → `export()` で書き戻し」方式
+- 永続化は WAL ではなく `PRAGMA journal_mode = MEMORY` + 「メモリ DB を読み込み → 集計 → `export()` で atomic rename 書き戻し」方式
 - cron は bot プロセス内の `node-cron` で実行
 
 ### 4. タイムフレームのクエリ
