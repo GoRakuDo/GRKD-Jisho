@@ -243,6 +243,25 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     font-size: 13px;
   }
 
+  /* ─── Summary footer row ─── */
+  :global(.analytics-tr-summary) {
+    border-top: 1px solid var(--color-graphite-300);
+    background: var(--color-porcelain-150);
+  }
+
+  :global(.analytics-td-summary) {
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-graphite-650);
+    vertical-align: middle;
+  }
+
+  :global(.analytics-td-summary.count) {
+    font-weight: 500;
+    font-family: var(--font-grkd-mono);
+  }
+
   :global(.analytics-td.count) {
     text-align: right;
     font-family: var(--font-grkd-mono);

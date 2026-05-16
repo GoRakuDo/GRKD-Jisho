@@ -78,6 +78,14 @@ export function renderRequestRateTable(
   const hourly = flattenHourly(data.buckets);
   hourly.reverse();
 
+  // Compute totals for summary footer
+  let totalLookups = 0;
+  let totalCacheMisses = 0;
+  for (const pt of hourly) {
+    totalLookups += pt.lookups;
+    totalCacheMisses += pt.cacheMisses;
+  }
+
   let html = `<table class="analytics-table">
     <thead>
       <tr>
@@ -100,7 +108,20 @@ export function renderRequestRateTable(
     }
   }
 
-  html += `</tbody></table>`;
+  html += `</tbody>`;
+
+  // Summary footer
+  if (hourly.length > 0) {
+    html += `<tfoot>
+      <tr class="analytics-tr-summary">
+        <td class="analytics-td-summary">Period Total</td>
+        <td class="analytics-td-summary count">${totalLookups.toLocaleString()}</td>
+        <td class="analytics-td-summary count">${totalCacheMisses.toLocaleString()}</td>
+      </tr>
+    </tfoot>`;
+  }
+
+  html += `</table>`;
   container.innerHTML = html;
 }
 
@@ -115,12 +136,24 @@ export function renderCacheRateTable(
   const hourly = flattenHourly(data.buckets);
   hourly.reverse();
 
+  // Compute totals for summary footer
+  let totalCacheHits = 0;
+  let totalLookups = 0;
+  for (const pt of hourly) {
+    totalCacheHits += pt.cacheHits;
+    totalLookups += pt.lookups;
+  }
+  const overallHitRate =
+    totalLookups > 0
+      ? ((totalCacheHits / totalLookups) * 100).toFixed(1)
+      : "0.0";
+
   let html = `<table class="analytics-table">
     <thead>
       <tr>
         <th class="analytics-th hour">Hour</th>
         <th class="analytics-th count">Cache Hits</th>
-        <th class="analytics-th count">Total</th>
+        <th class="analytics-th count">Lookups</th>
         <th class="analytics-th count">Hit Rate</th>
       </tr>
     </thead>
@@ -141,7 +174,21 @@ export function renderCacheRateTable(
     }
   }
 
-  html += `</tbody></table>`;
+  html += `</tbody>`;
+
+  // Summary footer
+  if (hourly.length > 0) {
+    html += `<tfoot>
+      <tr class="analytics-tr-summary">
+        <td class="analytics-td-summary">Period Total</td>
+        <td class="analytics-td-summary count">${totalCacheHits.toLocaleString()}</td>
+        <td class="analytics-td-summary count">${totalLookups.toLocaleString()}</td>
+        <td class="analytics-td-summary count">${overallHitRate}%</td>
+      </tr>
+    </tfoot>`;
+  }
+
+  html += `</table>`;
   container.innerHTML = html;
 }
 
