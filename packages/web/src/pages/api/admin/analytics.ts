@@ -31,6 +31,18 @@ interface HourlyStatRow {
   llmOpenrouter: number;
 }
 
+interface SqlJsStatement {
+  bind(params?: unknown[]): boolean;
+  step(): boolean;
+  getAsObject(params?: unknown[]): Record<string, unknown>;
+  free(): boolean;
+}
+
+interface SqlJsDatabase {
+  prepare(sql: string): SqlJsStatement;
+  close(): void;
+}
+
 /* ─── SQLite reader ───────────────────────────────────── */
 
 const SQLITE_PATH = ANALYTICS_DB_PATH;
@@ -38,22 +50,28 @@ const SQLITE_PATH = ANALYTICS_DB_PATH;
 async function querySqlite(days: number): Promise<HourlyStatRow[] | null> {
   if (!existsSync(SQLITE_PATH)) return null;
 
+  const until = new Date();
+  until.setMinutes(0, 0, 0);
+
+  let db2: SqlJsDatabase | undefined;
+  let stmt: SqlJsStatement | undefined;
+
   try {
     const initSqlJs = (await import("sql.js")).default;
     const SQL = await initSqlJs();
     const buffer = readFileSync(SQLITE_PATH);
-    const db2 = new SQL.Database(buffer);
+    db2 = new SQL.Database(buffer);
 
     const since = new Date(
       Date.now() - days * 24 * 60 * 60 * 1000,
     ).toISOString();
 
-    const stmt = db2.prepare(
+    stmt = db2.prepare(
       `SELECT * FROM hourly_stats
-       WHERE hour >= ?
+       WHERE hour >= ? AND hour < ?
        ORDER BY hour ASC, bucket_key ASC`,
     );
-    stmt.bind([since]);
+    stmt.bind([since, until.toISOString()]);
 
     const results: HourlyStatRow[] = [];
     while (stmt.step()) {
@@ -68,14 +86,15 @@ async function querySqlite(days: number): Promise<HourlyStatRow[] | null> {
         llmOpenrouter: Number(row.llm_openrouter ?? 0),
       });
     }
-    stmt.free();
-    db2.close();
 
     return results.length > 0 ? results : null;
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[AnalyticsAPI] SQLite read failed: ${reason} → Falling back to PostgreSQL`);
     return null;
+  } finally {
+    stmt?.free();
+    db2?.close();
   }
 }
 
@@ -108,6 +127,8 @@ function buildBucketsFromRows(rows: HourlyStatRow[]): Record<string, BucketRespo
     const bucket = bucketMap.get(bk)!;
     bucket.totalLookups += row.totalLookups;
     bucket.totalHits += row.cacheHits;
+    // cacheMisses は「キャッシュ外だったが応答が生成された」行だけ数える。
+    // LLM エラー行は lookup_logs に残さない設計なので、総 lookup と分母を揃える。
     bucket.totalMisses += row.cacheMisses;
     bucket.gemini += row.llmGemini;
     bucket.openrouter += row.llmOpenrouter;
@@ -174,6 +195,11 @@ export const GET: APIRoute = async (context) => {
     const sqliteRows = await querySqlite(days);
     if (sqliteRows) {
       const buckets = buildBucketsFromRows(sqliteRows);
+      const totalLookups = Object.values(buckets).reduce(
+        (sum, bucket) => sum + bucket.totalLookups,
+        0,
+      );
+      console.log(`[AnalyticsAPI] period=${period} source=sqlite totalLookups=${totalLookups} sqlitePath=${SQLITE_PATH}`);
       return respond(period, buckets, days);
     }
 
@@ -200,7 +226,13 @@ export const GET: APIRoute = async (context) => {
       .groupBy(sql`1`, schema.lookupLogs.outputBucketKey)
       .orderBy(sql`1`);
 
-    return respond(period, buildBucketsFromRows(hourlyRaw), days);
+    const buckets = buildBucketsFromRows(hourlyRaw);
+    const totalLookups = Object.values(buckets).reduce(
+      (sum, bucket) => sum + bucket.totalLookups,
+      0,
+    );
+    console.log(`[AnalyticsAPI] period=${period} source=postgres totalLookups=${totalLookups} sqlitePath=${SQLITE_PATH}`);
+    return respond(period, buckets, days);
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[AnalyticsAPI] Query failed: ${reason} → Check analytics DB and lookup_logs`);
