@@ -1,11 +1,9 @@
 /**
- * analytics-charts.ts — uPlot グラフレンダリング、データフェッチ、DOM更新
+ * analytics-charts.ts — テーブルレンダリングとデータ取得
  *
  * DESIGN.md 準拠の色・フォント・スペーシング。
  * Astro の <script> タグから import して使う。
  */
-import uPlot from "uplot";
-import "uplot/dist/uPlot.min.css";
 
 /* ── Types ──────────────────────────────────────────── */
 
@@ -37,36 +35,6 @@ export interface AnalyticsData {
 export const PERIODS = ["1d", "3d", "7d", "2w", "3w", "1m", "3m"] as const;
 export type Period = (typeof PERIODS)[number];
 
-/* ─── DESIGN TOKENS ─────────────────────────────────── */
-
-const COLORS = {
-  /** Primary chart series — from task spec */
-  series1: "oklch(0.623 0.214 259.815)",
-  /** Secondary chart series — from task spec */
-  series2: "oklch(0.546 0.245 262.881)",
-  /** Grid lines */
-  grid: "oklch(0.9 0.01 260)",
-  /** Axis labels */
-  axis: "oklch(0.57 0.014 255)",
-  /** Tooltip background (graphite-900, not pure black) */
-  tooltipBg: "oklch(0.2 0.018 255)",
-  /** Tooltip text (porcelain-50, not pure white) */
-  tooltipText: "oklch(0.97 0.012 95)",
-  /** Graphite-500 for muted elements */
-  muted: "oklch(0.57 0.014 255)",
-  /** Graphite-800 for headings */
-  heading: "oklch(0.27 0.018 255)",
-  /** Porcelain-50 for page bg */
-  pageBg: "oklch(0.97 0.012 95)",
-} as const;
-
-const FONT_MONO = '"JetBrains Mono", "IBM Plex Mono", SFMono-Regular, ui-monospace, monospace';
-
-/* ─── UPlot INSTANCES ───────────────────────────────── */
-
-let requestRateChart: uPlot | null = null;
-let cacheRateChart: uPlot | null = null;
-
 /* ─── DATA HELPERS ──────────────────────────────────── */
 
 /** Flatten hourly data from all buckets, sorted chronologically */
@@ -84,178 +52,97 @@ function flattenHourly(buckets: Record<string, BucketData>): HourlyPoint[] {
   return all;
 }
 
-/** Build uPlot data for request rate chart (2 series: lookups, misses) */
-function buildReqRateData(hourly: HourlyPoint[]): uPlot.AlignedData {
-  const t: number[] = [];
-  const lookups: number[] = [];
-  const misses: number[] = [];
-  for (const pt of hourly) {
-    t.push(new Date(pt.hour).getTime() / 1000);
-    lookups.push(pt.lookups);
-    misses.push(pt.cacheMisses);
-  }
-  return [t, lookups, misses];
-}
-
-/** Build uPlot data for cache hit rate chart (1 series: percentage) */
-function buildCacheRateData(hourly: HourlyPoint[]): uPlot.AlignedData {
-  const t: number[] = [];
-  const rates: number[] = [];
-  for (const pt of hourly) {
-    t.push(new Date(pt.hour).getTime() / 1000);
-    // Cache Hit Rate は全 lookup を母数にする。
-    // cacheMisses は「レスポンスが作れた失敗分」だけなので、母数にするとズレる。
-    rates.push(pt.lookups > 0 ? +((pt.cacheHits / pt.lookups) * 100).toFixed(1) : 0);
-  }
-  return [t, rates];
-}
-
-/** Format timestamp (seconds) to Jakarta time label */
-function fmtTime(tsSec: number): string {
+/** Format ISO hour string to Jakarta time label */
+function fmtJakartaHour(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Jakarta",
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(tsSec * 1000));
+  }).format(d);
 }
 
-/* ─── UPLOT OPTIONS ──────────────────────────────────── */
+/* ─── TABLE RENDERERS ────────────────────────────────── */
 
-function reqRateOptions(container: HTMLElement): uPlot.Options {
-  const W = container.clientWidth || 600;
-
-  return {
-    width: W,
-    height: 300,
-    cursor: {
-      show: true,
-      drag: { x: false, y: false },
-    },
-    select: { show: false, left: 0, top: 0, width: 0, height: 0 },
-    legend: { show: true },
-    axes: [
-      {
-        stroke: COLORS.axis,
-        grid: { stroke: COLORS.grid, width: 1 },
-        ticks: { stroke: COLORS.grid, width: 1 },
-        font: `11px ${FONT_MONO}`,
-        values: (_self: uPlot, ticks: number[]) => ticks.map(fmtTime),
-      },
-      {
-        stroke: COLORS.axis,
-        grid: { stroke: COLORS.grid, width: 1 },
-        ticks: { stroke: COLORS.grid, width: 1 },
-        font: `11px ${FONT_MONO}`,
-        size: 50,
-        label: "requests / hour",
-        labelSize: 14,
-        labelFont: `11px ${FONT_MONO}`,
-      },
-    ],
-    series: [
-      {},
-      {
-        label: "Lookups",
-        stroke: COLORS.series1,
-        width: 2,
-        points: { size: 4, stroke: COLORS.series1, width: 1 },
-        fill: `${COLORS.series1}15`,
-      },
-      {
-        label: "Cache Misses",
-        stroke: COLORS.series2,
-        width: 1.5,
-        points: { size: 3, stroke: COLORS.series2, width: 1 },
-        dash: [6, 3],
-      },
-    ],
-  };
-}
-
-function cacheRateOptions(container: HTMLElement): uPlot.Options {
-  const W = container.clientWidth || 600;
-
-  return {
-    width: W,
-    height: 300,
-    cursor: {
-      show: true,
-      drag: { x: false, y: false },
-    },
-    select: { show: false, left: 0, top: 0, width: 0, height: 0 },
-    legend: { show: true },
-    scales: {
-      x: { time: true },
-      y: { range: [0, 100] },
-    },
-    axes: [
-      {
-        stroke: COLORS.axis,
-        grid: { stroke: COLORS.grid, width: 1 },
-        ticks: { stroke: COLORS.grid, width: 1 },
-        font: `11px ${FONT_MONO}`,
-        values: (_self: uPlot, ticks: number[]) => ticks.map(fmtTime),
-      },
-      {
-        stroke: COLORS.axis,
-        grid: { stroke: COLORS.grid, width: 1 },
-        ticks: { stroke: COLORS.grid, width: 1 },
-        font: `11px ${FONT_MONO}`,
-        size: 50,
-        label: "hit rate %",
-        labelSize: 14,
-        labelFont: `11px ${FONT_MONO}`,
-      },
-    ],
-    series: [
-      {},
-      {
-        label: "Cache Hit Rate",
-        stroke: COLORS.series1,
-        width: 2,
-        points: { size: 4, stroke: COLORS.series1, width: 1 },
-        fill: `${COLORS.series1}15`,
-      },
-    ],
-  };
-}
-
-/* ─── INIT / RENDER ─────────────────────────────────── */
-
-export function initRequestRateChart(
+/**
+ * Request Rate テーブル — 3列: Hour, Lookups, Cache Misses
+ * 時系列降順（新しいhourが上）
+ */
+export function renderRequestRateTable(
   container: HTMLElement,
   data: AnalyticsData,
-): uPlot {
+): void {
   const hourly = flattenHourly(data.buckets);
-  const uData = buildReqRateData(hourly);
-  const opts = reqRateOptions(container);
+  hourly.reverse();
 
-  if (requestRateChart) {
-    requestRateChart.setData(uData);
-    return requestRateChart;
+  let html = `<table class="analytics-table">
+    <thead>
+      <tr>
+        <th class="analytics-th hour">Hour</th>
+        <th class="analytics-th count">Lookups</th>
+        <th class="analytics-th count">Cache Misses</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  if (hourly.length === 0) {
+    html += `<tr><td colspan="3" class="analytics-empty">No data for this period</td></tr>`;
+  } else {
+    for (const pt of hourly) {
+      html += `<tr class="analytics-tr">
+        <td class="analytics-td">${escHtml(fmtJakartaHour(pt.hour))}</td>
+        <td class="analytics-td count">${pt.lookups.toLocaleString()}</td>
+        <td class="analytics-td count">${pt.cacheMisses.toLocaleString()}</td>
+      </tr>`;
+    }
   }
 
-  requestRateChart = new uPlot(opts, uData, container);
-  return requestRateChart;
+  html += `</tbody></table>`;
+  container.innerHTML = html;
 }
 
-export function initCacheRateChart(
+/**
+ * Cache Hit Rate テーブル — 4列: Hour, Cache Hits, Total, Hit Rate
+ * 時系列降順
+ */
+export function renderCacheRateTable(
   container: HTMLElement,
   data: AnalyticsData,
-): uPlot {
+): void {
   const hourly = flattenHourly(data.buckets);
-  const uData = buildCacheRateData(hourly);
-  const opts = cacheRateOptions(container);
+  hourly.reverse();
 
-  if (cacheRateChart) {
-    cacheRateChart.setData(uData);
-    return cacheRateChart;
+  let html = `<table class="analytics-table">
+    <thead>
+      <tr>
+        <th class="analytics-th hour">Hour</th>
+        <th class="analytics-th count">Cache Hits</th>
+        <th class="analytics-th count">Total</th>
+        <th class="analytics-th count">Hit Rate</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  if (hourly.length === 0) {
+    html += `<tr><td colspan="4" class="analytics-empty">No data for this period</td></tr>`;
+  } else {
+    for (const pt of hourly) {
+      const total = pt.lookups;
+      const hitRate = total > 0 ? ((pt.cacheHits / total) * 100).toFixed(1) : "0.0";
+      html += `<tr class="analytics-tr">
+        <td class="analytics-td">${escHtml(fmtJakartaHour(pt.hour))}</td>
+        <td class="analytics-td count">${pt.cacheHits.toLocaleString()}</td>
+        <td class="analytics-td count">${total.toLocaleString()}</td>
+        <td class="analytics-td count">${hitRate}%</td>
+      </tr>`;
+    }
   }
 
-  cacheRateChart = new uPlot(opts, uData, container);
-  return cacheRateChart;
+  html += `</tbody></table>`;
+  container.innerHTML = html;
 }
 
 /* ─── PERIOD BUTTONS ────────────────────────────────── */
@@ -391,13 +278,15 @@ export function renderDictionaryHits(
     for (let i = 0; i < top.length; i++) {
       const item = top[i];
       if (!item) continue;
+      // pct derives from numeric-only fields — safe for style attr interpolation
       const pct = maxCount > 0 ? (item.hitCount / maxCount) * 100 : 0;
+      const safePct = Math.max(4, Math.min(100, pct));
       html += `
         <div class="analytics-bar-row">
           <span class="analytics-bar-rank">${i + 1}</span>
           <span class="analytics-bar-name">${escHtml(item.dictionaryName)}</span>
           <div class="analytics-bar-track">
-            <div class="analytics-bar-fill" style="width:${Math.max(pct, 4)}%"></div>
+            <div class="analytics-bar-fill" style="width:${safePct}%"></div>
           </div>
           <span class="analytics-bar-count">${item.hitCount.toLocaleString()}</span>
         </div>`;
@@ -441,16 +330,6 @@ export async function initAnalyticsPage(
   queriesContainer: HTMLElement,
   dictHitsContainer: HTMLElement,
 ): Promise<void> {
-  // uPlot はリサイズを自動追尾しないので ResizeObserver で監視
-  const resizeObserver = new ResizeObserver(() => {
-    const rw = reqRateContainer.clientWidth;
-    const cw = cacheRateContainer.clientWidth;
-    if (requestRateChart && rw > 0) requestRateChart.setSize({ width: rw, height: 300 });
-    if (cacheRateChart && cw > 0) cacheRateChart.setSize({ width: cw, height: 300 });
-  });
-  resizeObserver.observe(reqRateContainer);
-  resizeObserver.observe(cacheRateContainer);
-
   const loadData = async (period: Period) => {
     const data = await fetchAnalytics(period);
 
@@ -460,11 +339,11 @@ export async function initAnalyticsPage(
     // Update metric cards
     renderMetrics(metricsContainer, data);
 
-    // Update charts
-    initRequestRateChart(reqRateContainer, data);
-    initCacheRateChart(cacheRateContainer, data);
-
     // Update tables
+    renderRequestRateTable(reqRateContainer, data);
+    renderCacheRateTable(cacheRateContainer, data);
+
+    // Update other tables
     renderPopularQueries(queriesContainer, data.popularQueries);
     renderDictionaryHits(dictHitsContainer, data.dictionaryHits);
   };

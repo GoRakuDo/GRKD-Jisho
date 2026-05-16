@@ -10,22 +10,22 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     <!-- Metric cards — rendered by JS -->
     <div id="analytics-metrics" class="analytics-metrics"></div>
 
-    <!-- Request Rate chart -->
-    <div class="analytics-chart-card">
-      <div class="analytics-chart-header">
-        <h2 class="analytics-chart-title">Request Rate</h2>
-        <span class="analytics-chart-sub">requests / hour — lookups vs cache misses</span>
-      </div>
-      <div id="analytics-chart-reqrate" class="analytics-chart-container"></div>
+    <!-- Request Rate table -->
+    <div class="analytics-panel analytics-panel-table">
+      <h3 class="analytics-panel-title">
+        Request Rate
+        <span class="analytics-panel-sub">— requests / hour, lookups vs cache misses</span>
+      </h3>
+      <div id="analytics-reqrate-table"></div>
     </div>
 
-    <!-- Cache Hit Rate chart -->
-    <div class="analytics-chart-card">
-      <div class="analytics-chart-header">
-        <h2 class="analytics-chart-title">Cache Hit Rate</h2>
-        <span class="analytics-chart-sub">percentage of lookups served from cache</span>
-      </div>
-      <div id="analytics-chart-cacherate" class="analytics-chart-container"></div>
+    <!-- Cache Hit Rate table -->
+    <div class="analytics-panel analytics-panel-table">
+      <h3 class="analytics-panel-title">
+        Cache Hit Rate
+        <span class="analytics-panel-sub">— percentage of lookups served from cache</span>
+      </h3>
+      <div id="analytics-cacherate-table"></div>
     </div>
 
     <!-- Two-column tables -->
@@ -42,8 +42,8 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   const els = {
     periodBtn: document.getElementById("analytics-periods"),
     metrics: document.getElementById("analytics-metrics"),
-    reqRate: document.getElementById("analytics-chart-reqrate"),
-    cacheRate: document.getElementById("analytics-chart-cacherate"),
+    reqRate: document.getElementById("analytics-reqrate-table"),
+    cacheRate: document.getElementById("analytics-cacherate-table"),
     queries: document.getElementById("analytics-queries"),
     dictHits: document.getElementById("analytics-dicthits"),
   };
@@ -152,41 +152,6 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     letter-spacing: -0.015em;
     line-height: 1.2;
     font-family: var(--font-grkd-sans);
-  }
-
-  /* ─── Chart cards ─── */
-  .analytics-chart-card {
-    background: var(--color-porcelain-100);
-    border: 1px solid var(--color-graphite-180);
-    border-radius: var(--radius-panel);
-    overflow: hidden;
-  }
-
-  .analytics-chart-header {
-    padding: 16px 20px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .analytics-chart-title {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--color-graphite-800);
-    font-family: var(--font-grkd-sans);
-    letter-spacing: -0.01em;
-  }
-
-  .analytics-chart-sub {
-    font-size: 12px;
-    color: var(--color-graphite-500);
-    font-family: var(--font-grkd-sans);
-  }
-
-  .analytics-chart-container {
-    padding: 8px 0 0;
-    min-height: 300px;
   }
 
   /* ─── Tables row (2-column) ─── */
@@ -364,18 +329,17 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     flex-shrink: 0;
   }
 
-  /* ─── uPlot overrides ─── */
-  :global(.u-title) {
-    font-family: var(--font-grkd-sans) !important;
+  /* ─── Panel subtitle ─── */
+  :global(.analytics-panel-sub) {
+    font-weight: 400;
+    font-size: 12px;
+    color: var(--color-graphite-500);
+    margin-left: 6px;
   }
 
-  :global(.u-legend) {
-    font-family: var(--font-grkd-sans) !important;
-    font-size: 12px !important;
-  }
-
-  :global(.u-select) {
-    background: var(--color-royal-blue-100) !important;
+  /* ─── Hour column width ─── */
+  :global(.analytics-th.hour) {
+    min-width: 140px;
   }
 
   /* ─── Responsive ─── */

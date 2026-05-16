@@ -28,7 +28,6 @@
     "speakeasy": "^2.0.0",
     "sql.js": "^1.14.1",
     "tailwindcss": "^4.2.4",
-    "uplot": "^1.6.30",
     "zod": "^4.4.3"
   },
   "devDependencies": {
