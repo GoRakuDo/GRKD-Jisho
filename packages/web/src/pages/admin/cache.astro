@@ -156,7 +156,10 @@ if (session?.isAdmin) {
   {query && searchResults.length > 0 && (
     <CacheDeletePanel
       client:load
-      entries={searchResults}
+      entries={searchResults.map((entry) => ({
+        ...entry,
+        outputBucketLabel: getOutputBucketLabel(entry.roleKey),
+      }))}
       csrfToken={csrfToken}
     />
   )}
@@ -166,15 +169,19 @@ if (session?.isAdmin) {
       <table class="data-table">
         <thead>
           <tr>
+            <th>Select</th>
             <th>ID</th>
             <th>Query</th>
-            <th>Manual</th>
+            <th>Prompt Version</th>
+            <th>Output Bucket</th>
+            <th>Protection</th>
             <th>Updated</th>
+            <th>Edit</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td colspan="4" class="empty-cell">No cache entries found for "{query}".</td>
+            <td colspan="8" class="empty-cell">No cache entries found for "{query}".</td>
           </tr>
         </tbody>
       </table>

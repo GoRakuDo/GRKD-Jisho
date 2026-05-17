@@ -4,6 +4,8 @@ import CacheEditModal from "./CacheEditModal";
 interface CacheEntry {
   id: string;
   query: string;
+  promptVersion: string;
+  outputBucketLabel: string;
   isManualOverride: boolean;
   isDeleteProtected: boolean;
   updatedAt?: Date | null;
@@ -198,8 +200,9 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
               </th>
               <th className="px-4 py-3">ID</th>
               <th className="px-4 py-3">Query</th>
-              <th className="px-4 py-3">Manual</th>
-              <th className="px-4 py-3">Delete</th>
+              <th className="px-4 py-3">Prompt Version</th>
+              <th className="px-4 py-3">Output Bucket</th>
+              <th className="px-4 py-3">Protection</th>
               <th className="px-4 py-3">Updated</th>
               <th className="w-14 px-4 py-3 text-center">Edit</th>
             </tr>
@@ -223,27 +226,35 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
                   </td>
                   <td className="px-4 py-3 font-mono text-[13px] text-graphite-800">{entry.id}</td>
                   <td className="px-4 py-3 text-[14px] text-graphite-800">{entry.query}</td>
-                  <td className="px-4 py-3">
-                    {entry.isManualOverride ? (
-                      <span className="inline-flex rounded-full bg-royal-blue-100 px-2.5 py-1 text-[12px] font-semibold text-royal-blue-700">
-                        manual
-                      </span>
-                    ) : (
-                      <span className="inline-flex rounded-full bg-porcelain-150 px-2.5 py-1 text-[12px] font-semibold text-graphite-650">
-                        auto
-                      </span>
-                    )}
+                  <td className="px-4 py-3 font-mono text-[13px] text-graphite-650">
+                    {entry.promptVersion}
                   </td>
                   <td className="px-4 py-3">
-                    {entry.isDeleteProtected ? (
-                      <span className="inline-flex rounded-full bg-danger-100 px-2.5 py-1 text-[12px] font-semibold text-danger-700">
-                        locked
-                      </span>
-                    ) : (
-                      <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[12px] font-semibold text-emerald-700">
-                        open
-                      </span>
-                    )}
+                    <span className="inline-flex rounded-full bg-porcelain-150 px-2.5 py-1 text-[12px] font-semibold text-graphite-700">
+                      {entry.outputBucketLabel}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      {entry.isManualOverride ? (
+                        <span className="inline-flex rounded-full bg-royal-blue-100 px-2.5 py-1 text-[12px] font-semibold text-royal-blue-700">
+                          manual
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-porcelain-150 px-2.5 py-1 text-[12px] font-semibold text-graphite-650">
+                          auto
+                        </span>
+                      )}
+                      {entry.isDeleteProtected ? (
+                        <span className="inline-flex rounded-full bg-danger-100 px-2.5 py-1 text-[12px] font-semibold text-danger-700">
+                          locked
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-[12px] font-semibold text-emerald-700">
+                          open
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 font-mono text-[13px] text-graphite-650">
                     {entry.updatedAt

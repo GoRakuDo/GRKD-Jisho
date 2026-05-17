@@ -51,6 +51,7 @@ export async function searchCacheEntries(
     query: string;
     roleKey: string;
     modelName: string;
+    promptVersion: string;
     isManualOverride: boolean;
     isDeleteProtected: boolean;
     updatedAt: Date | null;
@@ -62,6 +63,7 @@ export async function searchCacheEntries(
       query: schema.responseCache.query,
       roleKey: schema.responseCache.roleKey,
       modelName: schema.responseCache.modelName,
+      promptVersion: schema.responseCache.promptVersion,
       isManualOverride: schema.responseCache.isManualOverride,
       isDeleteProtected: schema.responseCache.isDeleteProtected,
       updatedAt: schema.responseCache.updatedAt,
