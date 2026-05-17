@@ -178,7 +178,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
       </div>
 
       <div className="mt-4 overflow-x-auto rounded-[16px] border border-graphite-180 bg-porcelain-50">
-        <table className="min-w-[980px] border-collapse text-left text-[14px]">
+        <table className="w-full min-w-[980px] border-collapse text-left text-[14px]">
           <thead className="bg-porcelain-150 text-[12px] uppercase tracking-[0.08em] text-graphite-500">
             <tr>
               <th className="w-10 px-4 py-3">
