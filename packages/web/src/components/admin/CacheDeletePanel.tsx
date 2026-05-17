@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from "react";
 import CacheEditModal from "./CacheEditModal";
+import { getShortModelLabel } from "../../lib/model-label";
 
 interface CacheEntry {
   id: string;
   query: string;
+  modelName: string;
   promptVersion: string;
   outputBucketLabel: string;
   isManualOverride: boolean;
@@ -176,7 +178,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
       </div>
 
       <div className="mt-4 overflow-x-auto rounded-[16px] border border-graphite-180 bg-porcelain-50">
-        <table className="min-w-full border-collapse text-left text-[14px]">
+        <table className="min-w-[980px] border-collapse text-left text-[14px]">
           <thead className="bg-porcelain-150 text-[12px] uppercase tracking-[0.08em] text-graphite-500">
             <tr>
               <th className="w-10 px-4 py-3">
@@ -201,6 +203,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
               <th className="px-4 py-3">ID</th>
               <th className="px-4 py-3">Query</th>
               <th className="px-4 py-3">Prompt Version</th>
+              <th className="px-4 py-3">Model</th>
               <th className="px-4 py-3">Output Bucket</th>
               <th className="px-4 py-3">Protection</th>
               <th className="px-4 py-3">Updated</th>
@@ -228,6 +231,14 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
                   <td className="px-4 py-3 text-[14px] text-graphite-800">{entry.query}</td>
                   <td className="px-4 py-3 font-mono text-[13px] text-graphite-650">
                     {entry.promptVersion}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className="inline-flex rounded-full border border-royal-blue-100 bg-royal-blue-50 px-2.5 py-1 text-[12px] font-semibold text-royal-blue-700"
+                      title={entry.modelName}
+                    >
+                      {getShortModelLabel(entry.modelName)}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex rounded-full bg-porcelain-150 px-2.5 py-1 text-[12px] font-semibold text-graphite-700">

@@ -117,6 +117,7 @@ export async function bulkDeleteCache(ids: string[], forceDeleteProtected = fals
 export interface RecentCacheActivityRow {
   activity: "added" | "edited";
   query: string;
+  modelName: string;
   roleKey: string;
   promptVersion: string;
   createdAt: Date | null;
@@ -134,6 +135,7 @@ export async function getRecentCacheActivity(limit = 10): Promise<RecentCacheAct
     db
       .select({
         query: schema.responseCache.query,
+        modelName: schema.responseCache.modelName,
         roleKey: schema.responseCache.roleKey,
         promptVersion: schema.responseCache.promptVersion,
         createdAt: schema.responseCache.createdAt,
@@ -144,6 +146,7 @@ export async function getRecentCacheActivity(limit = 10): Promise<RecentCacheAct
     db
       .select({
         query: schema.responseCache.query,
+        modelName: schema.responseCache.modelName,
         roleKey: schema.responseCache.roleKey,
         promptVersion: schema.responseCache.promptVersion,
         createdAt: schema.responseEdits.createdAt,
@@ -161,6 +164,7 @@ export async function getRecentCacheActivity(limit = 10): Promise<RecentCacheAct
     ...addedRows.map((row) => ({
       activity: "added" as const,
       query: row.query,
+      modelName: row.modelName,
       roleKey: row.roleKey,
       promptVersion: row.promptVersion,
       createdAt: row.createdAt,
@@ -168,6 +172,7 @@ export async function getRecentCacheActivity(limit = 10): Promise<RecentCacheAct
     ...editedRows.map((row) => ({
       activity: "edited" as const,
       query: row.query,
+      modelName: row.modelName,
       roleKey: row.roleKey,
       promptVersion: row.promptVersion,
       createdAt: row.createdAt,

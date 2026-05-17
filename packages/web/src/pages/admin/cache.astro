@@ -2,6 +2,7 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
 import { getCacheStats, getRecentCacheActivity, searchCacheEntries, getOutputBucketLabel } from "@grkd-jisho/db";
+import { getShortModelLabel } from "../../lib/model-label";
 import { CacheDeletePanel } from "../../components/admin/CacheDeletePanel";
 import { generateCsrfToken } from "../../lib/csrf";
 
@@ -69,6 +70,7 @@ if (session?.isAdmin) {
               <th class="col-query" scope="col">Query</th>
               <th class="col-state" scope="col">State</th>
               <th class="col-prompt" scope="col">Prompt version</th>
+              <th class="col-model" scope="col">Model</th>
               <th class="col-role" scope="col">Output Bucket</th>
             </tr>
           </thead>
@@ -102,6 +104,9 @@ if (session?.isAdmin) {
                 </td>
                 <td class="col-prompt mono">
                   <span class="prompt-pill" title="Current cache row prompt version">{entry.promptVersion}</span>
+                </td>
+                <td class="col-model">
+                  <span class="model-pill" title={entry.modelName}>{getShortModelLabel(entry.modelName)}</span>
                 </td>
                 <td class="col-role">
                   <span class="role-pill">{getOutputBucketLabel(entry.roleKey)}</span>
@@ -173,6 +178,7 @@ if (session?.isAdmin) {
             <th>ID</th>
             <th>Query</th>
             <th>Prompt Version</th>
+            <th>Model</th>
             <th>Output Bucket</th>
             <th>Protection</th>
             <th>Updated</th>
@@ -181,7 +187,7 @@ if (session?.isAdmin) {
         </thead>
         <tbody>
           <tr>
-            <td colspan="8" class="empty-cell">No cache entries found for "{query}".</td>
+            <td colspan="9" class="empty-cell">No cache entries found for "{query}".</td>
           </tr>
         </tbody>
       </table>
@@ -563,7 +569,7 @@ if (session?.isAdmin) {
 
   .activity-table {
     width: 100%;
-    min-width: 920px;
+    min-width: 1040px;
     border-collapse: collapse;
   }
 
@@ -606,6 +612,7 @@ if (session?.isAdmin) {
 
   .state-pill,
   .prompt-pill,
+  .model-pill,
   .role-pill {
     display: inline-flex;
     align-items: center;
@@ -636,6 +643,14 @@ if (session?.isAdmin) {
     color: var(--color-graphite-650);
   }
 
+  .model-pill {
+    padding: 4px 10px;
+    background: var(--color-royal-blue-50);
+    border: 1px solid var(--color-royal-blue-100);
+    color: var(--color-royal-blue-700);
+    font-weight: 600;
+  }
+
   .role-pill {
     padding: 4px 10px;
     background: var(--color-porcelain-100);
@@ -643,6 +658,14 @@ if (session?.isAdmin) {
     color: var(--color-graphite-800);
     font-weight: 500;
   }
+
+  .col-no { width: 64px; }
+  .col-time { width: 200px; }
+  .col-query { width: auto; }
+  .col-state { width: 100px; }
+  .col-prompt { width: 170px; }
+  .col-model { width: 140px; }
+  .col-role { width: 180px; }
 
   .activity-empty {
     padding: 28px 20px 30px;
