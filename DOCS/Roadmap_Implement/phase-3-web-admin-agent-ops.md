@@ -663,7 +663,6 @@ AIエージェントが、変更前に影響範囲を確認できるようにす
 ### 追加tool
 
 ```txt
-grkd-jisho.dry_run_wipe
 grkd-jisho.dry_run_rate_limit_change
 grkd-jisho.dry_run_cache_refresh
 ```
@@ -690,29 +689,6 @@ MCP_ENABLE_DRY_RUN=false
 
 `withAudit()` は `dryRun` option を受け取れる形に変える。
 既存 Level 1 は `dryRun=false`、Level 2 は `dryRun=true`。
-
-### `grkd-jisho.dry_run_wipe`
-
-入力:
-
-```txt
-guild_id
-channel_id
-```
-
-返すもの:
-
-```txt
-channel_settings row
-wipe_enabled
-last_wipe_at
-recent wipe events
-would_require_bot_final_check=true
-```
-
-重要。
-MCP は Discord API を呼ばないため、pin数や現在のBot権限は正確には見られない。
-最終実行時に Bot 側で再チェックする。
 
 ### `grkd-jisho.dry_run_rate_limit_change`
 
@@ -850,7 +826,6 @@ Step G: MCP dry-run
 
 | tool | 目的 | DB write | Discord API | audit | 備考 |
 |---|---|---:|---:|---:|---|
-| `grkd-jisho.dry_run_wipe` | wipe設定/最近のwipeイベント確認 | no | no | `dry_run=true` | 最終実行はBot側で権限/ピン等を再確認 |
 | `grkd-jisho.dry_run_rate_limit_change` | new limit適用時の超過ユーザー見積もり | no | no | `dry_run=true` | `user_usage` はロール所属を持たない制約あり |
 | `grkd-jisho.dry_run_cache_refresh` | cache refreshの削除対象見積もり | no | no | `dry_run=true` | manual overrideは除外（deletable=total-manual） |
 
@@ -954,14 +929,6 @@ Step H: Verification
 - DB-only service を `@grkd-jisho/db` に寄せる。
 - Bot/Web は同じ service を使う。
 
-### Risk 3: dry_run_wipe がDiscordの実状態を見られない
-
-対処:
-
-- MCPはDB-only previewに限定。
-- `would_require_bot_final_check=true` を返す。
-- 実行時のpin保持・権限・24hフィルタは Bot が再確認。
-
 ### Risk 4: ops_jobs の承認レース
 
 対処:
@@ -1054,7 +1021,6 @@ Step H: Verification
 
 - [x] `MCP_ENABLE_DRY_RUN=false` では Level 2 tool が登録されない
 - [x] `MCP_ENABLE_DRY_RUN=true` で Level 2 tool が登録される
-- [x] `grkd-jisho.dry_run_wipe` がDB更新なしで結果を返す
 - [x] `grkd-jisho.dry_run_rate_limit_change` が影響人数を返す
 - [x] `grkd-jisho.dry_run_cache_refresh` がmanual overrideを除いた件数を返す
 - [x] 全dry-run tool call が `mcp_audit_logs.dry_run=true` で残る

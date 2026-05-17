@@ -1114,7 +1114,6 @@ Level 2 dry-run tools は `MCP_ENABLE_DRY_RUN=true` の時だけ登録する。
 
 | Tool | 説明 |
 |---|---|
-| `grkd-jisho.dry_run_wipe` | 対象チャンネル、pin数、必要権限を確認。削除はしない |
 | `grkd-jisho.dry_run_rate_limit_change` | rate limit変更後の影響ユーザー数を確認 |
 | `grkd-jisho.dry_run_cache_refresh` | cache refresh対象件数を確認 |
 
@@ -1146,7 +1145,7 @@ Level 2 dry-run tools は `MCP_ENABLE_DRY_RUN=true` の時だけ登録する。
 2. heartbeat が古い場合は grkd-jisho.recent_errors
 3. trace failure がある場合は grkd-jisho.get_trace
 4. LLMエラー増加なら fallback 状態を確認
-5. wipe失敗なら grkd-jisho.wipe_status と dry_run_wipe
+5. wipe失敗なら grkd-jisho.wipe_status を確認
 6. 危険操作が必要なら ops_jobs を作り、人間承認待ちにする
 ```
 

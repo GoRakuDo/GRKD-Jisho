@@ -3,7 +3,7 @@ import type { APIRoute } from "astro";
 import { getIsAuthenticated } from "../../../lib/locals";
 import { getSession } from "../../../lib/session";
 import { eq, gte, sql, count, and, lt } from "drizzle-orm";
-import { ANALYTICS_DB_PATH, db, schema } from "@grkd-jisho/db";
+import { ANALYTICS_DB_PATH, db, mergePopularQueries, schema } from "@grkd-jisho/db";
 
 /* ─── Types ──────────────────────────────────────────── */
 
@@ -257,21 +257,21 @@ async function respond(
 ): Promise<Response> {
   const since = sql`now() - ${days}::int * interval '1 day'`;
 
-  const [popularQueries, dictionaryHits] = await Promise.all([
-    db
-      .select({
-        query: schema.lookupLogs.normalizedQuery,
-        count: count(schema.lookupLogs.id),
-      })
-      .from(schema.lookupLogs)
-      .where(gte(schema.lookupLogs.createdAt, since))
-      .groupBy(schema.lookupLogs.normalizedQuery)
-      .orderBy(sql`count desc`)
-      .limit(20),
-    db
-      .select({
-        dictionaryName: schema.dictionaries.name,
-        hitCount: count(schema.lookupLogs.id),
+    const [popularQueryRows, dictionaryHits] = await Promise.all([
+      db
+        .select({
+          query: schema.lookupLogs.normalizedQuery,
+          count: count(schema.lookupLogs.id),
+        })
+        .from(schema.lookupLogs)
+        .where(gte(schema.lookupLogs.createdAt, since))
+        .groupBy(schema.lookupLogs.normalizedQuery)
+        .orderBy(sql`count desc`)
+        .limit(200),
+      db
+        .select({
+          dictionaryName: schema.dictionaries.name,
+          hitCount: count(schema.lookupLogs.id),
       })
       .from(schema.lookupLogs)
       .leftJoin(
@@ -290,19 +290,17 @@ async function respond(
   ]);
 
   return new Response(
-    JSON.stringify({
-      period,
-      buckets,
-      popularQueries: popularQueries.map((r) => ({
-        query: r.query, count: Number(r.count),
-      })),
-      dictionaryHits: dictionaryHits.map((r) => ({
-        dictionaryName: r.dictionaryName ?? "unknown",
-        hitCount: Number(r.hitCount),
-      })),
-    }),
-    { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } },
-  );
+      JSON.stringify({
+        period,
+        buckets,
+        popularQueries: mergePopularQueries(popularQueryRows, 20),
+        dictionaryHits: dictionaryHits.map((r) => ({
+          dictionaryName: r.dictionaryName ?? "unknown",
+          hitCount: Number(r.hitCount),
+        })),
+      }),
+      { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } },
+    );
 }
 
 /** Convert period string to number of days */

@@ -2,7 +2,7 @@ import type { APIRoute } from "astro";
 import { getIsAuthenticated } from "../../../lib/locals";
 import { getSession } from "../../../lib/session";
 import { eq, and, gte, sql, count } from "drizzle-orm";
-import { db, schema } from "@grkd-jisho/db";
+import { db, mergePopularQueries, schema } from "@grkd-jisho/db";
 
 export const GET: APIRoute = async (context) => {
   const session = getSession(context);
@@ -43,7 +43,7 @@ export const GET: APIRoute = async (context) => {
         : "0.0";
 
     // Popular queries
-    const popularQueries = await db
+    const popularQueryRows = await db
       .select({
         query: schema.lookupLogs.normalizedQuery,
         count: count(schema.lookupLogs.id),
@@ -52,7 +52,7 @@ export const GET: APIRoute = async (context) => {
       .where(gte(schema.lookupLogs.createdAt, since))
       .groupBy(schema.lookupLogs.normalizedQuery)
       .orderBy(sql`count desc`)
-      .limit(20);
+      .limit(200);
 
     // Dictionary hit count
     const dictHits = await db
@@ -100,7 +100,7 @@ export const GET: APIRoute = async (context) => {
         cacheHitRatio,
         errors: errorRow ? Number(errorRow.count) : 0,
         warns: warnRow ? Number(warnRow.count) : 0,
-        popularQueries,
+        popularQueries: mergePopularQueries(popularQueryRows, 20),
         dictHits,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } },

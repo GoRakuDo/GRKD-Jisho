@@ -15,7 +15,6 @@ import {
 import {
   dryRunCacheRefresh,
   dryRunRateLimitChange,
-  dryRunWipe,
 } from "./tools/dry-run-tools.js";
 import {
   requestCacheRefresh,
@@ -214,26 +213,6 @@ async function main(): Promise<void> {
 }
 
 function registerLevel2Tools(): void {
-  server.registerTool(
-    "grkd-jisho.dry_run_wipe",
-    {
-      description: "Dry-run: check wipe settings and recent wipe events (no DB write, no Discord API)",
-      inputSchema: z.object({
-        guild_id: z.string().min(1),
-        channel_id: z.string().min(1),
-      }),
-    },
-    async (args: { guild_id: string; channel_id: string }) => {
-      const result = await withAudit(
-        "grkd-jisho.dry_run_wipe",
-        args,
-        { dryRun: true },
-        async () => dryRunWipe({ guildId: args.guild_id, channelId: args.channel_id }),
-      );
-      return { content: [{ type: "text", text: JSON.stringify(result) }] };
-    },
-  );
-
   server.registerTool(
     "grkd-jisho.dry_run_rate_limit_change",
     {

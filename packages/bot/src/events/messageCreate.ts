@@ -11,6 +11,7 @@ import { recordLookup } from "../services/lookup-log.service.js";
 import { checkRateLimit, incrementUsage } from "../services/rate-limit.service.js";
 import { formatReply, formatNotFound, formatError } from "../services/reply-formatter.js";
 import { traceEvent } from "../services/observability.service.js";
+import { sanitizeLookupQuery } from "@grkd-jisho/db";
 
 /**
  * recordLookup + incrementUsage をまとめて実行するヘルパー。
@@ -134,18 +135,19 @@ async function handleMessage(message: Message): Promise<void> {
     await traceEvent(traceId, "channel.allowed", "info", {});
   }
 
-  const rawText = message.content.replace(/<@!?\d+>/g, "").trim();
-  if (!rawText) {
+  const rawText = message.content.trim();
+  const cleanedText = sanitizeLookupQuery(rawText);
+  if (!cleanedText) {
     await message.reply("検索語を入力してください。例: `@grkd-jisho 可憐`");
     return;
   }
 
   // 文の先頭から最長一致で辞書語を抽出
-  const extracted = await extractFirstTerm(rawText);
-  const query = extracted?.term ?? rawText;
+  const extracted = await extractFirstTerm(cleanedText);
+  const query = extracted?.term ?? cleanedText;
   const result = extracted?.result ?? null;
-  console.log(`[Lookup] trace=${traceId} raw="${rawText}" query="${query}"`);
-  await traceEvent(traceId, "query.extracted", "info", { raw: rawText, query });
+  console.log(`[Lookup] trace=${traceId} raw="${rawText}" cleaned="${cleanedText}" query="${query}"`);
+  await traceEvent(traceId, "query.extracted", "info", { raw: rawText, cleaned: cleanedText, query });
 
   const guildContextId = message.guildId ?? env.DISCORD_GUILD_ID;
 

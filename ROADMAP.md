@@ -294,7 +294,6 @@ Phase 5: Deferred Scope               TBA
 
 - [x] **3-10** Dry-run MCP tools
   - `MCP_ENABLE_DRY_RUN=false` がデフォルト
-  - `grkd-jisho.dry_run_wipe`
   - `grkd-jisho.dry_run_rate_limit_change`
   - `grkd-jisho.dry_run_cache_refresh`
   - 全dry-run tool call は `mcp_audit_logs.dry_run=true` で記録

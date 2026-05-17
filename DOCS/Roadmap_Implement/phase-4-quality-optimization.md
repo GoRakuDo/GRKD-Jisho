@@ -1087,7 +1087,7 @@ code-reviewer 判定: ✅ Approve（全修正後）
 4. lookup低下なら grkd-jisho.lookup_stats
 5. cache異常なら grkd-jisho.cache_stats
 6. rate limit問い合わせなら grkd-jisho.rate_limit_status
-7. wipe失敗なら grkd-jisho.wipe_status -> dry_run_wipe
+7. wipe失敗なら grkd-jisho.wipe_status を確認
 ```
 
 #### I-2. 操作依頼
@@ -1131,7 +1131,7 @@ dry-run
 |---|---|
 | 0\. 前提条件 | MCP接続設定例、L1-L4アクセスレベルテーブル、MCP_AGENT_IDとaudit log説明 |
 | 1\. 通常監視フロー | health→recent_errors→get_trace→lookup_stats→cache_stats→rate_limit_status→wipe_status（7step固定順） |
-| 2\. Dry-runフロー | dry_run_wipe / dry_run_rate_limit_change / dry_run_cache_refresh 解説 |
+| 2\. Dry-runフロー | dry_run_rate_limit_change / dry_run_cache_refresh 解説 |
 | 3\. 操作依頼フロー | dry_run→request_*→Bot自動実行→get_trace確認→audit log確認（6step） |
 | 4\. 危険操作フロー | request_wipe_now / request_bulk_cache_delete / request_prompt_version_rotate（人間承認必須） |
 | 5\. 緊急停止判断 | 即時停止条件5項目 / 操作中断条件4項目 / 報告テンプレート |

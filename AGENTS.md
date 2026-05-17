@@ -352,7 +352,6 @@ Level 1: read-only
   grkd-jisho.wipe_status
 
 Level 2: dry-run
-  grkd-jisho.dry_run_wipe
   grkd-jisho.dry_run_rate_limit_change
   grkd-jisho.dry_run_cache_refresh
 
