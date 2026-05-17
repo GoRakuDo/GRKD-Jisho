@@ -132,12 +132,6 @@ interface RateLimitChangeArgs {
   roleLabel?: string;
 }
 
-interface ToggleWipeArgs {
-  guildId: string;
-  channelId: string;
-  wipeEnabled: boolean;
-}
-
 /**
  * ジョブタイプ別の実処理を実行する。
  * 戻り値は resultJson として保存される。
@@ -158,8 +152,6 @@ async function executeJob(
       return executeUserUsageReset(args as unknown as UserUsageResetArgs);
     case "rate_limit_change":
       return executeRateLimitChange(args as unknown as RateLimitChangeArgs);
-    case "toggle_wipe":
-      return executeToggleWipe(args as unknown as ToggleWipeArgs);
     default:
       throw new Error(`Unknown job type: ${job.jobType}`);
   }
@@ -274,42 +266,6 @@ async function executeRateLimitChange(
     });
 
   return { before, after: args.dailyLimit };
-}
-
-async function executeToggleWipe(
-  args: ToggleWipeArgs,
-): Promise<Record<string, unknown>> {
-  if (!args.guildId || !args.channelId) {
-    throw new Error("guildId and channelId are required for toggle_wipe");
-  }
-
-  // before の値を取得
-  const [existing] = await db
-    .select()
-    .from(schema.channelSettings)
-    .where(eq(schema.channelSettings.channelId, args.channelId))
-    .limit(1);
-
-  const before = existing?.wipeEnabled ?? null;
-
-  // upsert
-  await db
-    .insert(schema.channelSettings)
-    .values({
-      guildId: args.guildId,
-      channelId: args.channelId,
-      wipeEnabled: args.wipeEnabled,
-    })
-    .onConflictDoUpdate({
-      target: schema.channelSettings.channelId,
-      set: { wipeEnabled: args.wipeEnabled },
-    });
-
-  return {
-    before,
-    after: args.wipeEnabled,
-    note: "Channel wipe setting updated. No immediate Discord API action.",
-  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

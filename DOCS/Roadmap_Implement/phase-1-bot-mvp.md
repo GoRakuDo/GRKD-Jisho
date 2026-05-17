@@ -1314,10 +1314,7 @@ async function executeJob(job: typeof schema.opsJobs.$inferSelect): Promise<void
       // Phase 2 で実装
       console.log(`[OpsJob] rate_limit_change: ${JSON.stringify(args)}`);
       break;
-    case "toggle_wipe":
-      // Phase 2 で実装
-      console.log(`[OpsJob] toggle_wipe: ${JSON.stringify(args)}`);
-      break;
+    // wipe setting updates are handled in Web UI; no MCP job remains here
     default:
       throw new Error(`Unknown job type: ${job.jobType}`);
   }

@@ -22,7 +22,7 @@
 | `packages/mcp/src/config/env.ts` | 3-21 | `MCP_READONLY_MODE=true`, `MCP_ENABLE_DRY_RUN=false` が実装済み。Phase 4 write解禁時はこのガードを本格利用する必要がある。 |
 | `packages/mcp/src/index.ts` | 59-185, 187-259 | Level 1 tool は常時登録、Level 2 dry-run は `env.enableDryRun` で条件登録。Level 3 write tool は未実装。 |
 | `packages/mcp/src/tools/dry-run-tools.ts` | 9-150 | dry-run はDB SELECTのみ。Discord APIもDB writeも行わない。Phase 4 write tool の前段として再利用できる。 |
-| `packages/bot/src/services/ops-job.service.ts` | 100-124 | `cache_refresh`, `user_usage_reset`, `rate_limit_change`, `toggle_wipe` は job type として存在するが、現状は `console.log` のみ。実処理が未実装。 |
+| `packages/bot/src/services/ops-job.service.ts` | 100-124 | `cache_refresh`, `user_usage_reset`, `rate_limit_change` は job type として存在するが、現状は `console.log` のみ。実処理が未実装。 |
 | `packages/bot/src/services/__tests__/*.test.ts` | 全行 | `rate-limit`, `response-cache`, `response-admin` のUnitテストはTODO。ユーザー指示どおり Phase 4 最初に実装する。 |
 | `packages/db/src/schema/dictionary-entries.ts` | 18-22 | `term`, `reading`, `dictionary_id` の通常indexはある。`pg_trgm` / GIN index はまだない。 |
 | `packages/bot/src/services/dictionary.service.ts` | 5-29 | 現在の検索は `term` 完全一致のみ。読み仮名fallbackや表記揺れ対応は未実装。 |
@@ -438,7 +438,7 @@ MCP_READONLY_MODE=false + MCP_ENABLE_DRY_RUN=false + MCP_ENABLE_LIMITED_WRITE=tr
 | `grkd-jisho.request_cache_refresh` | `cache_refresh` | false | manual override除外。件数上限を設ける。 |
 | `grkd-jisho.request_user_usage_reset` | `user_usage_reset` | false | 単一ユーザーのみ。guild_id必須。 |
 | `grkd-jisho.request_rate_limit_change` | `rate_limit_change` | true | ロール上限変更。人間承認を挟む。 |
-| `grkd-jisho.request_toggle_wipe` | `toggle_wipe` | true | wipe_enabled変更。人間承認を挟む。 |
+| wipe setting changes | Web UI only | true | wipe_enabled変更。人間承認を挟む。 |
 
 ### dry-run / request / executor の入力仕様統一
 
@@ -582,7 +582,7 @@ role_label optional
 - upsertする。
 - `result_json.before/after` を保存。
 
-#### E-4. `toggle_wipe`
+#### E-4. wipe setting changes (Web UI only)
 
 入力:
 
@@ -1313,7 +1313,7 @@ grkd.
 | request_cache_refresh | MCP | ops_jobs + audit | no | 原則不要 | manual除外、件数上限 |
 | request_user_usage_reset | MCP | ops_jobs + audit | no | 原則不要 | 単一ユーザー限定 |
 | request_rate_limit_change | MCP | ops_jobs + audit | no | 必須 | Web承認後Bot実行 |
-| request_toggle_wipe | MCP | ops_jobs + audit | no | 必須 | 即時wipeではない |
+| wipe setting changes | Web UI | ops_jobs + audit | no | 必須 | 即時wipeではない |
 | request_wipe_now | MCP | ops_jobs + audit | no | 必須 | Level 4。Phase 4後半でも慎重 |
 | bulk_cache_delete | MCP/Web | yes | no | 必須 | delete protection必須 |
 | prompt_version_rotate | MCP/Web | ops_jobs + audit | no | 必須 | Phase 4では設計/dry-run優先。実行はLevel 4 |

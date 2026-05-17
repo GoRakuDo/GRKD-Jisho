@@ -123,7 +123,7 @@ Web OAuth でも配列ループ:
 - `getChannelSettings(guildId)` — ✅ guildId パラメータ対応済み
 - `wipe-status.command.ts` — ✅ `interaction.guildId` で scope 済み
 - `wipe-channel.command.ts` — ✅ guildId を渡している
-- `ops-job.service.ts` — ✅ toggle_wipe で guildId を保持
+- `ops-job.service.ts` — ✅ wipe setting は Web UI 管理。guildId スコープは DB 側で保持済み
 
 **必要な変更:**
 なし。DB schema と Bot コマンドは既に multi-guild 対応。

@@ -21,7 +21,6 @@ import {
   requestCacheRefresh,
   requestUserUsageReset,
   requestRateLimitChange,
-  requestToggleWipe,
 } from "./tools/write-request-tools.js";
 
 type RecentErrorsArgs = { limit: number; level?: "warn" | "error" | undefined };
@@ -370,32 +369,6 @@ function registerLevel3Tools(): void {
     },
   );
 
-  server.registerTool(
-    "grkd-jisho.request_toggle_wipe",
-    {
-      description: "Request a wipe toggle job (requires human approval). Use dry_run_wipe first.",
-      inputSchema: z.object({
-        guild_id: z.string().min(1),
-        channel_id: z.string().min(1),
-        wipe_enabled: z.boolean(),
-        reason: z.string().min(1),
-      }),
-    },
-    async (args: {
-      guild_id: string;
-      channel_id: string;
-      wipe_enabled: boolean;
-      reason: string;
-    }) => {
-      const result = await withAudit(
-        "grkd-jisho.request_toggle_wipe",
-        args,
-        { dryRun: false },
-        async () => requestToggleWipe(args),
-      );
-      return { content: [{ type: "text", text: JSON.stringify(result) }] };
-    },
-  );
 }
 
 main().catch((error) => {

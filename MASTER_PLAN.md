@@ -1125,7 +1125,7 @@ Level 2 dry-run tools は `MCP_ENABLE_DRY_RUN=true` の時だけ登録する。
 | `grkd-jisho.request_cache_refresh` | cache refresh job を作成 | 内容により不要 |
 | `grkd-jisho.request_user_usage_reset` | user_usage reset job を作成 | 原則不要 |
 | `grkd-jisho.request_rate_limit_change` | role_rate_limits変更 job を作成 | 必要 |
-| `grkd-jisho.request_toggle_wipe` | wipe_enabled変更 job を作成 | 必要 |
+| wipe setting changes | Web UI で管理 | 必要 |
 
 #### Level 4: Dangerous tools
 

@@ -281,10 +281,10 @@ dry_run なしでの request は運用ルール違反。
   - 変更前に dry_run_rate_limit_change で影響確認
 ```
 
-### 3-5. grkd-jisho.request_toggle_wipe
+### 3-5. Wipe setting changes (Web UI only)
 
 ```txt
-目的: チャンネルのwipe有効/無効を切り替える。
+目的: チャンネルのwipe有効/無効を切り替える（Web UI で実施）。
 トリガー: wipe を開始/停止したい
 入力:
   - channel_id: 対象チャンネルID

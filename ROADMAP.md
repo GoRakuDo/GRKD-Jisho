@@ -367,7 +367,7 @@ Phase 5: Deferred Scope               TBA
   - `grkd-jisho.request_cache_refresh`
   - `grkd-jisho.request_user_usage_reset`
   - `grkd-jisho.request_rate_limit_change`
-  - `grkd-jisho.request_toggle_wipe`
+  - wipe setting changes are handled in Web UI, not MCP
   - 全て `ops_jobs` + `mcp_audit_logs` 経由に限定
 
 - [ ] **4-9** Agent Runbook / 自律監視

@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 import { createOpsJobWithAudit } from "../services/audit.service.js";
 import { env } from "../config/env.js";
+import { dryRunRateLimitChange } from "./dry-run-tools.js";
 
 /** キャッシュリフレッシュの件数上限を超えていないか事前確認 */
 async function checkCacheRefreshLimit(
@@ -124,6 +125,11 @@ export async function requestRateLimitChange(args: {
     };
   }
 
+  const preview = await dryRunRateLimitChange({
+    roleId: args.discord_role_id,
+    newDailyLimit: args.daily_limit,
+  });
+
   const jobArgs: Record<string, unknown> = {
     discordRoleId: args.discord_role_id,
     dailyLimit: args.daily_limit,
@@ -142,34 +148,7 @@ export async function requestRateLimitChange(args: {
 
   return {
     ...result,
-    note: "This change requires human approval via Web Admin UI before execution.",
-  };
-}
-
-export async function requestToggleWipe(args: {
-  guild_id: string;
-  channel_id: string;
-  wipe_enabled: boolean;
-  reason: string;
-}) {
-  const jobArgs: Record<string, unknown> = {
-    guildId: args.guild_id,
-    channelId: args.channel_id,
-    wipeEnabled: args.wipe_enabled,
-    reason: args.reason,
-  };
-
-  const result = await createOpsJobWithAudit({
-    agentId: env.agentId,
-    toolName: "grkd-jisho.request_toggle_wipe",
-    jobType: "toggle_wipe",
-    args: jobArgs,
-    approvalRequired: true,
-    rawToolArgs: args,
-  });
-
-  return {
-    ...result,
-    note: "This change requires human approval via Web Admin UI before execution.",
+    preview,
+    note: "This change requires human approval via Web Admin UI before execution. Preview reflects state at request time; values may change before approval.",
   };
 }

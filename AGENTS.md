@@ -360,7 +360,7 @@ Level 3: limited write
   grkd-jisho.request_cache_refresh
   grkd-jisho.request_user_usage_reset
   grkd-jisho.request_rate_limit_change
-  grkd-jisho.request_toggle_wipe
+  wipe setting changes are handled in Web UI, not MCP
 
 Level 4: dangerous
   grkd-jisho.request_wipe_now
