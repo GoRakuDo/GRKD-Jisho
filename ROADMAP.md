@@ -77,11 +77,12 @@ Phase 5: Deferred Scope               TBA
   - `ready` イベントで起動ログ
   - `DISCORD_TOKEN` で login
 
-- [ ] **1-2** `messageCreate` イベントハンドラー
+- [x] **1-2** `messageCreate / messageUpdate` イベントハンドラー
   - Bot メンション検出
   - 許可チャンネルガード (`DISCORD_ALLOWED_CHANNELS`)
   - クエリ抽出（メンション部分を除いた文字列）
   - 空クエリのバリデーション
+  - 編集で mention を追加したメッセージも `messageUpdate` から同じ検索フローに乗せる（`oldMessage` と `newMessage` の両方が使えるときだけ。`oldMessage` が null / partial の場合は安全側に倒して無反応。`lookup_logs.message_id` で二重実行を防ぐ）
 
 - [ ] **1-3** `DictionaryService.lookup(query)` 実装
   - `dictionaries` テーブルから `enabled=true` を `priority ASC` で取得
@@ -127,7 +128,7 @@ Phase 5: Deferred Scope               TBA
   - `checkRateLimit()`: ロール別上限 → DB 使用量 → 許可/拒否判断
   - `incrementUsage()`: `INSERT ... ON CONFLICT DO UPDATE SET count = count + 1`
   - Owner / Administrator は無制限（DB 参照省略）
-  - 上限超過時は Ephemeral メッセージ送信
+   - 上限超過時は通常のチャンネル返信（`message.reply()`）
 
 - [ ] **1-11** Channel Wipe-out スケジューラ実装
   - `node-cron` で `0 0 * * * Asia/Jakarta` スケジュール
@@ -151,7 +152,7 @@ Phase 5: Deferred Scope               TBA
   - 実行結果を `result_json` と `bot_events` に残す
 
 **完了基準:**  
-`@grkd-jisho 単語` に対してロール別で回答が返り、2回目以降はキャッシュが使われること。毎日 00:00 GMT+7 に `wipe_enabled = true` の設定チャンネルだけが bulkDelete 方式で自動消去され、固定メッセージのみ保持されること。さらに、検索1回ごとの `trace_id` から処理全体を追えること。
+`@grkd-jisho 単語` に対してロール別で回答が返り、2回目以降はキャッシュが使われること。編集で mention を追加したメッセージでも同じ反応が返ること。毎日 00:00 GMT+7 に `wipe_enabled = true` の設定チャンネルだけが bulkDelete 方式で自動消去され、固定メッセージのみ保持されること。さらに、検索1回ごとの `trace_id` から処理全体を追えること。
 
 ---
 

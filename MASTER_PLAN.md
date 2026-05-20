@@ -52,7 +52,7 @@ Discord Guild
 ┌─────────────────────────────────────────────────┐
 │  Bot Service  (packages/bot)                    │
 │                                                 │
-  │  messageCreate → extract raw text               │
+  │  messageCreate / messageUpdate → extract raw text │
   │  └→ extractFirstTerm() — greedy scan + deinflect│
   │  └→ channel guard (許可チャンネルののみ)           │
   │  └→ DictionaryService.lookup(query)             │
@@ -124,7 +124,7 @@ grkd-jisho/
 │   ├── bot/              # Discord Bot (Node.js + discord.js)
 │   │   ├── src/
 │   │   │   ├── commands/      # /search-jisho, /edit-jisho etc.
-│   │   │   ├── events/        # messageCreate, ready, interactionCreate
+│   │   │   ├── events/        # messageCreate, messageUpdate, ready, interactionCreate
 │   │   │   ├── services/
 │   │   │   │   ├── dictionary.service.ts
 │   │   │   │   ├── llm.service.ts
@@ -646,7 +646,7 @@ Owner / Administrator → 無制限
 ```
 
 リセット単位は **1日ごと（毎日 00:00 GMT+7）**。  
-上限超過時は **Ephemeral メッセージ** で本人だけに通知。
+上限超過時は通常のチャンネル返信（`message.reply()`）で通知。
 
 ### 17-2. DB スキーマ追加
 
@@ -775,17 +775,21 @@ function toGMT7Date(date: Date): string {
 }
 ```
 
-### 17-4. messageCreate への組み込み
+### 17-4. messageCreate / messageUpdate への組み込み
 
 ```
 @grkd-jisho 単語 を受信
   ↓
+編集で mention が新しく付いた messageUpdate も同じルートで受信
+  ↓
 checkRateLimit(userId, guildId, memberRoles, isOwner, isAdmin)
-  ├─ allowed: false → Ephemeral で「本日の上限（N回）に達しました」通知 → 終了
+  ├─ allowed: false → 通常のチャンネル返信で「本日の上限（N回）に達しました」通知 → 終了
   └─ allowed: true  → 辞書検索 → LLM → 返答
                         ↓
                       incrementUsage(userId, guildId)
 ```
+
+`messageUpdate` は、`oldMessage` と `newMessage` の両方が利用できるときだけ、`oldMessage` に bot mention が無く `newMessage` に bot mention がある編集を lookup 対象にする。`oldMessage` が null / partial の場合は安全側に倒して無反応にし、`lookup_logs.message_id` に既存記録があれば二重反応しない。
 
 ### 17-5. 管理コマンド追加
 
