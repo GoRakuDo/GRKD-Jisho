@@ -52,7 +52,7 @@ Discord Guild
 ┌─────────────────────────────────────────────────┐
 │  Bot Service  (packages/bot)                    │
 │                                                 │
-  │  messageCreate / messageUpdate → extract raw text │
+  │  messageCreate / messageUpdate → sendTyping() → extract raw text │
   │  └→ extractFirstTerm() — greedy scan + deinflect│
   │  └→ channel guard (許可チャンネルののみ)           │
   │  └→ DictionaryService.lookup(query)             │
@@ -780,6 +780,8 @@ function toGMT7Date(date: Date): string {
 ```
 @grkd-jisho 単語 を受信
   ↓
+typing indicator を送信
+  ↓
 編集で mention が新しく付いた messageUpdate も同じルートで受信
   ↓
 checkRateLimit(userId, guildId, memberRoles, isOwner, isAdmin)
@@ -790,6 +792,7 @@ checkRateLimit(userId, guildId, memberRoles, isOwner, isAdmin)
 ```
 
 `messageUpdate` は、`oldMessage` と `newMessage` の両方が利用できるときだけ、`oldMessage` に bot mention が無く `newMessage` に bot mention がある編集を lookup 対象にする。`oldMessage` が null / partial の場合は安全側に倒して無反応にし、`lookup_logs.message_id` に既存記録があれば二重反応しない。
+typing は lookup パイプラインに入った瞬間に開始し、LLM などで長引く場合は reply まで維持する。
 
 ### 17-5. 管理コマンド追加
 

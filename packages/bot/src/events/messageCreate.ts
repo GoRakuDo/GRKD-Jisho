@@ -13,6 +13,8 @@ import { formatReply, formatNotFound, formatError } from "../services/reply-form
 import { traceEvent } from "../services/observability.service.js";
 import { sanitizeLookupQuery } from "@grkd-jisho/db";
 
+const TYPING_REFRESH_INTERVAL_MS = 8_000;
+
 /**
  * recordLookup + incrementUsage をまとめて実行するヘルパー。
  * 両者をセットで呼び出すことで、一方だけ実行されてしまう不整合を防ぐ。
@@ -83,6 +85,33 @@ async function loadActivePromptContext(message: Message, traceId: string, scopeK
   };
 }
 
+async function startTypingIndicator(message: Message): Promise<() => void> {
+  const channel = message.channel;
+  if (!("sendTyping" in channel)) {
+    return () => undefined;
+  }
+
+  await channel.sendTyping().catch(() => undefined);
+
+  const typingTimer = setInterval(() => {
+    void channel.sendTyping().catch(() => undefined);
+  }, TYPING_REFRESH_INTERVAL_MS);
+
+  return () => {
+    clearInterval(typingTimer);
+  };
+}
+
+async function withTypingIndicator<T>(message: Message, task: () => Promise<T>): Promise<T> {
+  const stopTyping = await startTypingIndicator(message);
+
+  try {
+    return await task();
+  } finally {
+    stopTyping();
+  }
+}
+
 export const messageCreateHandler = async (message: Message): Promise<void> => {
   try {
     await handleMessage(message);
@@ -135,8 +164,9 @@ async function handleMessage(message: Message): Promise<void> {
     await traceEvent(traceId, "channel.allowed", "info", {});
   }
 
-  const rawText = message.content.trim();
-  const cleanedText = sanitizeLookupQuery(rawText);
+  await withTypingIndicator(message, async () => {
+    const rawText = message.content.trim();
+    const cleanedText = sanitizeLookupQuery(rawText);
   if (!cleanedText) {
     await message.reply("検索語を入力してください。例: `@grkd-jisho 可憐`");
     return;
@@ -437,4 +467,5 @@ async function handleMessage(message: Message): Promise<void> {
     console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check Gemini/OpenRouter/API key/model access`);
     await message.reply(formatError("LLM生成中にエラーが発生しました。"));
   }
+  });
 };

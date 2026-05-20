@@ -80,6 +80,7 @@ Phase 5: Deferred Scope               TBA
 - [x] **1-2** `messageCreate / messageUpdate` イベントハンドラー
   - Bot メンション検出
   - 許可チャンネルガード (`DISCORD_ALLOWED_CHANNELS`)
+  - lookup フローに入ったら typing indicator をすぐ送る。長い処理では再送して reply まで維持する
   - クエリ抽出（メンション部分を除いた文字列）
   - 空クエリのバリデーション
   - 編集で mention を追加したメッセージも `messageUpdate` から同じ検索フローに乗せる（`oldMessage` と `newMessage` の両方が使えるときだけ。`oldMessage` が null / partial の場合は安全側に倒して無反応。`lookup_logs.message_id` で二重実行を防ぐ）
@@ -152,7 +153,7 @@ Phase 5: Deferred Scope               TBA
   - 実行結果を `result_json` と `bot_events` に残す
 
 **完了基準:**  
-`@grkd-jisho 単語` に対してロール別で回答が返り、2回目以降はキャッシュが使われること。編集で mention を追加したメッセージでも同じ反応が返ること。毎日 00:00 GMT+7 に `wipe_enabled = true` の設定チャンネルだけが bulkDelete 方式で自動消去され、固定メッセージのみ保持されること。さらに、検索1回ごとの `trace_id` から処理全体を追えること。
+`@grkd-jisho 単語` に対してロール別で回答が返り、2回目以降はキャッシュが使われること。編集で mention を追加したメッセージでも同じ反応が返ること。lookup 開始直後に typing indicator が見え、長い処理でも reply まで維持されること。毎日 00:00 GMT+7 に `wipe_enabled = true` の設定チャンネルだけが bulkDelete 方式で自動消去され、固定メッセージのみ保持されること。さらに、検索1回ごとの `trace_id` から処理全体を追えること。
 
 ---
 
