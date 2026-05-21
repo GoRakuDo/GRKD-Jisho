@@ -141,6 +141,7 @@ export const WEBUI_CONFIG = {
     variables: [
       { name: "{{role_key}}", description: "Output bucket used for routing: daily-japanese or indonesian" },
       { name: "{{query}}", description: "The searched word or phrase" },
+      { name: "{{dictionary_form}}", description: "Dictionary base form (same as query on direct match)" },
       { name: "{{reading}}", description: "Reading or pronunciation of the query" },
       { name: "{{dictionary_name}}", description: "Name of the dictionary that supplied the entry" },
       { name: "{{definition_json}}", description: "Raw dictionary payload as JSON" },

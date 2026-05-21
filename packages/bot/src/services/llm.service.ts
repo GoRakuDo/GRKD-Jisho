@@ -9,6 +9,7 @@ const OPENROUTER_MAX_ATTEMPTS = 3;
 interface GenerateParams {
   roleKey: RoleKey;
   query: string;
+  dictionaryForm: string;
   reading: string;
   dictionaryName: string;
   definitionJson: string;
@@ -66,8 +67,9 @@ function hasExampleSentences(value: unknown): boolean {
   return false;
 }
 
-function buildInsufficientDataReply(query: string): string {
-  return `【${query}】\n辞書情報が不足しています。別の単語を調べてみてください。`;
+function buildInsufficientDataReply(dictionaryForm: string, fallback: string): string {
+  const label = dictionaryForm || fallback;
+  return `【${label}】\n辞書情報が不足しています。別の単語を調べてみてください。`;
 }
 
 export function normalizePromptTemplate(promptTemplate: string): string {
@@ -78,6 +80,7 @@ function renderPromptTemplate(promptTemplate: string, params: GenerateParams): s
   return normalizePromptTemplate(promptTemplate)
     .replaceAll("{{role_key}}", params.roleKey)
     .replaceAll("{{query}}", params.query)
+    .replaceAll("{{dictionary_form}}", params.dictionaryForm)
     .replaceAll("{{reading}}", params.reading)
     .replaceAll("{{dictionary_name}}", params.dictionaryName)
     .replaceAll("{{definition_json}}", params.definitionJson)
@@ -120,7 +123,7 @@ export interface GenerateResult {
 
 export async function generate(params: GenerateParams): Promise<GenerateResult> {
   if (shouldUseInsufficientDataFallback(params.definitionJson)) {
-    return { text: buildInsufficientDataReply(params.query), source: null };
+    return { text: buildInsufficientDataReply(params.dictionaryForm, params.query), source: null };
   }
 
   const prompt = renderPromptTemplate(params.promptTemplate, params);

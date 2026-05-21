@@ -29,6 +29,7 @@ describe("generate", () => {
     const result = await generate({
       roleKey: "daily-japanese",
       query: "これ",
+      dictionaryForm: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
       definitionJson: "[]",
@@ -50,6 +51,7 @@ describe("generate", () => {
     const result = await generate({
       roleKey: "indonesian",
       query: "これ",
+      dictionaryForm: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
       definitionJson,
@@ -87,6 +89,7 @@ describe("generate", () => {
     const result = await generate({
       roleKey: "indonesian",
       query: "これ",
+      dictionaryForm: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
       definitionJson,
@@ -121,6 +124,7 @@ describe("generate", () => {
     const result = await generate({
       roleKey: "daily-japanese",
       query: "これ",
+      dictionaryForm: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
       definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
@@ -174,6 +178,7 @@ describe("generate", () => {
     const result = await generate({
       roleKey: "indonesian",
       query: "これ",
+      dictionaryForm: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
       definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
@@ -210,6 +215,7 @@ describe("generate", () => {
     await expect(generate({
       roleKey: "indonesian",
       query: "これ",
+      dictionaryForm: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
       definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
@@ -230,6 +236,7 @@ describe("generate", () => {
     await expect(generate({
       roleKey: "indonesian",
       query: "これ",
+      dictionaryForm: "これ",
       reading: "これ",
       dictionaryName: "test dictionary",
       definitionJson: JSON.stringify({ meanings: ["near the listener"] }),

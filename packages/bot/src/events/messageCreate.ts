@@ -254,6 +254,7 @@ async function handleMessage(message: Message): Promise<void> {
       const { text: responseText, source: llmSource } = await generate({
         roleKey: outputBucketKey,
         query,
+        dictionaryForm: result.entry.term,
         reading: result.entry.reading,
         dictionaryName: result.dictionary.name,
         definitionJson: JSON.stringify(result.entry.definitionsJson),
@@ -414,6 +415,7 @@ async function handleMessage(message: Message): Promise<void> {
     const { text: responseText, source: llmSource } = await generate({
       roleKey: outputBucketKey,
       query,
+      dictionaryForm: result.entry.term,
       reading: result.entry.reading,
       dictionaryName: result.dictionary.name,
       definitionJson: JSON.stringify(result.entry.definitionsJson),

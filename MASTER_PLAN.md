@@ -427,6 +427,7 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 
 出力バケット: {{role_key}}
 検索語: {{query}}
+辞書形: {{dictionary_form}}
 辞書ソース: {{dictionary_name}}
 辞書定義: {{definition_json}}
 
