@@ -1,5 +1,6 @@
 import { env } from "../config/env.js";
 import { FALLBACK_LLM_MODEL, PRIMARY_LLM_MODEL } from "../config/llm-model.js";
+import { buildLanguageReaskPrompt, validateOutputLanguage, type LanguageGuardResult, type LanguageGuardViolation } from "./language-guard.service.js";
 import type { RoleKey } from "../types.js";
 
 const GEMINI_TIMEOUT_MS = 60_000;
@@ -15,6 +16,20 @@ interface GenerateParams {
   definitionJson: string;
   promptTemplate: string;
   promptVersion: string;
+}
+
+export class LanguageGuardError extends Error {
+  constructor(
+    public readonly bucket: RoleKey,
+    public readonly source: "gemini" | "openrouter",
+    public readonly reaskAttempts: number,
+    public readonly fallbackUsed: boolean,
+    public readonly violations: LanguageGuardViolation[],
+    message = "Language guard validation failed",
+  ) {
+    super(message);
+    this.name = "LanguageGuardError";
+  }
 }
 
 interface GeminiResponse {
@@ -131,19 +146,70 @@ export async function generate(params: GenerateParams): Promise<GenerateResult> 
   try {
     console.log(`[LLM] Gemini started → model=${PRIMARY_LLM_MODEL}`);
     const text = await callGemini(prompt);
-    console.log(`[LLM] Gemini success → model=${PRIMARY_LLM_MODEL}`);
     return { text, source: "gemini" };
   } catch (err) {
     console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY or Gemma 4 model access, falling back to OpenRouter`);
     try {
       const text = await callOpenRouter(prompt);
-      console.log(`[LLM] OpenRouter success → model=${FALLBACK_LLM_MODEL}`);
       return { text, source: "openrouter" };
     } catch (openRouterErr) {
       console.error(`[LLM] OpenRouter failed: ${openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr)} → Check OPENROUTER_API_KEY or OpenRouter model access`);
       throw openRouterErr;
     }
   }
+}
+
+export async function generateWithLanguageGuardrails(params: GenerateParams): Promise<GenerateResult> {
+  const renderedPrompt = renderPromptTemplate(params.promptTemplate, params);
+  const initial = await generate(params);
+
+  if (initial.source === null) {
+    return initial;
+  }
+
+  const initialValidation = validateOutputLanguage(initial.text, params.roleKey);
+  if (initialValidation.ok) {
+    return initial;
+  }
+
+  if (initial.source === "openrouter") {
+    throw new LanguageGuardError(params.roleKey, initial.source, 0, true, initialValidation.violations);
+  }
+
+  let latestValidation: Exclude<LanguageGuardResult, { ok: true }> = initialValidation;
+  let reaskAttempts = 0;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    reaskAttempts = attempt;
+    const reaskPrompt = buildLanguageReaskPrompt(renderedPrompt, params.roleKey, latestValidation);
+
+    try {
+      console.log(`[LLM] Gemini language reask started → attempt=${attempt}/2`);
+      const text = await callGemini(reaskPrompt);
+      const validation = validateOutputLanguage(text, params.roleKey);
+      if (validation.ok) {
+        console.log(`[LLM] Gemini language reask success → attempt=${attempt}/2`);
+        return { text, source: "gemini" };
+      }
+
+      latestValidation = validation;
+      console.warn(`[LLM] Gemini language reask failed → attempt=${attempt}/2, retrying`);
+    } catch (err) {
+      console.warn(`[LLM] Gemini language reask transport failed → attempt=${attempt}/2, retrying`);
+      if (err instanceof Error && isAbortError(err)) {
+        continue;
+      }
+    }
+  }
+
+  const fallbackPrompt = buildLanguageReaskPrompt(renderedPrompt, params.roleKey, latestValidation);
+  const fallbackText = await callOpenRouter(fallbackPrompt);
+  const fallbackValidation = validateOutputLanguage(fallbackText, params.roleKey);
+  if (fallbackValidation.ok) {
+    return { text: fallbackText, source: "openrouter" };
+  }
+
+  throw new LanguageGuardError(params.roleKey, "openrouter", reaskAttempts, true, fallbackValidation.violations);
 }
 
 function isAbortError(err: unknown): boolean {
@@ -156,7 +222,6 @@ async function callGemini(prompt: string): Promise<string> {
 
   try {
     const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${PRIMARY_LLM_MODEL}:generateContent`);
-    url.searchParams.set("key", env.GEMINI_API_KEY);
 
     const response = await fetch(url, {
       method: "POST",

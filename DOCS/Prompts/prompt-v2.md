@@ -76,6 +76,9 @@ Learners may construct "I was eaten by fish" type errors.
 
 ## 4. Output-Bucket Explanation Policy
 
+> Runtime language validation is specified in `DOCS/Design/language-guardrails.md`. Prompt text should still state the language policy, but final enforcement happens after LLM generation.
+> `daily-japanese` allows Japanese + Latin + Common/Inherited + whitespace, while `indonesian` uses the same allowed script set plus English stopword ratio ≤ 10%.
+
 ### 4-1. Output Bucket Definitions
 
 | OutputBucketKey | Target | Explanation Style |
@@ -145,6 +148,8 @@ Output:
 
 The Indonesian parenthetical is intentionally short. It signals "I know your L1" without filling in missing dictionary data.
 
+Runtime note: insufficient-data replies are bot-owned fallback strings (`source: null`), not LLM-generated text. They skip `DOCS/Design/language-guardrails.md` validation to avoid false positives in `daily-japanese`.
+
 ---
 
 ## 6. Prompt Template (for implementation)
@@ -162,6 +167,7 @@ The Indonesian parenthetical is intentionally short. It signals "I know your L1"
 - ユーザーのDiscordロール名をそのままプロンプトに入れない。
 - L1負の転移を助長する説明をしない。
 - 内部の思考、下書き、検討メモ、英語のメタコメントは出力しない。
+- bucket で許可された言語以外を出力しない。違反時は runtime language guardrails が ReAsk する。
 - Reasoning 分離は provider-native fields を使う。`{{query}}` は input variable のまま。出力 marker `ANSWER:` / `【{{query}}】` は使わない。
 
 ## L1負の転移への注意（インドネシア語話者向け）

@@ -423,6 +423,7 @@ L1（インドネシア語）のネガティブ転移を避けるサポートを
 - 不明な場合は「辞書情報が不足しています」と言ってください
 - Discord で読みやすい短い回答にしてください
 - 出力バケットに合わせて出力言語を切り替えてください
+- 出力後は `DOCS/Design/language-guardrails.md` の bucket 別 language guardrails を通し、許可外言語・壊れた marker があれば最大2回 ReAsk し、それでも fail なら fallback model に回してから返信してください
 - Reasoning 分離は provider-native fields を使う。`{{query}}` は input variable のまま。出力 marker の扱いは `DOCS/Prompts/prompt-v2.md` に集約する。
 
 出力バケット: {{role_key}}

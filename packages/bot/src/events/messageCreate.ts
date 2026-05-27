@@ -6,7 +6,7 @@ import { PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import { extractFirstTerm } from "../services/extract-first-term.js";
 import { resolveOutputBucketKey } from "../services/role-mapper.service.js";
 import { getCachedResponse, saveResponse } from "../services/response-cache.service.js";
-import { generate, normalizePromptTemplate } from "../services/llm.service.js";
+import { generateWithLanguageGuardrails, LanguageGuardError, normalizePromptTemplate } from "../services/llm.service.js";
 import { recordLookup } from "../services/lookup-log.service.js";
 import { checkRateLimit, incrementUsage } from "../services/rate-limit.service.js";
 import { formatReply, formatNotFound, formatError } from "../services/reply-formatter.js";
@@ -167,10 +167,10 @@ async function handleMessage(message: Message): Promise<void> {
   await withTypingIndicator(message, async () => {
     const rawText = message.content.trim();
     const cleanedText = sanitizeLookupQuery(rawText);
-  if (!cleanedText) {
-    await message.reply("検索語を入力してください。例: `@grkd-jisho 可憐`");
-    return;
-  }
+    if (!cleanedText) {
+      await message.reply("検索語を入力してください。例: `@grkd-jisho 可憐`");
+      return;
+    }
 
   // 文の先頭から最長一致で辞書語を抽出
   const extracted = await extractFirstTerm(cleanedText);
@@ -251,7 +251,7 @@ async function handleMessage(message: Message): Promise<void> {
     console.log(`[Lookup] trace=${traceId} llm.generate.started`);
 
     try {
-      const { text: responseText, source: llmSource } = await generate({
+      const { text: responseText, source: llmSource } = await generateWithLanguageGuardrails({
         roleKey: outputBucketKey,
         query,
         dictionaryForm: result.entry.term,
@@ -303,6 +303,19 @@ async function handleMessage(message: Message): Promise<void> {
       });
       console.log(`[Lookup] trace=${traceId} finalizeLookup done`);
     } catch (err) {
+      if (err instanceof LanguageGuardError) {
+        await traceEvent(traceId, "llm.language_guard.failed", "warn", {
+          bucket: err.bucket,
+          source: err.source,
+          reaskAttempts: err.reaskAttempts,
+          fallbackUsed: err.fallbackUsed,
+          violations: err.violations,
+        });
+        console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
+        await message.reply(formatError("LLM出力が言語ルールを満たしませんでした。もう一度試してください。"));
+        return;
+      }
+
       await traceEvent(traceId, "llm.error", "error", { error: String(err) });
       console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check Gemini/OpenRouter/API key/model access`);
       await message.reply(formatError("LLM生成中にエラーが発生しました。"));
@@ -412,7 +425,7 @@ async function handleMessage(message: Message): Promise<void> {
   });
   console.log(`[Lookup] trace=${traceId} llm.generate.started`);
   try {
-    const { text: responseText, source: llmSource } = await generate({
+    const { text: responseText, source: llmSource } = await generateWithLanguageGuardrails({
       roleKey: outputBucketKey,
       query,
       dictionaryForm: result.entry.term,
@@ -465,6 +478,19 @@ async function handleMessage(message: Message): Promise<void> {
     });
     console.log(`[Lookup] trace=${traceId} finalizeLookup done`);
   } catch (err) {
+    if (err instanceof LanguageGuardError) {
+      await traceEvent(traceId, "llm.language_guard.failed", "warn", {
+        bucket: err.bucket,
+        source: err.source,
+        reaskAttempts: err.reaskAttempts,
+        fallbackUsed: err.fallbackUsed,
+        violations: err.violations,
+      });
+      console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
+      await message.reply(formatError("LLM出力が言語ルールを満たしませんでした。もう一度試してください。"));
+      return;
+    }
+
     await traceEvent(traceId, "llm.error", "error", { error: String(err) });
     console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check Gemini/OpenRouter/API key/model access`);
     await message.reply(formatError("LLM生成中にエラーが発生しました。"));

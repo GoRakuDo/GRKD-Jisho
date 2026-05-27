@@ -24,6 +24,7 @@ GRKD-Jisho now routes responses through two output buckets:
 - Admin prompts page
 - Response / cache / detail labels in Web UI
 - Prompt seed and template variable descriptions
+- Runtime language guardrails (`DOCS/Design/language-guardrails.md`)
 
 ## Notes
 
@@ -32,3 +33,6 @@ GRKD-Jisho now routes responses through two output buckets:
 - If role binding rows cannot be loaded from the DB, the bot surfaces an error instead of silently falling back.
 - Prompt admin UI now shows `default`, `daily-japanese`, and `indonesian` scopes separately.
 - Bucket-specific prompts are private overrides; the default prompt remains the public baseline.
+- `daily-japanese` and `indonesian` have different allowed-language policies at runtime.
+- `daily-japanese` may pass when the output stays within the allowed script set (Japanese + Latin + Common/Inherited + whitespace) and no garbage marker appears.
+- `indonesian` uses the same allowed script set, plus English stopword ratio ≤ 10%. If validation fails, the bot should ReAsk twice before falling back to the fallback model.

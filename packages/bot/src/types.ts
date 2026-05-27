@@ -42,6 +42,7 @@ export type TraceEventType =
   | "llm.generate.started"
   | "llm.generated"
   | "llm.fallback"
+  | "llm.language_guard.failed"
   | "llm.error"
   | "cache.saved"
   | "reply.sent"

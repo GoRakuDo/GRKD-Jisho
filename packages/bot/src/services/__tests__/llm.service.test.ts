@@ -7,7 +7,7 @@ vi.mock("../../config/env", () => ({
   },
 }));
 
-import { generate, normalizePromptTemplate } from "../llm.service";
+import { generate, generateWithLanguageGuardrails, LanguageGuardError, normalizePromptTemplate } from "../llm.service";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -222,6 +222,129 @@ describe("generate", () => {
       promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
       promptVersion: "v9",
     })).rejects.toThrow(/OpenRouter request timed out after 150 seconds/i);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("language guard で daily-japanese の初回失敗は Gemini ReAsk で再生成する", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "아니다", thought: false },
+              ],
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "意味:\nこれはテストです。", thought: false },
+              ],
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateWithLanguageGuardrails({
+      roleKey: "daily-japanese",
+      query: "これ",
+      dictionaryForm: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    });
+
+    expect(result.text).toBe("意味:\nこれはテストです。");
+    expect(result.source).toBe("gemini");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("language guard で Gemini ReAsk 2回 + OpenRouter fallback まで落ちたら LanguageGuardError を投げる", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "مرحبا", thought: false },
+              ],
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "مرحبا مرة أخرى", thought: false },
+              ],
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "مرحبا ثالث", thought: false },
+              ],
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: "مرحبا من fallback",
+              reasoning: "hidden",
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(generateWithLanguageGuardrails({
+      roleKey: "daily-japanese",
+      query: "これ",
+      dictionaryForm: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    })).rejects.toBeInstanceOf(LanguageGuardError);
 
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
