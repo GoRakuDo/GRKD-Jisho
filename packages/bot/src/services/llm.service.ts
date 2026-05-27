@@ -7,6 +7,8 @@ const GEMINI_TIMEOUT_MS = 60_000;
 const OPENROUTER_TIMEOUT_MS = 150_000;
 const OPENROUTER_MAX_ATTEMPTS = 3;
 
+type LanguageGuardProvider = "gemini" | "openrouter";
+
 interface GenerateParams {
   roleKey: RoleKey;
   query: string;
@@ -130,6 +132,61 @@ function extractOpenRouterAnswer(data: OpenRouterResponse): string {
   return answerText;
 }
 
+function getProviderLabel(provider: LanguageGuardProvider): string {
+  return provider === "gemini" ? "Gemini" : "OpenRouter";
+}
+
+async function callLanguageModel(prompt: string, provider: LanguageGuardProvider): Promise<string> {
+  return provider === "gemini" ? callGemini(prompt) : callOpenRouter(prompt);
+}
+
+interface GuardedValidationFailure {
+  ok: false;
+  validation: Exclude<LanguageGuardResult, { ok: true }>;
+  reaskAttempts: number;
+}
+
+interface GuardedValidationSuccess {
+  ok: true;
+  text: string;
+  reaskAttempts: number;
+}
+
+async function validateWithReaskOnProvider(
+  provider: LanguageGuardProvider,
+  renderedPrompt: string,
+  bucket: RoleKey,
+  initialText: string,
+): Promise<GuardedValidationFailure | GuardedValidationSuccess> {
+  let latestValidation = validateOutputLanguage(initialText, bucket);
+  if (latestValidation.ok) {
+    return { ok: true, text: initialText, reaskAttempts: 0 };
+  }
+
+  let reaskAttempts = 0;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    reaskAttempts = attempt;
+    const reaskPrompt = buildLanguageReaskPrompt(renderedPrompt, bucket, latestValidation);
+
+    try {
+      console.log(`[LLM] ${getProviderLabel(provider)} language reask started → attempt=${attempt}/2`);
+      const text = await callLanguageModel(reaskPrompt, provider);
+      const validation = validateOutputLanguage(text, bucket);
+      if (validation.ok) {
+        console.log(`[LLM] ${getProviderLabel(provider)} language reask success → attempt=${attempt}/2`);
+        return { ok: true, text, reaskAttempts };
+      }
+
+      latestValidation = validation;
+      console.warn(`[LLM] ${getProviderLabel(provider)} language reask failed → attempt=${attempt}/2, retrying`);
+    } catch (err) {
+      console.warn(`[LLM] ${getProviderLabel(provider)} language reask transport failed → attempt=${attempt}/2, error=${err instanceof Error ? err.message : String(err)}, retrying`);
+    }
+  }
+
+  return { ok: false, validation: latestValidation, reaskAttempts };
+}
+
 export interface GenerateResult {
   text: string;
   /** null = insufficient data fallback (no LLM called) */
@@ -167,49 +224,22 @@ export async function generateWithLanguageGuardrails(params: GenerateParams): Pr
     return initial;
   }
 
-  const initialValidation = validateOutputLanguage(initial.text, params.roleKey);
-  if (initialValidation.ok) {
-    return initial;
+  const initialAttempt = await validateWithReaskOnProvider(initial.source, renderedPrompt, params.roleKey, initial.text);
+  if (initialAttempt.ok) {
+    return { text: initialAttempt.text, source: initial.source };
   }
 
   if (initial.source === "openrouter") {
-    throw new LanguageGuardError(params.roleKey, initial.source, 0, true, initialValidation.violations);
+    throw new LanguageGuardError(params.roleKey, initial.source, initialAttempt.reaskAttempts, true, initialAttempt.validation.violations);
   }
 
-  let latestValidation: Exclude<LanguageGuardResult, { ok: true }> = initialValidation;
-  let reaskAttempts = 0;
-
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    reaskAttempts = attempt;
-    const reaskPrompt = buildLanguageReaskPrompt(renderedPrompt, params.roleKey, latestValidation);
-
-    try {
-      console.log(`[LLM] Gemini language reask started → attempt=${attempt}/2`);
-      const text = await callGemini(reaskPrompt);
-      const validation = validateOutputLanguage(text, params.roleKey);
-      if (validation.ok) {
-        console.log(`[LLM] Gemini language reask success → attempt=${attempt}/2`);
-        return { text, source: "gemini" };
-      }
-
-      latestValidation = validation;
-      console.warn(`[LLM] Gemini language reask failed → attempt=${attempt}/2, retrying`);
-    } catch (err) {
-      console.warn(`[LLM] Gemini language reask transport failed → attempt=${attempt}/2, retrying`);
-      if (err instanceof Error && isAbortError(err)) {
-        continue;
-      }
-    }
+  const fallbackText = await callOpenRouter(renderedPrompt);
+  const fallbackAttempt = await validateWithReaskOnProvider("openrouter", renderedPrompt, params.roleKey, fallbackText);
+  if (fallbackAttempt.ok) {
+    return { text: fallbackAttempt.text, source: "openrouter" };
   }
 
-  const fallbackPrompt = buildLanguageReaskPrompt(renderedPrompt, params.roleKey, latestValidation);
-  const fallbackText = await callOpenRouter(fallbackPrompt);
-  const fallbackValidation = validateOutputLanguage(fallbackText, params.roleKey);
-  if (fallbackValidation.ok) {
-    return { text: fallbackText, source: "openrouter" };
-  }
-
-  throw new LanguageGuardError(params.roleKey, "openrouter", reaskAttempts, true, fallbackValidation.violations);
+  throw new LanguageGuardError(params.roleKey, "openrouter", fallbackAttempt.reaskAttempts, true, fallbackAttempt.validation.violations);
 }
 
 function isAbortError(err: unknown): boolean {

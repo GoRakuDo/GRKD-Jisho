@@ -35,4 +35,4 @@ GRKD-Jisho now routes responses through two output buckets:
 - Bucket-specific prompts are private overrides; the default prompt remains the public baseline.
 - `daily-japanese` and `indonesian` have different allowed-language policies at runtime.
 - `daily-japanese` may pass when the output stays within the allowed script set (Japanese + Latin + Common/Inherited + whitespace) and no garbage marker appears.
-- `indonesian` uses the same allowed script set, plus English stopword ratio ≤ 10%. If validation fails, the bot should ReAsk twice before falling back to the fallback model.
+- `indonesian` uses the same allowed script set, plus English stopword ratio ≤ 10%. If validation fails, the bot should ReAsk the same provider twice; if Gemini still fails, it then falls back to OpenRouter, which also gets the same two ReAsk attempts.

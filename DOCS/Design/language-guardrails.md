@@ -353,18 +353,18 @@ transport failure は既存の provider fallback / timeout retry 方針と混ぜ
 
 | Condition | Action | Provider |
 |---|---|---|
-| Gemini initial が transport failure | 既存 fallback と同じく OpenRouter へ回し、OpenRouter 出力を validation する | OpenRouter |
-| Gemini initial は成功したが validation failure | Gemini に ReAsk #1 | Gemini |
+| Gemini initial が transport failure | 既存 fallback と同じく OpenRouter へ回し、OpenRouter 出力を validation する。OpenRouter も同じ ReAsk を使う | OpenRouter |
+| Gemini initial は成功したが validation failure | Gemini に ReAsk #1 → #2 | Gemini |
 | Gemini ReAsk #1 が validation failure | Gemini に ReAsk #2 | Gemini |
 | Gemini ReAsk 中に transport failure | その ReAsk は失敗扱い。残り ReAsk 枠があれば次へ進む | Gemini |
-| Gemini initial + ReAsk 2回がすべて失敗 | OpenRouter fallback を1回呼ぶ | OpenRouter |
-| OpenRouter fallback output が validation failure | cache 保存なし、短い error reply | none |
+| Gemini initial + ReAsk 2回がすべて失敗 | OpenRouter fallback を呼び、OpenRouter でも同じ ReAsk を最大2回まで行う | OpenRouter |
+| OpenRouter 全試行（初期 + ReAsk ×2）が validation failure | cache 保存なし、短い error reply | none |
 
 OpenRouter の transport timeout は既存どおり 150 秒 × 最大3回。  
-ただし language guard の ReAsk を OpenRouter 側でも2回重ねると待ち時間が膨らむため、fallback model は原則1回だけ validation する。
+language guard の ReAsk は provider 非依存で同じ扱いにし、OpenRouter でも最大2回まで作り直す。
 
-Gemini initial が transport failure で OpenRouter へ回り、その OpenRouter output も validation failure した場合は unrecoverable と扱う。  
-理由は、Gemini transport failure はその時点で service unavailable とみなし、同じ provider に ReAsk しても transport failure を繰り返す可能性が高いため。壊れた OpenRouter output も送らない。
+Gemini initial が transport failure で OpenRouter へ回った場合でも、OpenRouter output が validation failure なら同じ OpenRouter ReAsk を最大2回まで行う。  
+壊れた OpenRouter output も送らない。
 
 ### cache hit の扱い
 
@@ -381,13 +381,14 @@ Gemini initial が transport failure で OpenRouter へ回り、その OpenRoute
 
 ### ReAsk 回数
 
-primary provider では最大2回。
+各 provider で最大2回。
 
 理由:
 
 - 1回だけだと偶発的な混入を直しきれないことがある
-- 2回でも壊れる場合は、同じ provider に粘らず fallback model に切り替える
-- fallback model の出力も必ず validator に通す
+- 2回でも壊れる場合は、その provider の出力は採用しない
+- Gemini が fail したら fallback model に切り替える
+- fallback model の出力も同じ ReAsk を最大2回まで通す
 - fallback model まで fail した場合は、壊れた回答を Discord に出さず、cache にも保存しない
 
 ### Provider 切り替え
@@ -400,13 +401,17 @@ Gemini ReAsk #1
 Gemini ReAsk #2
   ↓ fail
 OpenRouter fallback initial
+  ↓ fail
+OpenRouter ReAsk #1
+  ↓ fail
+OpenRouter ReAsk #2
   ↓ validate
 pass → reply/cache
 fail → no cache + short error reply
 ```
 
 OpenRouter 側で技術的 timeout が起きた場合は、既存の OpenRouter timeout retry 方針に従う。  
-ただし language guard の ReAsk と transport timeout retry が無制限に掛け算されないように、language guard 側の fallback 呼び出しは原則1回にする。
+language guard の ReAsk は provider ごとに最大2回まで。
 
 ### ReAsk prompt 例: Indonesian bucket
 
@@ -576,7 +581,7 @@ type GuardedGenerateResult = {
 | first output fail, ReAsk #1 fail, ReAsk #2 pass | ReAsk #2 answer is cached and replied |
 | Gemini initial + 2 ReAsk all fail | fallback model is called |
 | fallback output pass | fallback answer is cached and replied |
-| fallback output fail | no cache save; short error reply |
+| fallback output fail | fallback ReAsk #1/#2 を経ても fail なら no cache save; short error reply |
 | first output pass | no ReAsk and no fallback |
 
 ### Final failure
@@ -635,7 +640,7 @@ console には短く出す。
 |---|---|
 | 固有名詞や URL を daily-japanese で誤検出 | URL は検査前に除去し、Latin は通す。残る誤検出は `aaa` / `....` などの同一文字ゴミだけを対象にする |
 | Indonesian bucket の Latin script は英語比率だけでは厳密判定できない | 未知の Latin token は通し、英語ストップワード 10% 超だけを ReAsk に使う。必要なら stopword セットを微調整する |
-| ReAsk で応答時間が伸びる | primary provider は最大2回まで。まだ fail する場合は fallback model に切り替え、fallback 出力も fail なら送らない |
+| ReAsk で応答時間が伸びる | 各 provider は最大2回まで。Gemini が fail したら fallback model に切り替え、fallback 出力も fail なら送らない |
 | 既存 cache に壊れた出力が残る | 初期実装では runtime 再検査しない。必要なら管理画面で削除 |
 | validator が過剰に厳しい | violation を bot_events に残し、実データで allowlist を育てる |
 | 中国語テキストが通過する | 中国語（簡体字・繁体字）は Script=Han で日本語漢字と同一 Unicode Script に属するため、禁止スクリプト検出では排除できない。現時点では許容する。実運用で問題が発生した場合は追加の文字範囲チェック（例: CJK Unified Ideographs Extension 判定）を検討する |
@@ -650,8 +655,8 @@ console には短く出す。
 - `indonesian` bucket で英語ストップワード比率が 10% を超えたら ReAsk される
 - `daily-japanese` bucket では Latin 文字（英語・インドネシア語・ローマ字）は通る
 - ReAsk 成功時だけ cache 保存される
-- primary provider の ReAsk 2回が失敗したら fallback model に回る
-- fallback model も fail した場合は cache 保存されない
+- Gemini の ReAsk 2回が失敗したら fallback model に回る
+- fallback model も ReAsk 2回まで試し、それでも fail した場合は cache 保存されない
 - `bot_events` に違反理由が残る
 - unit test で Hangul / Cyrillic / Devanagari / garbage marker / indonesian english-ratio 超過を固定する
 - `pnpm --filter @grkd-jisho/bot test` が通る

@@ -275,7 +275,7 @@ describe("generate", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("language guard で Gemini ReAsk 2回 + OpenRouter fallback まで落ちたら LanguageGuardError を投げる", async () => {
+  it("language guard で Gemini ReAsk 2回 + OpenRouter ReAsk 2回 まで落ちたら LanguageGuardError を投げる", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({
         candidates: [
@@ -331,6 +331,32 @@ describe("generate", () => {
       }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: "مرحبا من reask",
+              reasoning: "hidden",
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: "مرحبا من reask 2",
+              reasoning: "hidden",
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
       }));
 
     vi.stubGlobal("fetch", fetchMock);
@@ -346,7 +372,55 @@ describe("generate", () => {
       promptVersion: "v9",
     })).rejects.toBeInstanceOf(LanguageGuardError);
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+  });
+
+  it("OpenRouter も language guard で ReAsk 2回する", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: "مرحبا",
+              reasoning: "hidden",
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: "意味:\nこれはテストです",
+              reasoning: "hidden",
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateWithLanguageGuardrails({
+      roleKey: "daily-japanese",
+      query: "これ",
+      dictionaryForm: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    });
+
+    expect(result.text).toBe("意味:\nこれはテストです");
+    expect(result.source).toBe("openrouter");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("OpenRouter の 500 エラーは即失敗し、リトライしない", async () => {
