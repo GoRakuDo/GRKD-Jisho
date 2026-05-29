@@ -155,6 +155,9 @@ const RULES: Rule[] = [
   // 形容詞
   { suffix: "くて", replacement: "い" },
   { suffix: "かった", replacement: "い" },
+  // 文語・古語形容詞の限定対応: 止事無き→止事無い、やんごとなき→やんごとない
+  { suffix: "無き", replacement: "無い" },
+  { suffix: "なき", replacement: "ない" },
   { suffix: "く", replacement: "い" },
 ];
 

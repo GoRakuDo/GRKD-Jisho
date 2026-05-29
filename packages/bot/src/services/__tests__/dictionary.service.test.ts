@@ -125,4 +125,20 @@ describe("lookupWord", () => {
     expect(result!.dictionary.id).toBe(20);
     expect(result!.matchedBy).toBe("term");
   });
+
+  it("文語形容詞: 止事無き は 止 まで短縮されず 止事無い に deinflect される", async () => {
+    const dict = { id: 30, name: "広辞苑", enabled: true, priority: 3 };
+    const entry = { id: BigInt(300), term: "止事無い", reading: "やんごとない", dictionaryId: 30 };
+
+    // dict found → exact term miss → exact reading miss → deinflected term hit
+    setDbResults([dict], [], [], [entry]);
+
+    const result = await lookupWord("止事無き");
+
+    expect(result).not.toBeNull();
+    expect(result!.entry.term).toBe("止事無い");
+    expect(result!.matchedBy).toBe("deinflected");
+    expect(result!.originalInflected).toBe("止事無き");
+    expect(result!.deinflectedFrom).toBe("止事無い");
+  });
 });

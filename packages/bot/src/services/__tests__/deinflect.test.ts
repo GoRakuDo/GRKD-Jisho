@@ -129,6 +129,16 @@ describe("deinflect", () => {
     expect(result.map((r) => r.text)).toContain("思う");
   });
 
+  it("文語形容詞: 止事無き→止事無い", () => {
+    const result = deinflect("止事無き");
+    expect(result.map((r) => r.text)).toContain("止事無い");
+  });
+
+  it("文語形容詞: やんごとなき→やんごとない", () => {
+    const result = deinflect("やんごとなき");
+    expect(result.map((r) => r.text)).toContain("やんごとない");
+  });
+
   // ── エッジケース ──
 
   it("空文字列は空配列", () => {
