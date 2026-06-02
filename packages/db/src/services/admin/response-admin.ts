@@ -1,4 +1,4 @@
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import { db } from "../../index";
 import * as schema from "../../schema";
 import type { ResponseEdit } from "../../schema/response-edits";
@@ -157,18 +157,69 @@ export async function updateResponse(
 
 // ── Delete single response ──
 
+type LockedResponseCacheRow = {
+  id: bigint;
+  isDeleteProtected: boolean;
+};
+
+async function lockResponseCacheRowsById(tx: Pick<typeof db, "execute">, cacheId: bigint) {
+  const result = (await tx.execute(sql`
+    SELECT id, is_delete_protected AS "isDeleteProtected"
+    FROM response_cache
+    WHERE id = ${cacheId}
+    FOR UPDATE
+  `)) as unknown as { rows: LockedResponseCacheRow[] };
+
+  return result.rows;
+}
+
+async function lockResponseCacheRowsByQuery(
+  tx: Pick<typeof db, "execute">,
+  normalizedQuery: string,
+  roleKey?: string,
+) {
+  const roleClause = roleKey ? sql` AND role_key = ${roleKey}` : sql``;
+
+  const result = (await tx.execute(sql`
+    SELECT id, is_delete_protected AS "isDeleteProtected"
+    FROM response_cache
+    WHERE normalized_query = ${normalizedQuery}
+    ${roleClause}
+    FOR UPDATE
+  `)) as unknown as { rows: LockedResponseCacheRow[] };
+
+  return result.rows;
+}
+
 export async function deleteResponse(cacheId: string): Promise<number> {
   if (!/^\d+$/.test(cacheId)) throw new Error("Invalid response ID");
 
   const numericId = BigInt(cacheId);
 
-  // Only delete if not delete-protected
-  const result = await db
-    .delete(schema.responseCache)
-    .where(and(eq(schema.responseCache.id, numericId), eq(schema.responseCache.isDeleteProtected, false)))
-    .returning({ id: schema.responseCache.id });
+  return db.transaction(async (tx) => {
+    const [row] = await lockResponseCacheRowsById(tx, numericId);
 
-  return result.length;
+    if (!row || row.isDeleteProtected) {
+      return 0;
+    }
+
+    // Delete children first so single-response delete works even if the live DB
+    // is still missing ON DELETE CASCADE on one of the child FKs.
+    await tx
+      .delete(schema.lookupLogs)
+      .where(eq(schema.lookupLogs.responseCacheId, numericId));
+
+    await tx
+      .delete(schema.responseEdits)
+      .where(eq(schema.responseEdits.responseCacheId, numericId));
+
+    const result = await tx
+      .delete(schema.responseCache)
+      .where(eq(schema.responseCache.id, numericId))
+      .returning({ id: schema.responseCache.id });
+
+    return result.length;
+  });
 }
 
 // ── Delete cache (skip delete-protected rows) ──
@@ -177,20 +228,29 @@ export async function deleteCacheByQuery(
   normalizedQuery: string,
   roleKey?: string,
 ): Promise<number> {
-  const conditions = [
-    eq(schema.responseCache.normalizedQuery, normalizedQuery),
-    eq(schema.responseCache.isDeleteProtected, false),
-  ];
-  if (roleKey) {
-    conditions.push(eq(schema.responseCache.roleKey, roleKey));
-  }
+  return db.transaction(async (tx) => {
+    const rows = await lockResponseCacheRowsByQuery(tx, normalizedQuery, roleKey);
+    const deletableIds = rows.filter((row) => !row.isDeleteProtected).map((row) => row.id);
 
-  const result = await db
-    .delete(schema.responseCache)
-    .where(and(...conditions))
-    .returning({ id: schema.responseCache.id });
+    if (deletableIds.length === 0) {
+      return 0;
+    }
 
-  return result.length;
+    await tx
+      .delete(schema.lookupLogs)
+      .where(inArray(schema.lookupLogs.responseCacheId, deletableIds));
+
+    await tx
+      .delete(schema.responseEdits)
+      .where(inArray(schema.responseEdits.responseCacheId, deletableIds));
+
+    const result = await tx
+      .delete(schema.responseCache)
+      .where(inArray(schema.responseCache.id, deletableIds))
+      .returning({ id: schema.responseCache.id });
+
+    return result.length;
+  });
 }
 
 // ── Source lookup ──
