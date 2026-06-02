@@ -226,6 +226,103 @@ describe("generate", () => {
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
+  it("language guard 通過後に output quality guard が失敗したら Gemini で ReAsk する", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "The response adheres strictly to the specified format. \\boxed{Completed}", thought: false },
+              ],
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "意味:\nこれはテストです。", thought: false },
+              ],
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateWithLanguageGuardrails({
+      roleKey: "daily-japanese",
+      query: "これ",
+      dictionaryForm: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    });
+
+    expect(result.text).toBe("意味:\nこれはテストです。");
+    expect(result.source).toBe("gemini");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("OpenRouter fallback でも output quality guard は同じ ReAsk を使う", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: "The response adheres strictly to the specified format. \\boxed{Completed}",
+              reasoning: "hidden reasoning",
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: "意味:\nこれはテストです。",
+              reasoning: "hidden reasoning",
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateWithLanguageGuardrails({
+      roleKey: "indonesian",
+      query: "これ",
+      dictionaryForm: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    });
+
+    expect(result.text).toBe("意味:\nこれはテストです。");
+    expect(result.source).toBe("openrouter");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("language guard で daily-japanese の初回失敗は Gemini ReAsk で再生成する", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({
@@ -395,7 +492,7 @@ describe("generate", () => {
         choices: [
           {
             message: {
-              content: "意味:\nこれはテストです",
+              content: "意味:\nこれはテストです。",
               reasoning: "hidden",
             },
           },
@@ -418,7 +515,7 @@ describe("generate", () => {
       promptVersion: "v9",
     });
 
-    expect(result.text).toBe("意味:\nこれはテストです");
+    expect(result.text).toBe("意味:\nこれはテストです。");
     expect(result.source).toBe("openrouter");
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });

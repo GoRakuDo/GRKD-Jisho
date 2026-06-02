@@ -1,6 +1,7 @@
 import { env } from "../config/env.js";
 import { FALLBACK_LLM_MODEL, PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import { buildLanguageReaskPrompt, validateOutputLanguage, type LanguageGuardResult, type LanguageGuardViolation } from "./language-guard.service.js";
+import { buildOutputQualityReaskPrompt, validateOutputQuality, type OutputQualityResult, type OutputQualityViolation } from "./output-quality-guard.service.js";
 import type { RoleKey } from "../types.js";
 
 const GEMINI_TIMEOUT_MS = 60_000;
@@ -8,6 +9,8 @@ const OPENROUTER_TIMEOUT_MS = 150_000;
 const OPENROUTER_MAX_ATTEMPTS = 3;
 
 type LanguageGuardProvider = "gemini" | "openrouter";
+type GuardrailFailureCategory = "language" | "quality" | "mixed";
+type GuardrailViolation = LanguageGuardViolation | OutputQualityViolation;
 
 interface GenerateParams {
   roleKey: RoleKey;
@@ -26,7 +29,8 @@ export class LanguageGuardError extends Error {
     public readonly source: "gemini" | "openrouter",
     public readonly reaskAttempts: number,
     public readonly fallbackUsed: boolean,
-    public readonly violations: LanguageGuardViolation[],
+    public readonly violations: GuardrailViolation[],
+    public readonly failureCategory: GuardrailFailureCategory = "language",
     message = "Language guard validation failed",
   ) {
     super(message);
@@ -140,10 +144,15 @@ async function callLanguageModel(prompt: string, provider: LanguageGuardProvider
   return provider === "gemini" ? callGemini(prompt) : callOpenRouter(prompt);
 }
 
+type GuardFailure =
+  | { kind: "language"; validation: Exclude<LanguageGuardResult, { ok: true }> }
+  | { kind: "quality"; validation: Exclude<OutputQualityResult, { ok: true }> };
+
 interface GuardedValidationFailure {
   ok: false;
-  validation: Exclude<LanguageGuardResult, { ok: true }>;
+  validation: GuardFailure;
   reaskAttempts: number;
+  failureKinds: Set<GuardrailFailureCategory>;
 }
 
 interface GuardedValidationSuccess {
@@ -155,36 +164,73 @@ interface GuardedValidationSuccess {
 async function validateWithReaskOnProvider(
   provider: LanguageGuardProvider,
   renderedPrompt: string,
-  bucket: RoleKey,
+  params: GenerateParams,
   initialText: string,
 ): Promise<GuardedValidationFailure | GuardedValidationSuccess> {
-  let latestValidation = validateOutputLanguage(initialText, bucket);
-  if (latestValidation.ok) {
+  let latestValidation = evaluateGuardrails(initialText, params);
+  if (!latestValidation) {
     return { ok: true, text: initialText, reaskAttempts: 0 };
   }
+
+  const failureKinds = new Set<GuardrailFailureCategory>([latestValidation.kind]);
 
   let reaskAttempts = 0;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     reaskAttempts = attempt;
-    const reaskPrompt = buildLanguageReaskPrompt(renderedPrompt, bucket, latestValidation);
+    const reaskPrompt = buildReaskPrompt(renderedPrompt, params.roleKey, latestValidation);
 
     try {
-      console.log(`[LLM] ${getProviderLabel(provider)} language reask started → attempt=${attempt}/2`);
+      console.log(`[LLM] ${getProviderLabel(provider)} guard reask started → attempt=${attempt}/2`);
       const text = await callLanguageModel(reaskPrompt, provider);
-      const validation = validateOutputLanguage(text, bucket);
-      if (validation.ok) {
-        console.log(`[LLM] ${getProviderLabel(provider)} language reask success → attempt=${attempt}/2`);
+      const validation = evaluateGuardrails(text, params);
+      if (!validation) {
+        console.log(`[LLM] ${getProviderLabel(provider)} guard reask success → attempt=${attempt}/2`);
         return { ok: true, text, reaskAttempts };
       }
 
       latestValidation = validation;
-      console.warn(`[LLM] ${getProviderLabel(provider)} language reask failed → attempt=${attempt}/2, retrying`);
+      failureKinds.add(validation.kind);
+      console.warn(`[LLM] ${getProviderLabel(provider)} guard reask failed → attempt=${attempt}/2, retrying`);
     } catch (err) {
-      console.warn(`[LLM] ${getProviderLabel(provider)} language reask transport failed → attempt=${attempt}/2, error=${err instanceof Error ? err.message : String(err)}, retrying`);
+      console.warn(`[LLM] ${getProviderLabel(provider)} guard reask transport failed → attempt=${attempt}/2, error=${err instanceof Error ? err.message : String(err)}, retrying`);
     }
   }
 
-  return { ok: false, validation: latestValidation, reaskAttempts };
+  return { ok: false, validation: latestValidation, reaskAttempts, failureKinds };
+}
+
+function evaluateGuardrails(text: string, params: GenerateParams): GuardFailure | null {
+  const languageValidation = validateOutputLanguage(text, params.roleKey);
+  if (!languageValidation.ok) {
+    return { kind: "language", validation: languageValidation };
+  }
+
+  const qualityValidation = validateOutputQuality({
+    text,
+    bucket: params.roleKey,
+    query: params.query,
+    dictionaryForm: params.dictionaryForm,
+    definitionJson: params.definitionJson,
+  });
+  if (!qualityValidation.ok) {
+    return { kind: "quality", validation: qualityValidation };
+  }
+
+  return null;
+}
+
+function buildReaskPrompt(renderedPrompt: string, bucket: RoleKey, failure: GuardFailure): string {
+  return failure.kind === "language"
+    ? buildLanguageReaskPrompt(renderedPrompt, bucket, failure.validation)
+    : buildOutputQualityReaskPrompt(renderedPrompt, failure.validation);
+}
+
+function summarizeFailureCategory(failureKinds: Set<GuardrailFailureCategory>): GuardrailFailureCategory {
+  if (failureKinds.size > 1) {
+    return "mixed";
+  }
+
+  return failureKinds.values().next().value ?? "language";
 }
 
 export interface GenerateResult {
@@ -224,22 +270,22 @@ export async function generateWithLanguageGuardrails(params: GenerateParams): Pr
     return initial;
   }
 
-  const initialAttempt = await validateWithReaskOnProvider(initial.source, renderedPrompt, params.roleKey, initial.text);
+  const initialAttempt = await validateWithReaskOnProvider(initial.source, renderedPrompt, params, initial.text);
   if (initialAttempt.ok) {
     return { text: initialAttempt.text, source: initial.source };
   }
 
   if (initial.source === "openrouter") {
-    throw new LanguageGuardError(params.roleKey, initial.source, initialAttempt.reaskAttempts, true, initialAttempt.validation.violations);
+    throw new LanguageGuardError(params.roleKey, initial.source, initialAttempt.reaskAttempts, true, initialAttempt.validation.validation.violations, summarizeFailureCategory(initialAttempt.failureKinds));
   }
 
   const fallbackText = await callOpenRouter(renderedPrompt);
-  const fallbackAttempt = await validateWithReaskOnProvider("openrouter", renderedPrompt, params.roleKey, fallbackText);
+  const fallbackAttempt = await validateWithReaskOnProvider("openrouter", renderedPrompt, params, fallbackText);
   if (fallbackAttempt.ok) {
     return { text: fallbackAttempt.text, source: "openrouter" };
   }
 
-  throw new LanguageGuardError(params.roleKey, "openrouter", fallbackAttempt.reaskAttempts, true, fallbackAttempt.validation.violations);
+  throw new LanguageGuardError(params.roleKey, "openrouter", fallbackAttempt.reaskAttempts, true, fallbackAttempt.validation.validation.violations, summarizeFailureCategory(fallbackAttempt.failureKinds));
 }
 
 function isAbortError(err: unknown): boolean {

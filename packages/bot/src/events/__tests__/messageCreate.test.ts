@@ -21,6 +21,7 @@ const {
       public readonly reaskAttempts: number,
       public readonly fallbackUsed: boolean,
       public readonly violations: Array<{ kind: string; label: string; sample: string }>,
+      public readonly failureCategory: "language" | "quality" | "mixed" = "language",
     ) {
       super("Language guard validation failed");
       this.name = "LanguageGuardError";

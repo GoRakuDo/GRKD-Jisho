@@ -309,6 +309,7 @@ async function handleMessage(message: Message): Promise<void> {
           source: err.source,
           reaskAttempts: err.reaskAttempts,
           fallbackUsed: err.fallbackUsed,
+          failureCategory: err.failureCategory ?? "language",
           violations: err.violations,
         });
         console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
@@ -484,6 +485,7 @@ async function handleMessage(message: Message): Promise<void> {
         source: err.source,
         reaskAttempts: err.reaskAttempts,
         fallbackUsed: err.fallbackUsed,
+        failureCategory: err.failureCategory ?? "language",
         violations: err.violations,
       });
       console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
