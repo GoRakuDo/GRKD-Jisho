@@ -530,6 +530,8 @@ export async function saveResponse(params: CacheKey & { responseText: string }) 
 `packages/bot/src/services/llm.service.ts` を作成する。
 
 > **Legacy reference only:** the snippet below reflects the older bridge template that existed before provider-native separation. For the improved v2 prompt format, see `DOCS/Prompts/prompt-v2.md`.
+>
+> **Current sampling defaults:** Gemini / OpenRouter の両方で `temperature=0.65`, `topP=0.8` を使う。`thinkingConfig` や `reasoning.exclude` とは別に、出力の揺れ幅を同じ基準で揃える。
 
 **責務:**
 - Gemini API を呼び出し

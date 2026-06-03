@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_LLM_TEMPERATURE, DEFAULT_LLM_TOP_P } from "../../config/llm-model";
 
 vi.mock("../../config/env", () => ({
   env: {
@@ -142,7 +143,11 @@ describe("generate", () => {
 
     const requestBody = JSON.parse(body as string) as {
       contents: Array<{ parts: Array<{ text: string }> }>;
-      generationConfig?: { thinkingConfig?: { includeThoughts?: boolean; thinkingLevel?: string } };
+      generationConfig?: {
+        temperature?: number;
+        topP?: number;
+        thinkingConfig?: { includeThoughts?: boolean; thinkingLevel?: string };
+      };
     };
 
     const promptText = requestBody.contents[0]?.parts[0]?.text ?? "";
@@ -153,6 +158,8 @@ describe("generate", () => {
     expect(promptText).toContain("VER=v9");
     expect(promptText).not.toContain("ANSWER:");
     expect(promptText).not.toContain("REASONING:");
+    expect(requestBody.generationConfig?.temperature).toBe(DEFAULT_LLM_TEMPERATURE);
+    expect(requestBody.generationConfig?.topP).toBe(DEFAULT_LLM_TOP_P);
     expect(requestBody.generationConfig?.thinkingConfig?.includeThoughts).toBe(true);
   });
 
@@ -196,11 +203,15 @@ describe("generate", () => {
 
     const requestBody = JSON.parse(fallbackBody as string) as {
       messages: Array<{ content: string }>;
+      temperature?: number;
+      top_p?: number;
       reasoning?: { max_tokens?: number; exclude?: boolean };
     };
 
     expect(requestBody.messages[0]?.content).toContain("HELLO=これ");
     expect(requestBody.messages[0]?.content).toContain("v9");
+    expect(requestBody.temperature).toBe(DEFAULT_LLM_TEMPERATURE);
+    expect(requestBody.top_p).toBe(DEFAULT_LLM_TOP_P);
     expect(requestBody.reasoning?.max_tokens).toBe(4096);
     expect(requestBody.reasoning?.exclude).toBe(true);
   });

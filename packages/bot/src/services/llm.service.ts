@@ -1,5 +1,5 @@
 import { env } from "../config/env.js";
-import { FALLBACK_LLM_MODEL, PRIMARY_LLM_MODEL } from "../config/llm-model.js";
+import { DEFAULT_LLM_TEMPERATURE, DEFAULT_LLM_TOP_P, FALLBACK_LLM_MODEL, PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import { buildLanguageReaskPrompt, validateOutputLanguage, type LanguageGuardResult, type LanguageGuardViolation } from "./language-guard.service.js";
 import { buildOutputQualityReaskPrompt, validateOutputQuality, type OutputQualityResult, type OutputQualityViolation } from "./output-quality-guard.service.js";
 import type { RoleKey } from "../types.js";
@@ -309,6 +309,8 @@ async function callGemini(prompt: string): Promise<string> {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
+          temperature: DEFAULT_LLM_TEMPERATURE,
+          topP: DEFAULT_LLM_TOP_P,
           thinkingConfig: {
             includeThoughts: true,
             thinkingLevel: "HIGH",
@@ -377,6 +379,8 @@ async function callOpenRouterOnce(prompt: string): Promise<string> {
       body: JSON.stringify({
         model: FALLBACK_LLM_MODEL,
         messages: [{ role: "user", content: prompt }],
+        temperature: DEFAULT_LLM_TEMPERATURE,
+        top_p: DEFAULT_LLM_TOP_P,
         reasoning: {
           max_tokens: 4096,
           exclude: true,

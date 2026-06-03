@@ -40,6 +40,8 @@ WebUI = 管理・品質改善の拠点
 | Containerize | Docker + docker-compose | ローカル → クラウドのmigration が容易 |
 | Cloud Deploy | Railway (推奨) or Fly.io | Dockerfile ベースでそのまま移行可 |
 
+> **LLM sampling defaults:** Gemini / OpenRouter ともに `temperature=0.65`, `topP=0.8` を初期値として使う。回答のぶれを抑え、辞書説明の再現性を優先する。
+
 ---
 
 ## 3. System Architecture
