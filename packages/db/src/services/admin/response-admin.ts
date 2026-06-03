@@ -162,15 +162,40 @@ type LockedResponseCacheRow = {
   isDeleteProtected: boolean;
 };
 
+type RawLockedResponseCacheRow = {
+  id: bigint | string | number;
+  isDeleteProtected?: boolean;
+  isdeleteprotected?: boolean;
+  is_delete_protected?: boolean;
+};
+
+function toLockedResponseCacheRows(result: unknown): LockedResponseCacheRow[] {
+  const rows = Array.isArray(result)
+    ? result
+    : Array.isArray((result as { rows?: unknown }).rows)
+      ? (result as { rows: unknown[] }).rows
+      : [];
+
+  return rows.map((row) => {
+    const raw = row as RawLockedResponseCacheRow;
+    return {
+      id: BigInt(raw.id),
+      isDeleteProtected: Boolean(
+        raw.isDeleteProtected ?? raw.isdeleteprotected ?? raw.is_delete_protected,
+      ),
+    };
+  });
+}
+
 async function lockResponseCacheRowsById(tx: Pick<typeof db, "execute">, cacheId: bigint) {
-  const result = (await tx.execute(sql`
+  const result = await tx.execute(sql`
     SELECT id, is_delete_protected AS "isDeleteProtected"
     FROM response_cache
     WHERE id = ${cacheId}
     FOR UPDATE
-  `)) as unknown as { rows: LockedResponseCacheRow[] };
+  `);
 
-  return result.rows;
+  return toLockedResponseCacheRows(result);
 }
 
 async function lockResponseCacheRowsByQuery(
@@ -180,15 +205,15 @@ async function lockResponseCacheRowsByQuery(
 ) {
   const roleClause = roleKey ? sql` AND role_key = ${roleKey}` : sql``;
 
-  const result = (await tx.execute(sql`
+  const result = await tx.execute(sql`
     SELECT id, is_delete_protected AS "isDeleteProtected"
     FROM response_cache
     WHERE normalized_query = ${normalizedQuery}
     ${roleClause}
     FOR UPDATE
-  `)) as unknown as { rows: LockedResponseCacheRow[] };
+  `);
 
-  return result.rows;
+  return toLockedResponseCacheRows(result);
 }
 
 export async function deleteResponse(cacheId: string): Promise<number> {
