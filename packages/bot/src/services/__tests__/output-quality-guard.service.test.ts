@@ -79,22 +79,38 @@ describe("validateOutputQuality", () => {
 
   it("短すぎる本文を落とす", () => {
     const result = validateOutputQuality({
-      text: "## 【は】\n\n意味:\n助詞",
+      text: "## 【表】\n\nUser Safety: safe",
       bucket: "daily-japanese",
-      query: "は",
-      dictionaryForm: "は",
+      query: "表",
+      dictionaryForm: "表",
       definitionJson: "{}",
     });
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.violations.some((violation) => violation.kind === "too-short")).toBe(true);
+      expect(result.violations.some((violation) => violation.kind === "safety-self-report")).toBe(true);
+    }
+  });
+
+  it("安全判定だけの self-report を落とす", () => {
+    const result = validateOutputQuality({
+      text: "User Safety: safe",
+      bucket: "indonesian",
+      query: "表",
+      dictionaryForm: "表",
+      definitionJson: "{}",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.violations.some((violation) => violation.kind === "safety-self-report")).toBe(true);
     }
   });
 
   it("十分な本文は通す", () => {
     const result = validateOutputQuality({
-      text: "## 【は】\n\n意味:\n助詞です。文の主題を示します。",
+      text: "## 【は】\n\n意味:\n「は」は、文の中で話題にしたいものを前に出す助詞です。たとえば「私は学生です」なら、「私」についてこれから説明します、という合図になります。新しい情報を強く出すというより、すでに話題に乗っているものを静かに取り上げる感じです。会話では、相手と共有しているテーマを続けるときにも使います。インドネシア語に一語で完全対応する語はないので、文全体の役割で見るのが大事です。短い語ですが、文の焦点を決める大事な部品です。何を主役として扱うかを示すため、前後の文脈と一緒に読むと自然に理解できます。特に長い会話では重要です。",
       bucket: "daily-japanese",
       query: "は",
       dictionaryForm: "は",

@@ -4,6 +4,7 @@ export type OutputQualityGuardBucket = RoleKey;
 
 export type OutputQualityViolationKind =
   | "format-self-report"
+  | "safety-self-report"
   | "completion-only"
   | "assistant-meta"
   | "body-missing"
@@ -30,8 +31,10 @@ const FORMAT_SELF_REPORT_PHRASES = [
 ];
 
 const FORMAT_SELF_REPORT_REGEX = /(?:adhere[sd]?|compl(?:y|ied)|conform|follow(?:ed|s)?|meet(?:s|ing)?)\s+(?:with\s+)?(?:strictly\s+)?(?:to\s+)?(?:the\s+)?(?:specified|required|given)\s+format/i;
+const SAFETY_SELF_REPORT_REGEX = /\b(?:user\s+safety|safety)\s*[:：]\s*(?:safe|ok|passed?)\b/i;
 
 const ASSISTANT_META_REGEX = /\b(?:As an AI|I cannot|I can't provide)\b/i;
+const MIN_EXPLANATORY_BODY_CHARS = 250;
 
 const HEADING_LINE_REGEX = /^(?:#{1,6}\s+.+|【.*】)$/;
 const LABEL_WITH_CONTENT_REGEX = /^(読み|意味|わかりやすい説明|ニュアンス|関連語|meaning|explanation|notes|related(?: words?)?|summary)\s*[:：]\s*(.*)$/i;
@@ -90,6 +93,15 @@ function collectFormatSelfReportViolations(text: string): OutputQualityViolation
   }
 
   return uniqueViolations(violations);
+}
+
+function collectSafetySelfReportViolations(text: string): OutputQualityViolation[] {
+  const sample = normalizeTextForScanning(text).match(SAFETY_SELF_REPORT_REGEX)?.[0];
+  if (!sample) {
+    return [];
+  }
+
+  return [{ kind: "safety-self-report", label: "Safety self-report", sample }];
 }
 
 function collectCompletionOnlyViolations(text: string): OutputQualityViolation[] {
@@ -158,7 +170,7 @@ function collectTooShortViolations(text: string): OutputQualityViolation[] {
   const bodyLength = bodyText.replace(/\s+/g, "").length;
   const sentenceCount = bodyText.match(/[。.!?]/g)?.length ?? 0;
 
-  if (bodyLength < 10 && sentenceCount === 0) {
+  if (bodyLength < MIN_EXPLANATORY_BODY_CHARS) {
     return [{ kind: "too-short", label: "Too short", sample: `${bodyLength} chars / ${sentenceCount} sentences` }];
   }
 
@@ -177,6 +189,7 @@ export function validateOutputQuality(params: {
   const violations: OutputQualityViolation[] = [];
 
   violations.push(...collectFormatSelfReportViolations(text));
+  violations.push(...collectSafetySelfReportViolations(text));
   violations.push(...collectCompletionOnlyViolations(text));
   violations.push(...collectAssistantMetaViolations(text));
 

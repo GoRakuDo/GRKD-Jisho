@@ -10,6 +10,8 @@ vi.mock("../../config/env", () => ({
 
 import { generate, generateWithLanguageGuardrails, LanguageGuardError, normalizePromptTemplate } from "../llm.service";
 
+const VALID_DAILY_RESPONSE = "意味:\n「これ」は、話している人と聞いている人の近くにある物や、今まさに話題にしている内容を指す言葉です。たとえば机の上の本を指して『これは本です』と言えば、その本を中心に説明しています。物だけでなく、直前に出た話題や状況をまとめて指すときにも使います。短い語ですが、会話の焦点を相手に見せる大事な役割があります。文脈の中で何を指しているかを確認すると、自然に理解できます。前の発言全体をまとめて受けることもあり、『これが問題です』のように状況そのものを指す場合もあります。指している対象が近くの物なのか、話題なのかを見分けると、意味がかなり取りやすくなります。";
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -75,7 +77,7 @@ describe("generate", () => {
         {
           content: {
             parts: [
-              { text: "【これ】\n意味:\nこれはテストです", thought: false },
+              { text: `【これ】\n${VALID_DAILY_RESPONSE}`, thought: false },
             ],
           },
         },
@@ -98,7 +100,7 @@ describe("generate", () => {
       promptVersion: "v1",
     });
 
-    expect(result.text).toBe("【これ】\n意味:\nこれはテストです");
+    expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
     expect(result.source).toBe("gemini");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -110,7 +112,7 @@ describe("generate", () => {
           content: {
             parts: [
               { text: "internal reasoning", thought: true },
-              { text: "【これ】\n意味:\nこれはテストです", thought: false },
+              { text: `【これ】\n${VALID_DAILY_RESPONSE}`, thought: false },
             ],
           },
         },
@@ -133,7 +135,7 @@ describe("generate", () => {
       promptVersion: "v9",
     });
 
-    expect(result.text).toBe("【これ】\n意味:\nこれはテストです");
+    expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
     expect(result.source).toBe("gemini");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -170,7 +172,7 @@ describe("generate", () => {
         choices: [
           {
             message: {
-              content: "【これ】\n意味:\nこれはテストです",
+              content: `【これ】\n${VALID_DAILY_RESPONSE}`,
               reasoning: "hidden reasoning",
             },
           },
@@ -193,7 +195,7 @@ describe("generate", () => {
       promptVersion: "v9",
     });
 
-    expect(result.text).toBe("【これ】\n意味:\nこれはテストです");
+    expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
     expect(result.source).toBe("openrouter");
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
@@ -258,7 +260,7 @@ describe("generate", () => {
           {
             content: {
               parts: [
-                { text: "意味:\nこれはテストです。", thought: false },
+                { text: VALID_DAILY_RESPONSE, thought: false },
               ],
             },
           },
@@ -281,7 +283,7 @@ describe("generate", () => {
       promptVersion: "v9",
     });
 
-    expect(result.text).toBe("意味:\nこれはテストです。");
+    expect(result.text).toBe(VALID_DAILY_RESPONSE);
     expect(result.source).toBe("gemini");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -306,7 +308,7 @@ describe("generate", () => {
         choices: [
           {
             message: {
-              content: "意味:\nこれはテストです。",
+              content: VALID_DAILY_RESPONSE,
               reasoning: "hidden reasoning",
             },
           },
@@ -329,7 +331,7 @@ describe("generate", () => {
       promptVersion: "v9",
     });
 
-    expect(result.text).toBe("意味:\nこれはテストです。");
+    expect(result.text).toBe(VALID_DAILY_RESPONSE);
     expect(result.source).toBe("openrouter");
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
@@ -355,7 +357,7 @@ describe("generate", () => {
           {
             content: {
               parts: [
-                { text: "意味:\nこれはテストです。", thought: false },
+                { text: VALID_DAILY_RESPONSE, thought: false },
               ],
             },
           },
@@ -378,7 +380,7 @@ describe("generate", () => {
       promptVersion: "v9",
     });
 
-    expect(result.text).toBe("意味:\nこれはテストです。");
+    expect(result.text).toBe(VALID_DAILY_RESPONSE);
     expect(result.source).toBe("gemini");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -503,7 +505,7 @@ describe("generate", () => {
         choices: [
           {
             message: {
-              content: "意味:\nこれはテストです。",
+              content: VALID_DAILY_RESPONSE,
               reasoning: "hidden",
             },
           },
@@ -526,7 +528,7 @@ describe("generate", () => {
       promptVersion: "v9",
     });
 
-    expect(result.text).toBe("意味:\nこれはテストです。");
+    expect(result.text).toBe(VALID_DAILY_RESPONSE);
     expect(result.source).toBe("openrouter");
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });

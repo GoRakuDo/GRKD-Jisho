@@ -277,10 +277,11 @@ Output Quality Guard
 | Category | 例 | 判定 |
 |---|---|---|
 | format-compliance self report | `The response adheres strictly to the specified format`, `I followed the instructions`, `specified format` | fail |
+| safety self report | `User Safety: safe`, `Safety: safe` | fail |
 | completion-only marker | `Completed`, `\boxed{Completed}`, `Task completed` | fail |
 | assistant refusal / meta response | `As an AI`, `I cannot`, `I can't provide` | fail |
 | body missing | 見出しはあるが、見出し以外の説明本文がない | fail |
-| too short with dictionary data | 辞書定義が存在するのに本文が極端に短い（初期値: 見出し/ラベル除去後の本文が10文字未満、かつ説明文が1文もない） | fail |
+| too short with dictionary data | 辞書定義が存在するのに本文が短すぎる（見出し/ラベル除去後の本文が250文字未満） | fail |
 
 #### 検出方式の初期方針
 
@@ -313,10 +314,10 @@ MVPでは fuzzy matching は入れない。
 1. code block / URL を除去する
 2. `{{dictionary_form}}` / `{{reading}}` を含む先頭見出し行を除去する
 3. `読み:` / `意味:` / `わかりやすい説明:` / `ニュアンス:` / `関連語:` などの label 行だけを除去する
-4. 残りの本文が10文字未満なら `too-short`
+4. 残りの本文が250文字未満なら `too-short`
 5. 残り本文に日本語文、または Indonesian bucket では Latin 説明文が1文も無いなら `body-missing`
 
-短い辞書語（例: 助詞「は」）の valid answer を落としすぎないため、10文字は初期値とし、実 cache で false positive が出たら調整する。
+短い辞書語（例: 助詞「は」）でも、辞書説明としては最低限の本文量が必要になる。`User Safety: safe` のような安全判定だけの短文を cache に保存しないため、最低本文長は250文字にする。
 
 #### Bucket 別の最低品質
 
