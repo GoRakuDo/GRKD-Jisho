@@ -278,6 +278,7 @@ Output Quality Guard
 |---|---|---|
 | format-compliance self report | `The response adheres strictly to the specified format`, `I followed the instructions`, `specified format` | fail |
 | safety self report | `User Safety: safe`, `Safety: safe` | fail |
+| broken dictionary card shape | code block wrapper, Romaji section, sample translation, custom message, generic numbered template headings | fail |
 | completion-only marker | `Completed`, `\boxed{Completed}`, `Task completed` | fail |
 | assistant refusal / meta response | `As an AI`, `I cannot`, `I can't provide` | fail |
 | body missing | 見出しはあるが、見出し以外の説明本文がない | fail |
@@ -318,6 +319,51 @@ MVPでは fuzzy matching は入れない。
 5. 残り本文に日本語文、または Indonesian bucket では Latin 説明文が1文も無いなら `body-missing`
 
 短い辞書語（例: 助詞「は」）でも、辞書説明としては最低限の本文量が必要になる。`User Safety: safe` のような安全判定だけの短文を cache に保存しないため、最低本文長は250文字にする。
+
+#### Output Shape Guard: 辞書カードの形崩れを落とす
+
+2026-06-05 の実 cache で、`query=表` に対して長文ではあるが、本文が `「それ」` の説明、`Romaji:`、`sample translation`、`カスタムメッセージ`、コードブロックを含む壊れた回答が保存された。これは本文長だけでは検出できない。
+
+正常な Indonesian bucket の出力は、次の形を守る。
+
+```txt
+## 【半信半疑（はんしんはんぎ）ー Dalam Nuansa Bahasa Indonesia】
+
+**〘名詞〙 Kata Benda**
+**Intuisi Inti: ...**
+
+1. **辞書語の意味** ...
+   - 例文...
+```
+
+つまり、正常な辞書カードは以下の性質を持つ。
+
+- 見出しと本文の主役が検索語・辞書語からズレない
+- Indonesian bucket ではインドネシア語の説明文が中心
+- 日本語は検索語、読み、品詞、例文、辞書語の引用に限定
+- Romaji は出さない
+- `sample translation` や `カスタムメッセージ` のような補助セクションを出さない
+- ` ```markdown ` のようなコードブロック wrapper を出さない
+- `### 1. 主なポイント` / `### 2. 例文と説明` のような汎用テンプレ見出しを出さない
+
+初期実装では、意味ズレの完全判定までは行わず、まず観測済みの壊れ形を fail にする。
+
+Fail marker:
+
+~~~txt
+```markdown
+Romaji:
+sample translation
+カスタムメッセージ
+### 1. 主なポイント
+### 2. 例文と説明
+### 3. 語義・ニュアンス
+Aturan keseluru:
+~~~
+
+さらに、検索語と違う日本語代名詞が本文の主役として繰り返される場合も疑う。初期ルールでは `query` / `dictionary_form` が `これ` / `それ` / `あれ` ではないのに、本文に `「それ」` / `「これ」` / `「あれ」` が3回以上出た場合を fail にする。太字付き引用（例: `**「それ」**`）は二重カウントしない。
+
+この guard は完全な意味理解ではない。目的は、正常な辞書カードの形から大きく外れた出力を cache 保存前に止め、ReAsk へ戻すこと。
 
 #### Bucket 別の最低品質
 
