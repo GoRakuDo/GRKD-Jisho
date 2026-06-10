@@ -352,7 +352,15 @@ async function handleMessage(message: Message): Promise<void> {
   if (!allowed) {
     console.log(`[Lookup] trace=${traceId} rate limit blocked → limit=${limit}`);
     await message.reply(
-      `本日の検索上限（${limit === Infinity ? "無制限" : `${limit}回`}）に達しました。明日 00:00 GMT+7 にリセットされます。`,
+      [
+        `本日の検索上限（${limit === Infinity ? "無制限" : `${limit}回`}）に達しました。明日 00:00 GMT+7 にリセットされます。`,
+        "",
+        "Kalau Terbantu dengan Project GRKD-Jisho,",
+        "bisa support kita kasih setiap harinya 10x request lbh banyak :thumbsup:",
+        "",
+        "Trakteer Kopi :coffee:  https://trakteer.id/yosiakefas/showcase?menu=open",
+        "Atau dengan Membership YouTube https://www.youtube.com/@yosiakefas/join :kashiwade:",
+      ].join("\n"),
     );
     await traceEvent(traceId, "rate_limit.blocked", "warn", { limit });
     return;
