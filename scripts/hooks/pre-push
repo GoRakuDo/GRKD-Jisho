@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+echo "==> code-reviewer approval gate"
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in
+    0000000000000000000000000000000000000000)
+      continue
+      ;;
+  esac
+
+  if ! pnpm review:check -- --commit "$local_sha"; then
+    echo "[ReviewGate] no APPROVE marker for $local_ref ($local_sha)" >&2
+    echo "  → Run @code-reviewer, then pnpm review:approve -- --commit $local_sha --blocker-high-count 0 --summary \"...\"" >&2
+    exit 1
+  fi
+done

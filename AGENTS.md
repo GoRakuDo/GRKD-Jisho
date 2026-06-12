@@ -498,6 +498,35 @@ DOCS/Roadmap_Implement/phase-0-foundation.md
 
 コードがまだ存在しない場合でも、ドキュメントを根拠に最小構成から作る。
 
+### 15-1. code-reviewer 機械ゲート
+
+ファイル編集・コード変更・設定変更・ドキュメント更新を行った場合、`@code-reviewer` の **APPROVE** は必須である。
+
+> **限界:** この gate は「うっかり review を飛ばす」事故を止めるための process-trust gate である。marker 自体は署名付き証明ではない。`git push --no-verify` や CI 直 push は hook を迂回できるため、将来の完全強制は GitHub branch protection + required status check で行う。
+
+このルールは prose だけにしない。以下のコマンドは、現在の `HEAD` に対応する approval marker が無い場合に失敗する。
+
+```bash
+pnpm review:check
+pnpm push:reindex
+scripts/deploy-precheck.sh
+scripts/deploy-precheck.ps1
+```
+
+レビューが APPROVE になった後だけ、以下で marker を作る。
+
+```bash
+pnpm review:approve -- --blocker-high-count 0 --summary "code-reviewer APPROVE: <短い要約>"
+```
+
+marker は `.review/approved/<commit-sha>.json` に保存される。`.review/` はローカル専用で、コミットしない。
+
+初回セットアップでは、通常の `git push` でも止まるように hook を入れる。
+
+```bash
+pnpm hooks:install
+```
+
 ---
 
 ## 16. 判断に迷ったら

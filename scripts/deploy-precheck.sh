@@ -24,6 +24,15 @@ ok()   { PASS=$((PASS+1)); echo -e "  ${GREEN}✅${NC} $*"; }
 warn() { WARN=$((WARN+1)); echo -e "  ${YELLOW}⚠${NC} $*"; }
 fail() { FAIL=$((FAIL+1)); echo -e "  ${RED}❌${NC} $*"; }
 
+# ── code-reviewer approval gate ──────────────────────────
+step "code-reviewer approval gate"
+if pnpm review:check; then
+    ok "code-reviewer APPROVE marker confirmed"
+else
+    fail "code-reviewer APPROVE marker がありません"
+    warn "@code-reviewer を実行し、APPROVE後に pnpm review:approve を実行してください"
+fi
+
 # ── pnpm deploy:check ────────────────────────────────────
 # C-4/C-3 CLI ツールによる環境変数・前提条件チェックに委譲
 step "pnpm deploy:check (環境変数・前提条件)"

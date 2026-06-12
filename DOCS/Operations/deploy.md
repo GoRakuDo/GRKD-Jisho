@@ -213,6 +213,35 @@ unset PGPASSWORD
 
 ---
 
+## 4-5. code-reviewer Approval Gate
+
+GRKD-Jisho では、編集後の `@code-reviewer` APPROVE を push/deploy 前の機械ゲートにする。
+
+> **限界:** この gate は「うっかり review を飛ばす」事故を止めるための process-trust gate。marker は署名付き証明ではなく、shell access があれば作れる。`git push --no-verify` と CI 直 push は hook を迂回できる。完全強制は GitHub branch protection + required status check で行う。
+
+```bash
+# review marker 作成（@code-reviewer APPROVE 後だけ）
+pnpm review:approve -- --blocker-high-count 0 --summary "code-reviewer APPROVE: <summary>"
+
+# marker 確認
+pnpm review:check
+
+# Git hook 導入（通常の git push も止める）
+pnpm hooks:install
+```
+
+`pnpm push:reindex` と `scripts/deploy-precheck.*` は、現在の `HEAD` に対応する `.review/approved/<commit-sha>.json` が無ければ失敗する。
+これにより、モデル切替・長時間作業・焦りで `@code-reviewer` を飛ばしても、push/deploy 前に止まる。
+
+### 4-5-1. 既知のバイパス経路
+
+- `git push --no-verify` は pre-push hook を完全に skip する。
+- CI/CD 上の直接 `git push` は local hook が無いため skip される。
+- `.review/` marker はローカル専用であり、レビュー本文そのものの証明ではない。
+- 悪意ある bypass まで止める場合は、remote 側の branch protection / required status check を追加する。
+
+---
+
 ## 5. Bot Token / 環境変数
 
 ### 5-1. Discord Bot Token の取得

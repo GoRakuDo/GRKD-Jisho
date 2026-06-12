@@ -327,6 +327,13 @@ Phase 5: Deferred Scope               TBA
   - バックアップは成功後にのみ retention pruning を行い、対象prefix以外のファイルは触らない
   - password は argv に出さず `PGPASSWORD` 経由、tmp→rename、`chmod 600`、`pg_restore --list` 検証を必須にする
 
+- [x] **4-2b** code-reviewer 機械ゲート
+  - `pnpm review:approve` / `pnpm review:check` で `@code-reviewer` APPROVE を marker 化
+  - `.review/approved/<commit-sha>.json` をローカル専用 approval marker として扱う
+  - `pnpm push:reindex` と `scripts/deploy-precheck.*` の先頭で `review:check` を実行する
+  - `pnpm hooks:install` で通常の `git push` にも pre-push gate を入れる
+  - 既知の限界として `git push --no-verify` / CI 直 push は remote branch protection で別途止める
+
 - [ ] **4-3** プロンプトバージョン管理
   - `v2` プロンプトの実験的導入
   - A/B テスト機能（guild 内一部ユーザーに新プロンプト適用）

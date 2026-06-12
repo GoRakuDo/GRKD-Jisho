@@ -45,6 +45,22 @@ Write-Output "╔═════════════════════
 Write-Output "║   GRKD-Jisho デプロイ前チェック             ║"
 Write-Output "╚══════════════════════════════════════════════╝"
 
+Write-Step "code-reviewer approval gate"
+try {
+    $result = & pnpm review:check 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Pass "code-reviewer APPROVE marker confirmed"
+        Write-Output $result
+    } else {
+        Write-Fail "code-reviewer APPROVE marker がありません"
+        Write-Warn "@code-reviewer を実行し、APPROVE後に pnpm review:approve を実行してください"
+        Write-Output $result
+    }
+}
+catch {
+    Write-Fail "review gate の実行に失敗: $($_.Exception.Message)"
+}
+
 Write-Step "pnpm deploy:check (環境変数・前提条件)"
 try {
     $result = & pnpm --filter @grkd-jisho/db run deploy:check 2>&1

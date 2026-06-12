@@ -24,9 +24,8 @@ function Invoke-Step {
   }
 }
 
-Invoke-Step -Name 'git push' -Command {
-  & git push @PushArgs
-}
+Invoke-Step -Name 'code-reviewer gate' -Command { & pnpm review:check }
+Invoke-Step -Name 'git push' -Command { & git push @PushArgs }
 
 $reindexScript = Join-Path $repoRoot 'reindex.ps1'
 if (-not (Test-Path -LiteralPath $reindexScript)) {
