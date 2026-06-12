@@ -76,6 +76,26 @@ export async function importFrequencyZip(
     throw new Error("Failed to upsert frequency dictionary");
   }
 
+  // Deduplicate by (expression, reading) — keep the best value per group.
+  // JPDB has primary + secondary entries for the same (expression, reading),
+  // which causes "ON CONFLICT DO UPDATE cannot be applied to the same row twice"
+  // if both appear in the same INSERT batch.
+  const deduped = new Map<string, (typeof entries)[number]>();
+  const isLowerBetter = frequencyMode === "rank-based";
+  for (const e of entries) {
+    const key = `${e.expression}\0${e.reading ?? ""}`;
+    const existing = deduped.get(key);
+    if (!existing) {
+      deduped.set(key, e);
+    } else {
+      const isBetter = isLowerBetter
+        ? e.frequencyValue < existing.frequencyValue
+        : e.frequencyValue > existing.frequencyValue;
+      if (isBetter) deduped.set(key, e);
+    }
+  }
+  const uniqueEntries = [...deduped.values()];
+
   const CHUNK_SIZE = 500;
   const beforeCount = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -83,8 +103,8 @@ export async function importFrequencyZip(
     .where(sql`${termFrequencies.dictionaryId} = ${dict.id}`)
     .then((r) => r[0]?.count ?? 0);
 
-  for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
-    const chunk = entries.slice(i, i + CHUNK_SIZE);
+  for (let i = 0; i < uniqueEntries.length; i += CHUNK_SIZE) {
+    const chunk = uniqueEntries.slice(i, i + CHUNK_SIZE);
     const rows = chunk.map((e) => ({
       dictionaryId: dict.id,
       expression: e.expression,
@@ -123,7 +143,7 @@ export async function importFrequencyZip(
     dictionaryName: options.dictionaryName,
     slug,
     imported,
-    skipped,
+    skipped: skipped + (entries.length - uniqueEntries.length),
     totalParsed: entries.length,
   };
 }
