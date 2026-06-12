@@ -26,12 +26,6 @@ Invoke-Step -Name 'Codesight wiki + scan' -Command {
   npx --yes codesight@1.14.0 --wiki
 }
 
-Invoke-Step -Name 'Graphify update' -Command {
-  python -m graphify update .
-}
-
 Write-Host "\nDone." -ForegroundColor Green
 Write-Host "Codesight: .codesight/wiki/index.md" -ForegroundColor DarkGray
-Write-Host "Graphify:  graphify-out/GRAPH_REPORT.md" -ForegroundColor DarkGray
-Write-Host "Graphify:  graphify-out/graph.html" -ForegroundColor DarkGray
-Write-Host "Graphify:  graphify-out/graph.json" -ForegroundColor DarkGray
+Write-Host "Codebase Memory: managed by codebase-memory-mcp index" -ForegroundColor DarkGray

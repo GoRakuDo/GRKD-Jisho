@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **Reindex pipeline** — Removed the Graphify update step and `graphify-out/` project artifact. Codebase structure indexing is now handled through `codebase-memory-mcp` instead of Graphify.
+
 ### Security
 
 ### Verification
