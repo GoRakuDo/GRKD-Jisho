@@ -1,4 +1,4 @@
-import { eq, asc, and, or, type AnyColumn } from "drizzle-orm";
+import { eq, asc, and, or, not, type AnyColumn } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 import type { LookupResult } from "../types.js";
 import { normalizeQuery } from "./normalize-query.js";
@@ -110,7 +110,10 @@ export async function lookupWord(
   const dictionaries = await db
     .select()
     .from(schema.dictionaries)
-    .where(eq(schema.dictionaries.enabled, true))
+    .where(and(
+      eq(schema.dictionaries.enabled, true),
+      not(eq(schema.dictionaries.isFrequencyOnly, true)),
+    ))
     .orderBy(asc(schema.dictionaries.priority));
 
   // deinflect は純関数なので辞書ループの前に1回だけ実行

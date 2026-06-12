@@ -403,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <tr>
               <td>{fd.name}</td>
               <td>{fd.entryCount.toLocaleString()}</td>
-              <td><span class={`status-badge ${fd.enabled ? 'status-enabled' : 'status-disabled'}`}>{fd.enabled ? 'enabled' : 'disabled'}</span></td>
+              <td><span class={`status-badge ${fd.enabled ? 'badge-enabled' : 'badge-disabled'}`}>{fd.enabled ? 'enabled' : 'disabled'}</span></td>
             </tr>
           ))}
         </tbody>

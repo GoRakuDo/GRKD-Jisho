@@ -1,4 +1,4 @@
-import { eq, and, asc, count, not } from "drizzle-orm";
+import { eq, asc, count, not } from "drizzle-orm";
 import { db } from "../../index";
 import * as schema from "../../schema";
 
