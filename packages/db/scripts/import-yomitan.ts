@@ -33,7 +33,7 @@ try {
     priority,
   });
 
-  console.log(`[ImportYomitanCLI] Import completed: dictionary=${result.dictionaryName} entries=${result.importedEntries} skipped=${result.skippedMalformed}`);
+  console.log(`[ImportYomitanCLI] Import completed: dictionary=${result.dictionaryName} entries=${result.importedEntries} skipped=${result.skippedMalformed} frequencies=${result.importedFrequencies} skippedFreq=${result.skippedFrequencies}`);
   process.exit(0);
 } catch (err) {
   const reason = err instanceof Error ? err.message : String(err);

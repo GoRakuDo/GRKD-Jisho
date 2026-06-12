@@ -67,3 +67,60 @@ export function mergePopularQueries(
     .slice(0, limit)
     .map(([query, count]) => ({ query, count }));
 }
+
+/**
+ * 明示的な reading 指定の解析結果。
+ *
+ * ユーザーが `漢字[よみ]` / `漢字［よみ］` 形式でクエリを送った場合に
+ * 抽出する。Frequency ranker をスキップして、指定された reading を最優先で
+ * dictionary 検索する用途を想定。
+ */
+export type ParsedLookupQuery = {
+  /** 辞書検索に掛ける term。漢字だけの query なら term と一致。 */
+  term: string;
+  /** ユーザーが明示した reading。指定なしなら null。 */
+  explicitReading: string | null;
+  /** 元の入力。parse に失敗した場合はそのまま返す。 */
+  rawInput: string;
+};
+
+/**
+ * `漢字[よみ]` / `漢字［よみ］` 形式を解析する。
+ *
+ * ルール:
+ * - 入力全体が `term[reading]` 形式（間に空白許容、前後に空白許容）のときだけ
+ *   explicit reading 指定として扱う
+ * - 入力の前後や bracket の前後に**余計なテキスト**がある場合は explicit reading なし
+ *   （デフォルトの greedy scan にフォールバック）
+ * - bracket 内が空、または bracket 同士が不一致なら explicit reading なし
+ *
+ * 注意: `【...】` はプロンプトの heading で使うので対象外。
+ *
+ * 例:
+ *   人間[にんげん]   -> { term: "人間", explicitReading: "にんげん" }
+ *   人間[  たべる  ] -> { term: "人間", explicitReading: "たべる" }   (内側空白は trim)
+ *   人間             -> { term: "人間", explicitReading: null }
+ *   今日は人間ですね -> { term: "今日は人間ですね", explicitReading: null }
+ *   人間【じんかん】 -> { term: "人間【じんかん】", explicitReading: null } (【】は対象外)
+ *   []               -> { term: "[]", explicitReading: null } (term が無い)
+ *   人間[]           -> { term: "人間[]", explicitReading: null } (reading が無い)
+ */
+export function parseLookupQuery(input: string): ParsedLookupQuery {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return { term: trimmed, explicitReading: null, rawInput: input };
+  }
+
+  // 入力全体が `term[reading]` 形式かを判定する。
+  // 角括弧は ASCII `[]` または全角 `［］` を受け付ける。
+  const match = /^(\S+?)\s*[\[［]\s*(\S+?)\s*[\]］]\s*$/.exec(trimmed);
+  if (!match) {
+    return { term: trimmed, explicitReading: null, rawInput: input };
+  }
+  const term = match[1] ?? "";
+  const reading = (match[2] ?? "").trim();
+  if (!term || !reading) {
+    return { term: trimmed, explicitReading: null, rawInput: input };
+  }
+  return { term, explicitReading: reading, rawInput: input };
+}

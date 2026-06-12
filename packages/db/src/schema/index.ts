@@ -1,5 +1,6 @@
 export * from "./dictionaries";
 export * from "./dictionary-entries";
+export * from "./term-frequencies";
 export * from "./response-cache";
 export * from "./response-edits";
 export * from "./lookup-logs";

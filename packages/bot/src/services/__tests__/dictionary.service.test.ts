@@ -26,6 +26,13 @@ const { mockDb, mockSchema, setDbResults } = vi.hoisted(() => {
   const schema = {
     dictionaries: { enabled: "test", priority: "test" },
     dictionaryEntries: { dictionaryId: "test", term: "test", reading: "test" },
+    termFrequencies: {
+      dictionaryId: "tf.dict",
+      expression: "tf.expr",
+      reading: "tf.reading",
+      frequencyValue: "tf.fv",
+      frequencyMode: "tf.mode",
+    },
   };
 
   return {
@@ -140,5 +147,63 @@ describe("lookupWord", () => {
     expect(result!.matchedBy).toBe("deinflected");
     expect(result!.originalInflected).toBe("止事無き");
     expect(result!.deinflectedFrom).toBe("止事無い");
+  });
+
+  it("multi-reading 漢字: ranker で frequency ベストが優先される", async () => {
+    const dict = { id: 40, name: "新明解", enabled: true, priority: 1 };
+    const entryA = { id: BigInt(401), term: "人間", reading: "にんげん", dictionaryId: 40 };
+    const entryB = { id: BigInt(402), term: "人間", reading: "じんかん", dictionaryId: 40 };
+    // 1: dictionaries → [dict]
+    // 2: term query → [entryA, entryB] (2 件)
+    // 3: term_frequencies query → ranker へ
+    setDbResults(
+      [dict],
+      [entryA, entryB],
+      [
+        { reading: "じんかん", frequencyValue: "12345", frequencyMode: "rank-based" },
+        { reading: "にんげん", frequencyValue: "158", frequencyMode: "rank-based" },
+      ]
+    );
+
+    const result = await lookupWord("人間");
+
+    expect(result).not.toBeNull();
+    expect(result!.entry.reading).toBe("にんげん"); // ranker が 158 を選ぶ
+    expect(result!.matchedBy).toBe("term");
+  });
+
+  it("multi-reading 漢字: frequency データが空なら元の順序を維持", async () => {
+    const dict = { id: 41, name: "新明解", enabled: true, priority: 1 };
+    const entryA = { id: BigInt(411), term: "人間", reading: "にんげん", dictionaryId: 41 };
+    const entryB = { id: BigInt(412), term: "人間", reading: "じんかん", dictionaryId: 41 };
+    setDbResults([dict], [entryA, entryB], []); // no frequency data
+
+    const result = await lookupWord("人間");
+    expect(result).not.toBeNull();
+    expect(result!.entry.reading).toBe("にんげん"); // 元の順序 (id 順)
+  });
+
+  it("explicit reading: 多読み候補の中で指定の reading を返す", async () => {
+    const dict = { id: 50, name: "新明解", enabled: true, priority: 1 };
+    const entryA = { id: BigInt(501), term: "人間", reading: "にんげん", dictionaryId: 50 };
+    const entryB = { id: BigInt(502), term: "人間", reading: "じんかん", dictionaryId: 50 };
+    setDbResults([dict], [entryA, entryB]);
+
+    const result = await lookupWord("人間", "じんかん");
+    expect(result).not.toBeNull();
+    expect(result!.entry.reading).toBe("じんかん");
+    expect(result!.matchedBy).toBe("term");
+  });
+
+  it("explicit reading: 指定 reading が辞書に無ければ null (reading fallback しない)", async () => {
+    const dict = { id: 60, name: "新明解", enabled: true, priority: 1 };
+    const entryA = { id: BigInt(601), term: "人間", reading: "にんげん", dictionaryId: 60 };
+    const entryB = { id: BigInt(602), term: "人間", reading: "じんかん", dictionaryId: 60 };
+    // explicit reading = "あいだ" → 多読み候補に無い → null
+    // reading match は explicit reading 指定時には走らない
+    setDbResults([dict], [entryA, entryB]);
+
+    const result = await lookupWord("人間", "あいだ");
+    expect(result).toBeNull();
   });
 });

@@ -14,7 +14,7 @@
 
 | 根拠 | 読んだ箇所 | 意味 |
 |---|---:|---|
-| `ROADMAP.md` | 303-355 | Phase 4 の正式スコープは全文検索、ログパージ、prompt version、監視、デプロイ、読み仮名検索、複数Guild optional、Limited write MCP、Agent runbook。 |
+| `ROADMAP.md` | 303-381 | Phase 4 の正式スコープは全文検索、ログパージ、prompt version、監視、デプロイ、読み仮名検索、複数Guild optional、Frequencyベース多読み候補ランキング、Limited write MCP、Agent runbook。 |
 | `MASTER_PLAN.md` | 1041-1088 | MCP Level 1〜4 tool の境界。Phase 4 で Level 3 limited write、必要なら Level 4 dangerous request を扱う。 |
 | `AGENTS.md` | 340-393 | MCPはDiscord APIを直接呼ばない。Level 3以上は audit 必須。Level 4 は human approval 必須。 |
 | `phase-3-web-admin-agent-ops.md` | 64-70, 465, 489, 518, 766-771 | Phase 3 から Phase 4 へ送った残タスク: Level 3/4 MCP、Web heartbeat、response詳細ページ、辞書import preview、複数Guild。 |
@@ -39,7 +39,7 @@ Phase 4 は「派手な新機能」より、運用で壊れにくくする段階
 
 ```txt
 1. 品質保証      = Phase 3までの中核サービスにUnitテストを入れる
-2. 検索品質      = 読み仮名・表記揺れ・全文検索を少しずつ改善する
+2. 検索品質      = 読み仮名・表記揺れ・多読み候補ランキング・全文検索を少しずつ改善する
 3. 運用保全      = ログ保持、heartbeat、エラー監視、runbookを整える
 4. Prompt管理    = v2 prompt実験とcache invalidation方針を作る
 5. Limited write = MCPから安全なops_jobs作成だけを許可する

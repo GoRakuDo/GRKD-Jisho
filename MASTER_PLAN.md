@@ -40,7 +40,7 @@ WebUI = 管理・品質改善の拠点
 | Containerize | Docker + docker-compose | ローカル → クラウドのmigration が容易 |
 | Cloud Deploy | Railway (推奨) or Fly.io | Dockerfile ベースでそのまま移行可 |
 
-> **LLM sampling defaults:** Gemini / OpenRouter ともに `temperature=0.65`, `topP=0.8` を初期値として使う。回答のぶれを抑え、辞書説明の再現性を優先する。
+> **LLM sampling defaults:** Gemini / OpenRouter ともに `temperature=0.70`, `topP=0.8` を初期値として使う。回答のぶれを抑えつつ、辞書説明の自然さを少し上げる。
 
 ---
 
@@ -59,6 +59,7 @@ Discord Guild
   │  └→ channel guard (許可チャンネルののみ)           │
   │  └→ DictionaryService.lookup(query)             │
   │       └→ exact match → deinflect fallback       │
+  │       └→ frequency reading ranker for ambiguous kanji readings │
   │       └→ dict_1 → dict_2 → dict_3 フォールバック│
 │  └→ RoleMapper.resolve(member.roles)            │
 │  └→ ResponseCacheService.get(cacheKey)          │
@@ -75,6 +76,7 @@ Discord Guild
 │  PostgreSQL                                     │
 │  ├ dictionaries          (辞書メタ情報)          │
 │  ├ dictionary_entries    (Yomitan 元データ)      │
+│  ├ term_frequencies      (Yomitan Frequency meta; Phase 4 planned) │
 │  ├ response_cache        (LLM生成済み回答)       │
 │  ├ response_edits        (編集履歴)              │
 │  ├ lookup_logs           (検索ログ)              │

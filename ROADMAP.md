@@ -358,12 +358,16 @@ Phase 5: Deferred Scope               TBA
   - `lookupWord()` に deinflect 統合（完全一致 → deinflect fallback）
   - `matchedBy: "deinflected"` で検出元を追跡
   - 設計文書: `DOCS/Design/deinflection-system.md`
-  - Phase 4 Step J で影響範囲を調査済み
-  - 実装は Phase 5 Deferred Scope（TBA）へ後倒し
-  - この項目では Phase 5 の詳細実装計画を定義しない
-  - `v0.1.0` 公開版の single guild 注意書きは、別セクションの Pre-Release Plan R-4 で扱う
+  - 実装・テスト・Kasou反映済み
 
-- [ ] **4-8** Limited write MCP tools
+- [ ] **4-8a** Frequency ベースの多読み候補ランキング
+  - Yomitan `term_meta_bank_*.json` の `freq` data を読み、`term_frequencies` に保存する
+  - デフォルト候補は `[Freq] JPDB (Recommended).zip`
+  - 漢字 query で複数読みがある場合、reading付き Frequency を優先して自然な読みを選ぶ
+  - ユーザーが特殊読みを意図する場合は `人間[じんかん]` / `間[あい]` のように明示できる
+  - 設計文書: `DOCS/Design/frequency-reading-ranker.md`
+
+- [ ] **4-9** Limited write MCP tools
   - Phase 3 では `MCP_READONLY_MODE=true` を維持し、Level 2 dry-run は `MCP_ENABLE_DRY_RUN=true` の時だけ有効化する
   - `grkd-jisho.request_cache_refresh`
   - `grkd-jisho.request_user_usage_reset`
@@ -371,7 +375,7 @@ Phase 5: Deferred Scope               TBA
   - wipe setting changes are handled in Web UI, not MCP
   - 全て `ops_jobs` + `mcp_audit_logs` 経由に限定
 
-- [ ] **4-9** Agent Runbook / 自律監視
+- [ ] **4-10** Agent Runbook / 自律監視
   - 外側AIエージェント用 runbook を `DOCS/Operations/agent-runbook.md` に作成
   - `grkd-jisho.health` → `grkd-jisho.recent_errors` → `grkd-jisho.get_trace` の診断順を固定
   - dangerous operation は human approval 必須

@@ -1,16 +1,27 @@
 import AdmZip from "adm-zip";
+import { sql } from "drizzle-orm";
 import { db } from "../../client";
 import { dictionaries } from "../../schema/dictionaries";
 import { dictionaryEntries } from "../../schema/dictionary-entries";
+import { termFrequencies } from "../../schema/term-frequencies";
 
 type IndexJson = {
   title: string;
   revision: string;
   format?: 1 | 2 | 3;
   version?: 1 | 2 | 3;
+  frequencyMode?: "rank-based" | "occurrence-based";
 };
 
 type RawTermEntry = unknown[];
+
+type NormalizedFrequency = {
+  expression: string;
+  reading: string | null;
+  frequencyValue: number;
+  displayValue: string;
+  frequencyMode: "rank-based" | "occurrence-based";
+};
 
 export type ImportYomitanOptions = {
   dictionaryName?: string;
@@ -25,6 +36,8 @@ export type ImportYomitanResult = {
   format: 1 | 2 | 3;
   importedEntries: number;
   skippedMalformed: number;
+  importedFrequencies: number;
+  skippedFrequencies: number;
 };
 
 function normalizeIndex(indexData: IndexJson): { title: string; revision: string; format: 1 | 2 | 3 } {
@@ -97,6 +110,73 @@ function convertTermBankEntryV3(record: RawTermEntry): {
     glossary,
     sequence,
     termTags,
+  };
+}
+
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+function parseFrequencyValue(v: unknown): { value: number; display: string } | null {
+  if (isFiniteNumber(v)) {
+    return { value: v, display: String(v) };
+  }
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (trimmed.length === 0) return null;
+    const num = Number(trimmed);
+    if (Number.isFinite(num)) {
+      return { value: num, display: trimmed };
+    }
+    return null;
+  }
+  if (typeof v === "object" && v !== null) {
+    const obj = v as Record<string, unknown>;
+    if ("value" in obj) {
+      const inner = parseFrequencyValue(obj["value"]);
+      if (!inner) return null;
+      const displayRaw = obj["displayValue"];
+      const display = typeof displayRaw === "string" ? displayRaw : inner.display;
+      return { value: inner.value, display };
+    }
+    if ("frequency" in obj) {
+      const inner = parseFrequencyValue(obj["frequency"]);
+      return inner;
+    }
+  }
+  return null;
+}
+
+function convertTermMetaFreqEntry(
+  record: unknown,
+  frequencyMode: "rank-based" | "occurrence-based"
+): NormalizedFrequency | null {
+  if (!Array.isArray(record) || record.length < 3) {
+    return null;
+  }
+
+  const expression = record[0];
+  const mode = record[1];
+  const data = record[2];
+
+  if (typeof expression !== "string" || expression.length === 0) return null;
+  if (mode !== "freq") return null;
+
+  const reading = typeof data === "object" && data !== null && !Array.isArray(data) &&
+    "reading" in (data as Record<string, unknown>) &&
+    typeof (data as Record<string, unknown>)["reading"] === "string"
+      ? ((data as Record<string, unknown>)["reading"] as string)
+      : null;
+
+  const parsed = parseFrequencyValue(data);
+  if (!parsed) return null;
+
+  return {
+    expression,
+    reading,
+    frequencyValue: parsed.value,
+    displayValue: parsed.display,
+    frequencyMode,
   };
 }
 
@@ -224,6 +304,80 @@ export async function importYomitanDictionaryFromBuffer(
     }
   }
 
+  const frequencyMode = indexData.frequencyMode ?? "rank-based";
+  const metaBankEntries = zip
+    .getEntries()
+    .filter((e) => /^term_meta_bank_(\d+)\.json$/.test(e.entryName))
+    .sort((a, b) => a.entryName.localeCompare(b.entryName));
+
+  let importedFrequencies = 0;
+  let skippedFrequencies = 0;
+
+  for (const entry of metaBankEntries) {
+    const raw = JSON.parse(entry.getData().toString("utf8")) as unknown[];
+    if (!Array.isArray(raw)) {
+      continue;
+    }
+
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < raw.length; i += CHUNK_SIZE) {
+      const chunk = raw.slice(i, i + CHUNK_SIZE);
+      const rows: {
+        dictionaryId: number;
+        expression: string;
+        reading: string | null;
+        frequencyValue: string;
+        displayValue: string;
+        frequencyMode: string;
+        rawJson: unknown;
+      }[] = [];
+
+      for (const record of chunk) {
+        const normalized = convertTermMetaFreqEntry(record, frequencyMode);
+        if (!normalized) {
+          skippedFrequencies += 1;
+          continue;
+        }
+        rows.push({
+          dictionaryId: dict.id,
+          expression: normalized.expression,
+          reading: normalized.reading,
+          frequencyValue: normalized.frequencyValue.toString(),
+          displayValue: normalized.displayValue,
+          frequencyMode: normalized.frequencyMode,
+          rawJson: record,
+        });
+      }
+
+      if (rows.length === 0) {
+        continue;
+      }
+
+      // ON CONFLICT DO UPDATE with LEAST: 同じ (dict, expression, reading) に対して
+      // 既に小さい値が入っていれば維持し、入っていなければ新しい小さい値で上書きする。
+      // これで JPDB の `人間/にんげん=158` と `人間/にんげん=37433㋕` がどんな順序で
+      // 入ってきても、最終的にテーブルには MIN 値だけが残る。
+      const inserted = await db
+        .insert(termFrequencies)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: [
+            termFrequencies.dictionaryId,
+            termFrequencies.expression,
+            termFrequencies.reading,
+          ],
+          set: {
+            frequencyValue: sql`LEAST(${termFrequencies.frequencyValue}, EXCLUDED.frequency_value)`,
+          },
+        })
+        .returning({ id: termFrequencies.id });
+
+      importedFrequencies += inserted.length;
+      // DO UPDATE なので conflict した行も returning に含まれる。
+      // parse 失敗は skippedFrequencies に既に計上済み。
+    }
+  }
+
   return {
     dictionaryId: String(dict.id),
     dictionaryName,
@@ -232,5 +386,7 @@ export async function importYomitanDictionaryFromBuffer(
     format: normalizedIndex.format,
     importedEntries,
     skippedMalformed,
+    importedFrequencies,
+    skippedFrequencies,
   };
 }

@@ -178,24 +178,40 @@ Bot 用に**必要なルールだけをハードコード**する。目安:
 
 ```typescript
 export async function lookupWord(rawQuery: string): Promise<LookupResult | null> {
-  // 1. 完全一致チェック（既存）
-  const exact = await findExactMatch(rawQuery);
-  if (exact) return exact;
+  const deinflectCandidates = deinflect(rawQuery); // 辞書ループ前に1回だけ実行
 
-  // 2. deinflect → 全候補で検索（NEW）
-  const candidates = deinflect(rawQuery);
-  for (const { text } of candidates) {
-    const result = await findExactMatch(text);
-    if (result) return {
-      ...result,
-      originalInflected: rawQuery, // 元の活用形
-      deinflectedFrom: text,       // 見つかった辞書形
-    };
+  for (const dict of dictionaries) {
+    // 1. 完全一致チェック（term / reading）
+    const exact = await findExactInDictionary(dict, rawQuery);
+    if (exact) return exact;
+
+    // 2. deinflect → 全候補で検索
+    for (const { text } of deinflectCandidates) {
+      const result = await findExactInDictionary(dict, text);
+      if (result) return {
+        ...result,
+        originalInflected: rawQuery,
+        deinflectedFrom: text,
+      };
+    }
   }
 
   return null;
 }
 ```
+
+### 多読み候補の扱い
+
+活用逆変換とは別に、漢字見出しに複数の読みがある場合は Frequency ベースの候補ランキングで解決する。
+
+例:
+
+```txt
+人間 -> にんげん / じんかん
+間   -> あい / あいだ / ま / かん / けん / はざま
+```
+
+この問題は deinflect ではなく「同じ term に対する entry selection」の問題なので、詳細は `DOCS/Design/frequency-reading-ranker.md` に分離する。
 
 ## ファイル構成
 
