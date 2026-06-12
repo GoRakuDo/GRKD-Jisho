@@ -189,16 +189,18 @@ grkd-jisho/
 
 ```sql
 CREATE TABLE dictionaries (
-  id          SERIAL PRIMARY KEY,
-  name        TEXT NOT NULL UNIQUE,     -- "JMdict", "大辞泉"
-  slug        TEXT NOT NULL UNIQUE,     -- "jmdict", "daijisen"
-  priority    INTEGER NOT NULL DEFAULT 0, -- 小さい数字が高優先
-  enabled     BOOLEAN NOT NULL DEFAULT true,
-  created_at  TIMESTAMPTZ DEFAULT now()
+  id                SERIAL PRIMARY KEY,
+  name              TEXT NOT NULL UNIQUE,     -- "JMdict", "大辞泉"
+  slug              TEXT NOT NULL UNIQUE,     -- "jmdict", "daijisen"
+  priority          INTEGER NOT NULL DEFAULT 0, -- 小さい数字が高優先
+  enabled           BOOLEAN NOT NULL DEFAULT true,
+  is_frequency_only BOOLEAN NOT NULL DEFAULT false, -- true = freq data only, not a lookup source
+  created_at        TIMESTAMPTZ DEFAULT now()
 );
 ```
 
 > **設計ポイント:** `priority` フィールドで辞書の順序を DB から動的に変更できる。dict_1/dict_2/dict_3 はコードに埋め込まず、この DB から読む。
+> **is_frequency_only:** freq-only 辞書（例: `[Freq] JPDB (Recommended).zip`）は辞書ルックアップのソースではない。Bot の `lookupWord()` はこのフラグが `true` の辞書をスキップし、reading ranker のみが使用する。
 
 ---
 

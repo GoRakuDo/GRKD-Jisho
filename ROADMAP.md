@@ -365,6 +365,7 @@ Phase 5: Deferred Scope               TBA
   - デフォルト候補は `[Freq] JPDB (Recommended).zip`
   - 漢字 query で複数読みがある場合、reading付き Frequency を優先して自然な読みを選ぶ
   - ユーザーが特殊読みを意図する場合は `人間[じんかん]` / `間[あい]` のように明示できる
+  - `is_frequency_only` フラグで freq-only 辞書を通常辞書リストから分離（Bot lookup はスキップ）
   - 設計文書: `DOCS/Design/frequency-reading-ranker.md`
   - WebUI Frequency Import (dictionaries ページ) 対応済み
 

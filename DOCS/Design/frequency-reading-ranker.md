@@ -437,6 +437,18 @@ type ParsedLookupQuery = {
 - `dictionaries.astro`: Frequency Import セクション (zip upload → preview table → Import → Enable Now)
 - `dictionaries.ts`: GET/PUT に isAdmin gate 追加 (pre-existing gap 修正)
 
+### Step 7: isFrequencyOnly 分離
+
+**✅ 2026-06-13 完了**。
+
+- `dictionaries` テーブルに `is_frequency_only` カラム追加 (migration 0018)
+- `importFrequencyZip`: freq-only zip インポート時に `isFrequencyOnly: true` を設定
+- `getDictionaryList()`: `not(eq(isFrequencyOnly, true))` で freq-only を除外
+- `getFrequencyDictionaries()`: freq-only 辞書のみ返す新関数
+- `dictionary.service.ts`: Bot の `lookupWord()` ループで freq-only 辞書をスキップ（hot path の無駄なクエリ排除）
+- `dictionaries.astro`: Frequency Data セクションに freq-only 辞書一覧を表示
+- Kasou 既存 Freq JPDB: `UPDATE dictionaries SET is_frequency_only = true WHERE slug LIKE 'freq-%'` で手動フラグ更新
+
 ---
 
 ## 非対応
