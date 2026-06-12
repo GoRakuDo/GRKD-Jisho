@@ -4,7 +4,7 @@ import { db } from "../../client";
 import { dictionaries } from "../../schema/dictionaries";
 import { dictionaryEntries } from "../../schema/dictionary-entries";
 import { termFrequencies } from "../../schema/term-frequencies";
-import { normalizeFreqEntry } from "../../utils/frequency-parser";
+import { normalizeFreqEntry, dedupeFrequencyEntries } from "../../utils/frequency-parser";
 
 type IndexJson = {
   title: string;
@@ -257,47 +257,74 @@ export async function importYomitanDictionaryFromBuffer(
       continue;
     }
 
-    const CHUNK_SIZE = 500;
-    for (let i = 0; i < raw.length; i += CHUNK_SIZE) {
-      const chunk = raw.slice(i, i + CHUNK_SIZE);
-      const rows: {
-        dictionaryId: number;
-        expression: string;
-        reading: string | null;
-        frequencyValue: string;
-        displayValue: string;
-        frequencyMode: string;
-        rawJson: unknown;
-      }[] = [];
+    // Normalize all records, then dedup before chunked insert.
+    // JPDB has primary + secondary entries for the same (expression, reading)
+    // which cause "ON CONFLICT DO UPDATE cannot be applied to the same row twice"
+    // if both appear in the same INSERT batch.
+    const normalized: {
+      dictionaryId: number;
+      expression: string;
+      reading: string | null;
+      frequencyValue: string;
+      displayValue: string;
+      frequencyMode: string;
+      rawJson: unknown;
+    }[] = [];
 
-      for (const record of chunk) {
-        const normalized = normalizeFreqEntry(record, frequencyMode);
-        if (!normalized) {
-          skippedFrequencies += 1;
-          continue;
-        }
-        rows.push({
-          dictionaryId: dict.id,
-          expression: normalized.expression,
-          reading: normalized.reading,
-          frequencyValue: normalized.frequencyValue.toString(),
-          displayValue: normalized.displayValue,
-          frequencyMode: normalized.frequencyMode,
-          rawJson: record,
-        });
+    for (const record of raw) {
+      const n = normalizeFreqEntry(record, frequencyMode);
+      if (!n) {
+        skippedFrequencies += 1;
+        continue;
       }
+      normalized.push({
+        dictionaryId: dict.id,
+        expression: n.expression,
+        reading: n.reading,
+        frequencyValue: n.frequencyValue.toString(),
+        displayValue: n.displayValue,
+        frequencyMode: n.frequencyMode,
+        rawJson: record,
+      });
+    }
 
-      if (rows.length === 0) {
+    // Dedup by (expression, reading), keeping the best value per group.
+    const { unique: uniqueRows, dedupedCount } = dedupeFrequencyEntries(
+      normalized.map((r) => ({
+        expression: r.expression,
+        reading: r.reading,
+        frequencyValue: Number(r.frequencyValue),
+        displayValue: r.displayValue,
+        frequencyMode: r.frequencyMode as "rank-based" | "occurrence-based",
+        rawRecord: r.rawJson,
+      })),
+      frequencyMode,
+    );
+    skippedFrequencies += dedupedCount;
+
+    const dedupedRows = uniqueRows.map((e) => ({
+      dictionaryId: dict.id,
+      expression: e.expression,
+      reading: e.reading,
+      frequencyValue: e.frequencyValue.toString(),
+      displayValue: e.displayValue,
+      frequencyMode: e.frequencyMode,
+      rawJson: e.rawRecord,
+    }));
+
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < dedupedRows.length; i += CHUNK_SIZE) {
+      const chunk = dedupedRows.slice(i, i + CHUNK_SIZE);
+
+      if (chunk.length === 0) {
         continue;
       }
 
       // ON CONFLICT DO UPDATE with LEAST: 同じ (dict, expression, reading) に対して
       // 既に小さい値が入っていれば維持し、入っていなければ新しい小さい値で上書きする。
-      // これで JPDB の `人間/にんげん=158` と `人間/にんげん=37433㋕` がどんな順序で
-      // 入ってきても、最終的にテーブルには MIN 値だけが残る。
       await db
         .insert(termFrequencies)
-        .values(rows)
+        .values(chunk)
         .onConflictDoUpdate({
           target: [
             termFrequencies.dictionaryId,

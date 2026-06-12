@@ -3,7 +3,7 @@
  * Separated from frequency-import.ts so it can be tested without DATABASE_URL.
  */
 
-type NormalizedFrequency = {
+export type NormalizedFrequency = {
   expression: string;
   reading: string | null;
   frequencyValue: number;
@@ -147,4 +147,34 @@ export function previewFrequencyEntries(
     })),
     frequencyMode,
   };
+}
+
+/**
+ * Deduplicate frequency entries by (expression, reading).
+ * Keeps the best value: lowest for rank-based, highest for occurrence-based.
+ * Null reading uses a sentinel to avoid collapsing with empty-string reading.
+ */
+export function dedupeFrequencyEntries(
+  entries: NormalizedFrequency[],
+  frequencyMode: "rank-based" | "occurrence-based",
+): { unique: NormalizedFrequency[]; dedupedCount: number } {
+  const isLowerBetter = frequencyMode === "rank-based";
+  const deduped = new Map<string, NormalizedFrequency>();
+  let dedupedCount = 0;
+
+  for (const e of entries) {
+    const key = `${e.expression}\0${e.reading === null ? "\0NULL" : e.reading}`;
+    const existing = deduped.get(key);
+    if (existing) {
+      const isBetter = isLowerBetter
+        ? e.frequencyValue < existing.frequencyValue
+        : e.frequencyValue > existing.frequencyValue;
+      if (isBetter) deduped.set(key, e);
+      dedupedCount++;
+    } else {
+      deduped.set(key, e);
+    }
+  }
+
+  return { unique: [...deduped.values()], dedupedCount };
 }

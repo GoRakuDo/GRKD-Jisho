@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../../client";
 import { dictionaries } from "../../schema/dictionaries";
 import { termFrequencies } from "../../schema/term-frequencies";
-import { parseFrequencyEntries, previewFrequencyEntries } from "../../utils/frequency-parser";
+import { parseFrequencyEntries, previewFrequencyEntries, dedupeFrequencyEntries } from "../../utils/frequency-parser";
 import type { FrequencyPreviewResult } from "../../utils/frequency-parser";
 
 export type FrequencyImportResult = {
@@ -76,25 +76,7 @@ export async function importFrequencyZip(
     throw new Error("Failed to upsert frequency dictionary");
   }
 
-  // Deduplicate by (expression, reading) — keep the best value per group.
-  // JPDB has primary + secondary entries for the same (expression, reading),
-  // which causes "ON CONFLICT DO UPDATE cannot be applied to the same row twice"
-  // if both appear in the same INSERT batch.
-  const deduped = new Map<string, (typeof entries)[number]>();
-  const isLowerBetter = frequencyMode === "rank-based";
-  for (const e of entries) {
-    const key = `${e.expression}\0${e.reading ?? ""}`;
-    const existing = deduped.get(key);
-    if (!existing) {
-      deduped.set(key, e);
-    } else {
-      const isBetter = isLowerBetter
-        ? e.frequencyValue < existing.frequencyValue
-        : e.frequencyValue > existing.frequencyValue;
-      if (isBetter) deduped.set(key, e);
-    }
-  }
-  const uniqueEntries = [...deduped.values()];
+  const { unique: uniqueEntries, dedupedCount } = dedupeFrequencyEntries(entries, frequencyMode);
 
   const CHUNK_SIZE = 500;
   const beforeCount = await db
@@ -143,7 +125,7 @@ export async function importFrequencyZip(
     dictionaryName: options.dictionaryName,
     slug,
     imported,
-    skipped: skipped + (entries.length - uniqueEntries.length),
+    skipped: skipped + dedupedCount,
     totalParsed: entries.length,
   };
 }

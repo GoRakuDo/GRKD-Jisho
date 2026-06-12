@@ -9,6 +9,7 @@ import {
   normalizeFreqEntry,
   parseFrequencyEntries,
   previewFrequencyEntries,
+  dedupeFrequencyEntries,
 } from "@grkd-jisho/db";
 
 describe("normalizeFreqEntry", () => {
@@ -192,5 +193,90 @@ describe("previewFrequencyEntries", () => {
     expect(result.totalEntries).toBe(1);
     expect(result.sampleEntries).toHaveLength(1);
     expect(result.sampleEntries[0]!.expression).toBe("人間");
+  });
+});
+
+describe("dedupeFrequencyEntries", () => {
+  function makeEntry(expression: string, reading: string | null, value: number) {
+    return {
+      expression,
+      reading,
+      frequencyValue: value,
+      displayValue: String(value),
+      frequencyMode: "rank-based" as const,
+      rawRecord: null,
+    };
+  }
+
+  it("keeps lowest value for rank-based mode", () => {
+    const entries = [
+      makeEntry("人間", "にんげん", 37433),
+      makeEntry("人間", "にんげん", 158),
+    ];
+    const { unique, dedupedCount } = dedupeFrequencyEntries(entries, "rank-based");
+    expect(unique).toHaveLength(1);
+    expect(unique[0]!.frequencyValue).toBe(158);
+    expect(dedupedCount).toBe(1);
+  });
+
+  it("keeps highest value for occurrence-based mode", () => {
+    const entries = [
+      makeEntry("test", "test", 100),
+      makeEntry("test", "test", 500),
+    ];
+    const { unique, dedupedCount } = dedupeFrequencyEntries(entries, "occurrence-based");
+    expect(unique).toHaveLength(1);
+    expect(unique[0]!.frequencyValue).toBe(500);
+    expect(dedupedCount).toBe(1);
+  });
+
+  it("preserves first entry on tie", () => {
+    const e1 = makeEntry("word", "reading", 100);
+    const e2 = makeEntry("word", "reading", 100);
+    const { unique } = dedupeFrequencyEntries([e1, e2], "rank-based");
+    expect(unique).toHaveLength(1);
+    expect(unique[0]!.frequencyValue).toBe(100);
+  });
+
+  it("does not merge different expressions", () => {
+    const entries = [
+      makeEntry("人間", "にんげん", 158),
+      makeEntry("人", "ひと", 50),
+    ];
+    const { unique } = dedupeFrequencyEntries(entries, "rank-based");
+    expect(unique).toHaveLength(2);
+  });
+
+  it("does not merge different readings for same expression", () => {
+    const entries = [
+      makeEntry("間", "あいだ", 308),
+      makeEntry("間", "かん", 1639),
+    ];
+    const { unique } = dedupeFrequencyEntries(entries, "rank-based");
+    expect(unique).toHaveLength(2);
+    expect(unique[0]!.reading).toBe("あいだ");
+    expect(unique[1]!.reading).toBe("かん");
+  });
+
+  it("deduplicates null readings without collapsing with empty string", () => {
+    const entries = [
+      makeEntry("の", null, 1),
+      makeEntry("の", "", 2),
+    ];
+    const { unique } = dedupeFrequencyEntries(entries, "rank-based");
+    expect(unique).toHaveLength(2);
+  });
+
+  it("returns empty array for empty input", () => {
+    const { unique, dedupedCount } = dedupeFrequencyEntries([], "rank-based");
+    expect(unique).toHaveLength(0);
+    expect(dedupedCount).toBe(0);
+  });
+
+  it("handles single entry", () => {
+    const entries = [makeEntry("一", "いち", 42)];
+    const { unique, dedupedCount } = dedupeFrequencyEntries(entries, "rank-based");
+    expect(unique).toHaveLength(1);
+    expect(dedupedCount).toBe(0);
   });
 });
