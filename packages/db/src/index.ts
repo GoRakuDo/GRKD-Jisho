@@ -4,6 +4,7 @@ import * as schema from "./schema/index";
 export { schema };
 export { ANALYTICS_DB_PATH } from "./config/analytics-path";
 export * from "./utils/query-cleanup";
+export * from "./utils/frequency-parser";
 
 // Admin services — shared between bot and web
 export * from "./services/date-utils";
@@ -18,3 +19,4 @@ export * from "./services/admin/wipe-admin";
 export * from "./services/admin/yomitan-import";
 export * from "./services/admin/prompt-admin";
 export * from "./services/admin/role-bindings-admin";
+export * from "./services/admin/frequency-import";

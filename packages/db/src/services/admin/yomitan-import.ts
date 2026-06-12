@@ -4,6 +4,7 @@ import { db } from "../../client";
 import { dictionaries } from "../../schema/dictionaries";
 import { dictionaryEntries } from "../../schema/dictionary-entries";
 import { termFrequencies } from "../../schema/term-frequencies";
+import { normalizeFreqEntry } from "../../utils/frequency-parser";
 
 type IndexJson = {
   title: string;
@@ -14,14 +15,6 @@ type IndexJson = {
 };
 
 type RawTermEntry = unknown[];
-
-type NormalizedFrequency = {
-  expression: string;
-  reading: string | null;
-  frequencyValue: number;
-  displayValue: string;
-  frequencyMode: "rank-based" | "occurrence-based";
-};
 
 export type ImportYomitanOptions = {
   dictionaryName?: string;
@@ -110,73 +103,6 @@ function convertTermBankEntryV3(record: RawTermEntry): {
     glossary,
     sequence,
     termTags,
-  };
-}
-
-function isFiniteNumber(v: unknown): v is number {
-  return typeof v === "number" && Number.isFinite(v);
-}
-
-function parseFrequencyValue(v: unknown): { value: number; display: string } | null {
-  if (isFiniteNumber(v)) {
-    return { value: v, display: String(v) };
-  }
-  if (typeof v === "string") {
-    const trimmed = v.trim();
-    if (trimmed.length === 0) return null;
-    const num = Number(trimmed);
-    if (Number.isFinite(num)) {
-      return { value: num, display: trimmed };
-    }
-    return null;
-  }
-  if (typeof v === "object" && v !== null) {
-    const obj = v as Record<string, unknown>;
-    if ("value" in obj) {
-      const inner = parseFrequencyValue(obj["value"]);
-      if (!inner) return null;
-      const displayRaw = obj["displayValue"];
-      const display = typeof displayRaw === "string" ? displayRaw : inner.display;
-      return { value: inner.value, display };
-    }
-    if ("frequency" in obj) {
-      const inner = parseFrequencyValue(obj["frequency"]);
-      return inner;
-    }
-  }
-  return null;
-}
-
-function convertTermMetaFreqEntry(
-  record: unknown,
-  frequencyMode: "rank-based" | "occurrence-based"
-): NormalizedFrequency | null {
-  if (!Array.isArray(record) || record.length < 3) {
-    return null;
-  }
-
-  const expression = record[0];
-  const mode = record[1];
-  const data = record[2];
-
-  if (typeof expression !== "string" || expression.length === 0) return null;
-  if (mode !== "freq") return null;
-
-  const reading = typeof data === "object" && data !== null && !Array.isArray(data) &&
-    "reading" in (data as Record<string, unknown>) &&
-    typeof (data as Record<string, unknown>)["reading"] === "string"
-      ? ((data as Record<string, unknown>)["reading"] as string)
-      : null;
-
-  const parsed = parseFrequencyValue(data);
-  if (!parsed) return null;
-
-  return {
-    expression,
-    reading,
-    frequencyValue: parsed.value,
-    displayValue: parsed.display,
-    frequencyMode,
   };
 }
 
@@ -313,8 +239,20 @@ export async function importYomitanDictionaryFromBuffer(
   let importedFrequencies = 0;
   let skippedFrequencies = 0;
 
+  const beforeFreqCount = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(termFrequencies)
+    .where(sql`${termFrequencies.dictionaryId} = ${dict.id}`)
+    .then((r) => r[0]?.count ?? 0);
+
   for (const entry of metaBankEntries) {
-    const raw = JSON.parse(entry.getData().toString("utf8")) as unknown[];
+    let raw: unknown;
+    try {
+      raw = JSON.parse(entry.getData().toString("utf8"));
+    } catch {
+      skippedFrequencies += 1;
+      continue;
+    }
     if (!Array.isArray(raw)) {
       continue;
     }
@@ -333,7 +271,7 @@ export async function importYomitanDictionaryFromBuffer(
       }[] = [];
 
       for (const record of chunk) {
-        const normalized = convertTermMetaFreqEntry(record, frequencyMode);
+        const normalized = normalizeFreqEntry(record, frequencyMode);
         if (!normalized) {
           skippedFrequencies += 1;
           continue;
@@ -357,7 +295,7 @@ export async function importYomitanDictionaryFromBuffer(
       // 既に小さい値が入っていれば維持し、入っていなければ新しい小さい値で上書きする。
       // これで JPDB の `人間/にんげん=158` と `人間/にんげん=37433㋕` がどんな順序で
       // 入ってきても、最終的にテーブルには MIN 値だけが残る。
-      const inserted = await db
+      await db
         .insert(termFrequencies)
         .values(rows)
         .onConflictDoUpdate({
@@ -369,14 +307,17 @@ export async function importYomitanDictionaryFromBuffer(
           set: {
             frequencyValue: sql`LEAST(${termFrequencies.frequencyValue}, EXCLUDED.frequency_value)`,
           },
-        })
-        .returning({ id: termFrequencies.id });
-
-      importedFrequencies += inserted.length;
-      // DO UPDATE なので conflict した行も returning に含まれる。
-      // parse 失敗は skippedFrequencies に既に計上済み。
+        });
     }
   }
+
+  const afterFreqCount = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(termFrequencies)
+    .where(sql`${termFrequencies.dictionaryId} = ${dict.id}`)
+    .then((r) => r[0]?.count ?? 0);
+
+  importedFrequencies = afterFreqCount - beforeFreqCount;
 
   return {
     dictionaryId: String(dict.id),

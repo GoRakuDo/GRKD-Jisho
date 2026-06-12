@@ -19,6 +19,13 @@ export const GET: APIRoute = async (context) => {
     });
   }
 
+  if (!session.isAdmin) {
+    return new Response(JSON.stringify({ error: "forbidden" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const dictionaries = await getDictionaryList();
     const withEntryCounts = await Promise.all(
@@ -47,6 +54,13 @@ export const PUT: APIRoute = async (context) => {
   if (!session || !getIsAuthenticated(context)) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (!session.isAdmin) {
+    return new Response(JSON.stringify({ error: "forbidden" }), {
+      status: 403,
       headers: { "Content-Type": "application/json" },
     });
   }

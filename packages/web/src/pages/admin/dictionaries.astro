@@ -34,7 +34,16 @@ if (session?.isAdmin) {
       .from(schema.dictionaryEntries)
       .groupBy(schema.dictionaryEntries.dictionaryId);
 
-    const countMap = new Map(entryCounts.map((r) => [String(r.dictId), Number(r.count)]));
+    const freqCounts = await db
+      .select({
+        dictId: schema.termFrequencies.dictionaryId,
+        count: count(schema.termFrequencies.id),
+      })
+      .from(schema.termFrequencies)
+      .groupBy(schema.termFrequencies.dictionaryId);
+
+    const entryCountMap = new Map(entryCounts.map((r) => [String(r.dictId), Number(r.count)]));
+    const freqCountMap = new Map(freqCounts.map((r) => [String(r.dictId), Number(r.count)]));
 
     dictionaries = dicts.map((d) => ({
       id: String(d.id),
@@ -42,7 +51,7 @@ if (session?.isAdmin) {
       slug: d.slug,
       priority: d.priority,
       enabled: d.enabled,
-      entryCount: countMap.get(String(d.id)) ?? 0,
+      entryCount: (entryCountMap.get(String(d.id)) ?? 0) + (freqCountMap.get(String(d.id)) ?? 0),
     }));
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
@@ -127,6 +136,174 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const SSR_CSRF_TOKEN = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+  const fileInput = document.getElementById('freq-file-input') as HTMLInputElement;
+  const uploadArea = document.getElementById('freq-upload-area')!;
+  const previewDiv = document.getElementById('freq-preview')!;
+  const successDiv = document.getElementById('freq-success')!;
+  const errorDiv = document.getElementById('freq-error')!;
+  const previewTitle = document.getElementById('freq-preview-title')!;
+  const previewMeta = document.getElementById('freq-preview-meta')!;
+  const previewTbody = document.getElementById('freq-preview-tbody')!;
+  const importBtn = document.getElementById('freq-import-btn') as HTMLButtonElement;
+  const cancelBtn = document.getElementById('freq-cancel-btn')!;
+  const enableBtn = document.getElementById('freq-enable-btn')!;
+
+  let selectedFile: File | null = null;
+  let importedDictId: string | null = null;
+
+  function getFrequencyMode(): string {
+    return (document.getElementById('freq-mode-select') as HTMLSelectElement)?.value ?? 'rank-based';
+  }
+
+  function showError(msg: string) {
+    errorDiv.style.display = 'flex';
+    document.getElementById('freq-error-text')!.textContent = msg;
+    successDiv.style.display = 'none';
+  }
+
+  function hideError() {
+    errorDiv.style.display = 'none';
+  }
+
+  function showSuccess(msg: string) {
+    successDiv.style.display = 'flex';
+    document.getElementById('freq-success-text')!.textContent = msg;
+    errorDiv.style.display = 'none';
+  }
+
+  function resetToUpload() {
+    previewDiv.style.display = 'none';
+    uploadArea.style.display = 'flex';
+    selectedFile = null;
+    if (fileInput) fileInput.value = '';
+    hideError();
+  }
+
+  fileInput?.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    selectedFile = file;
+    hideError();
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('frequencyMode', getFrequencyMode());
+
+    try {
+      uploadArea.style.display = 'none';
+      previewDiv.style.display = 'block';
+
+      const res = await fetch('/api/admin/frequencies/preview', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'x-csrf-token': SSR_CSRF_TOKEN },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Preview failed (${res.status})`);
+      }
+
+      previewTitle.textContent = `${data.totalEntries.toLocaleString()} frequency entries`;
+      previewMeta.textContent = `Mode: ${data.frequencyMode} | File: ${data.fileName} (${(data.fileSize / 1024).toFixed(1)} KB)`;
+
+      previewTbody.innerHTML = '';
+      for (const entry of data.sampleEntries) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td class="mono">${escapeHtml(entry.expression)}</td><td class="mono">${escapeHtml(entry.reading ?? '-')}</td><td class="mono">${escapeHtml(String(entry.frequency))}</td><td class="mono">${escapeHtml(entry.display)}</td>`;
+        previewTbody.appendChild(tr);
+      }
+
+      if (data.sampleEntries.length < data.totalEntries) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="4" style="text-align: center; color: var(--color-graphite-500); font-style: italic;">... and ${(data.totalEntries - data.sampleEntries.length).toLocaleString()} more entries</td>`;
+        previewTbody.appendChild(tr);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Preview failed';
+      showError(msg);
+      resetToUpload();
+    }
+  });
+
+  cancelBtn?.addEventListener('click', resetToUpload);
+
+  enableBtn?.addEventListener('click', async () => {
+    if (!importedDictId) return;
+    enableBtn.disabled = true;
+    enableBtn.textContent = 'Enabling...';
+    try {
+      const res = await fetch('/api/admin/dictionaries', {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'x-csrf-token': SSR_CSRF_TOKEN },
+        body: JSON.stringify({ id: Number(importedDictId), enabled: true }),
+      });
+      if (res.ok) {
+        enableBtn.textContent = 'Enabled!';
+        enableBtn.style.background = 'var(--color-success-600)';
+        setTimeout(() => { enableBtn.style.display = 'none'; }, 2000);
+      } else {
+        throw new Error('Failed to enable');
+      }
+    } catch {
+      enableBtn.disabled = false;
+      enableBtn.textContent = 'Enable Now';
+      showError('Failed to enable dictionary. Try from the dictionary table above.');
+    }
+  });
+
+  importBtn?.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('dictionaryName', selectedFile.name.replace(/\.zip$/i, '').replace(/[[\]]/g, '').trim());
+    formData.append('frequencyMode', getFrequencyMode());
+
+    importBtn.disabled = true;
+    importBtn.textContent = 'Importing...';
+    hideError();
+
+    try {
+      const res = await fetch('/api/admin/frequencies/import', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'x-csrf-token': SSR_CSRF_TOKEN },
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || `Import failed (${res.status})`);
+      }
+
+      const r = data.result;
+      importedDictId = r.dictionaryId;
+      showSuccess(`Imported ${r.imported.toLocaleString()} frequency entries into "${r.dictionaryName}". Frequency dictionaries must be enabled to affect reading ranker.`);
+      enableBtn.style.display = 'inline-flex';
+      previewDiv.style.display = 'none';
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Import failed';
+      showError(msg);
+    } finally {
+      importBtn.disabled = false;
+      importBtn.textContent = 'Import Frequency Data';
+    }
+  });
+
+  function escapeHtml(str: string): string {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+});
+</script>
+
 <AdminLayout title="Dictionaries" active="dictionaries" csrfToken={csrfToken}>
   <div class="page-header">
     <div>
@@ -187,6 +364,74 @@ document.addEventListener('DOMContentLoaded', () => {
         </tbody>
       </table>
     </div>
+  )}
+
+  {session?.isAdmin && (
+  <div class="freq-section">
+    <div class="freq-header">
+      <div>
+        <h2 class="freq-title">Frequency Data</h2>
+        <p class="freq-description">Import Yomitan frequency ZIP files to rank dictionary readings by usage frequency.</p>
+      </div>
+    </div>
+
+    <div id="freq-upload-area" class="freq-upload-area">
+      <svg class="freq-upload-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <p class="freq-upload-text">Drop a frequency .zip file here, or <label for="freq-file-input" class="freq-upload-link">browse</label></p>
+      <p class="freq-upload-hint">term_meta_bank_*.json files inside a Yomitan-compatible ZIP</p>
+      <div class="freq-mode-row">
+        <label for="freq-mode-select" class="freq-mode-label">Frequency Mode:</label>
+        <select id="freq-mode-select" class="freq-mode-select">
+          <option value="rank-based" selected>Rank-based (lower = more common)</option>
+          <option value="occurrence-based">Occurrence-based (higher = more common)</option>
+        </select>
+      </div>
+      <input type="file" id="freq-file-input" accept=".zip" style="display: none;" />
+    </div>
+
+    <div id="freq-preview" class="freq-preview" style="display: none;">
+      <div class="freq-preview-header">
+        <div>
+          <p class="freq-preview-title" id="freq-preview-title"></p>
+          <p class="freq-preview-meta" id="freq-preview-meta"></p>
+        </div>
+        <div class="freq-preview-actions">
+          <button id="freq-cancel-btn" class="freq-btn-secondary">Cancel</button>
+          <button id="freq-import-btn" class="freq-btn-primary">Import Frequency Data</button>
+        </div>
+      </div>
+      <div class="freq-preview-table-wrap">
+        <table class="freq-preview-table">
+          <thead>
+            <tr>
+              <th>Expression</th>
+              <th>Reading</th>
+              <th>Frequency</th>
+              <th>Display</th>
+            </tr>
+          </thead>
+          <tbody id="freq-preview-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="freq-success" class="freq-success" style="display: none;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      <span id="freq-success-text"></span>
+      <button id="freq-enable-btn" class="freq-btn-primary" style="display: none;">Enable Now</button>
+    </div>
+
+    <div id="freq-error" class="freq-error" style="display: none;">
+      <span id="freq-error-text"></span>
+    </div>
+  </div>
   )}
 </AdminLayout>
 
@@ -395,6 +640,257 @@ document.addEventListener('DOMContentLoaded', () => {
 
     .import-button {
       width: 100%;
+    }
+  }
+
+  /* Frequency Import Section */
+  .freq-section {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--color-graphite-180);
+  }
+
+  .freq-header {
+    margin-bottom: 16px;
+  }
+
+  .freq-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+    margin: 0;
+  }
+
+  .freq-description {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--color-graphite-500);
+  }
+
+  .freq-upload-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 32px 24px;
+    background: var(--color-porcelain-100);
+    border: 2px dashed var(--color-graphite-300);
+    border-radius: var(--radius-card);
+    cursor: pointer;
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+  }
+
+  .freq-upload-area:hover {
+    border-color: var(--color-royal-blue-600);
+    background: var(--color-royal-blue-50);
+  }
+
+  .freq-upload-icon {
+    color: var(--color-graphite-500);
+  }
+
+  .freq-upload-text {
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-graphite-650);
+  }
+
+  .freq-upload-link {
+    color: var(--color-royal-blue-600);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .freq-upload-link:hover {
+    color: var(--color-royal-blue-700);
+  }
+
+  .freq-upload-hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--color-graphite-500);
+  }
+
+  .freq-mode-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .freq-mode-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-graphite-650);
+  }
+
+  .freq-mode-select {
+    padding: 4px 8px;
+    border: 1px solid var(--color-graphite-300);
+    border-radius: var(--radius-input);
+    background: var(--color-porcelain-50);
+    color: var(--color-graphite-800);
+    font-size: 12px;
+    outline: none;
+  }
+
+  .freq-mode-select:focus {
+    border-color: var(--color-royal-blue-600);
+    box-shadow: 0 0 0 2px var(--color-royal-blue-100);
+  }
+
+  .freq-preview {
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+  }
+
+  .freq-preview-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px;
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .freq-preview-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-graphite-800);
+  }
+
+  .freq-preview-meta {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--color-graphite-500);
+    font-family: var(--font-grkd-mono);
+  }
+
+  .freq-preview-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .freq-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: var(--radius-button);
+    background: var(--color-royal-blue-600);
+    color: var(--color-porcelain-50);
+    border: 1px solid var(--color-royal-blue-700);
+    cursor: pointer;
+    transition: background-color 0.18s ease;
+  }
+
+  .freq-btn-primary:hover {
+    background: var(--color-royal-blue-700);
+  }
+
+  .freq-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .freq-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: var(--radius-button);
+    background: var(--color-porcelain-100);
+    color: var(--color-graphite-800);
+    border: 1px solid var(--color-graphite-300);
+    cursor: pointer;
+    transition: background-color 0.18s ease;
+  }
+
+  .freq-btn-secondary:hover {
+    background: var(--color-porcelain-150);
+  }
+
+  .freq-preview-table-wrap {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .freq-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .freq-preview-table th {
+    background: var(--color-porcelain-150);
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-graphite-500);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--color-graphite-180);
+    position: sticky;
+    top: 0;
+  }
+
+  .freq-preview-table td {
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--color-graphite-650);
+    border-bottom: 1px solid var(--color-graphite-180);
+  }
+
+  .freq-success {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--color-success-100);
+    border: 1px solid var(--color-success-600);
+    border-radius: var(--radius-button);
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--color-success-600);
+    font-weight: 500;
+  }
+
+  .freq-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--color-danger-100);
+    border: 1px solid var(--color-danger-600);
+    border-radius: var(--radius-button);
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--color-danger-600);
+    font-weight: 500;
+  }
+
+  @media (max-width: 760px) {
+    .freq-preview-header {
+      flex-direction: column;
+    }
+
+    .freq-preview-actions {
+      width: 100%;
+    }
+
+    .freq-btn-primary, .freq-btn-secondary {
+      flex: 1;
     }
   }
 </style>
