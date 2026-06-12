@@ -6,6 +6,7 @@ export const dictionaries = pgTable("dictionaries", {
   slug: text("slug").notNull().unique(),
   priority: integer("priority").notNull().default(0),
   enabled: boolean("enabled").notNull().default(true),
+  isFrequencyOnly: boolean("is_frequency_only").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 

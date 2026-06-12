@@ -3,6 +3,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 import { getSession } from "../../lib/session";
 import {
   getDictionaryList,
+  getFrequencyDictionaries,
   db,
   schema,
 } from "@grkd-jisho/db";
@@ -22,10 +23,12 @@ interface DictWithCount {
 }
 
 let dictionaries: DictWithCount[] = [];
+let frequencyDictionaries: DictWithCount[] = [];
 
 if (session?.isAdmin) {
   try {
     const dicts = await getDictionaryList();
+    const freqDicts = await getFrequencyDictionaries();
     const entryCounts = await db
       .select({
         dictId: schema.dictionaryEntries.dictionaryId,
@@ -51,7 +54,16 @@ if (session?.isAdmin) {
       slug: d.slug,
       priority: d.priority,
       enabled: d.enabled,
-      entryCount: (entryCountMap.get(String(d.id)) ?? 0) + (freqCountMap.get(String(d.id)) ?? 0),
+      entryCount: entryCountMap.get(String(d.id)) ?? 0,
+    }));
+
+    frequencyDictionaries = freqDicts.map((d) => ({
+      id: String(d.id),
+      name: d.name,
+      slug: d.slug,
+      priority: d.priority,
+      enabled: d.enabled,
+      entryCount: freqCountMap.get(String(d.id)) ?? 0,
     }));
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
@@ -375,6 +387,30 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     </div>
 
+    {frequencyDictionaries.length > 0 && (
+    <div class="freq-imported-list">
+      <p class="freq-imported-label">Imported frequency sources</p>
+      <table class="freq-imported-table">
+        <thead>
+          <tr>
+            <th>NAME</th>
+            <th>ENTRIES</th>
+            <th>STATUS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {frequencyDictionaries.map((fd) => (
+            <tr>
+              <td>{fd.name}</td>
+              <td>{fd.entryCount.toLocaleString()}</td>
+              <td><span class={`status-badge ${fd.enabled ? 'status-enabled' : 'status-disabled'}`}>{fd.enabled ? 'enabled' : 'disabled'}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    )}
+
     <div id="freq-upload-area" class="freq-upload-area">
       <svg class="freq-upload-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -665,6 +701,46 @@ document.addEventListener('DOMContentLoaded', () => {
     margin: 4px 0 0;
     font-size: 13px;
     color: var(--color-graphite-500);
+  }
+
+  .freq-imported-list {
+    margin-bottom: 16px;
+  }
+
+  .freq-imported-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-graphite-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0 0 8px;
+  }
+
+  .freq-imported-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--color-porcelain-100);
+    border: 1px solid var(--color-graphite-180);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+  }
+
+  .freq-imported-table th {
+    background: var(--color-porcelain-150);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-graphite-500);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 8px 12px;
+    text-align: left;
+  }
+
+  .freq-imported-table td {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--color-graphite-700);
+    border-top: 1px solid var(--color-graphite-180);
   }
 
   .freq-upload-area {

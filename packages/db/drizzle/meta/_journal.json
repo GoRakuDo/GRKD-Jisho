@@ -127,6 +127,13 @@
       "when": 1781244026477,
       "tag": "0017_icy_norrin_radd",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1781259881846,
+      "tag": "0018_oval_shape",
+      "breakpoints": true
     }
   ]
 }

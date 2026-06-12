@@ -1,4 +1,4 @@
-import { eq, and, asc, count } from "drizzle-orm";
+import { eq, and, asc, count, not } from "drizzle-orm";
 import { db } from "../../index";
 import * as schema from "../../schema";
 
@@ -6,6 +6,15 @@ export async function getDictionaryList() {
   return db
     .select()
     .from(schema.dictionaries)
+    .where(not(eq(schema.dictionaries.isFrequencyOnly, true)))
+    .orderBy(asc(schema.dictionaries.priority));
+}
+
+export async function getFrequencyDictionaries() {
+  return db
+    .select()
+    .from(schema.dictionaries)
+    .where(eq(schema.dictionaries.isFrequencyOnly, true))
     .orderBy(asc(schema.dictionaries.priority));
 }
 

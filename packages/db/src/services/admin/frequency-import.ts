@@ -65,6 +65,7 @@ export async function importFrequencyZip(
       slug,
       priority: 0,
       enabled: false,
+      isFrequencyOnly: true,
     })
     .onConflictDoUpdate({
       target: dictionaries.slug,

@@ -1,0 +1,1 @@
+ALTER TABLE "dictionaries" ADD COLUMN "is_frequency_only" boolean DEFAULT false NOT NULL;
