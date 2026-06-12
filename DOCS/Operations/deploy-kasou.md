@@ -3,7 +3,7 @@
 > **対象マシン**: HP t620 (AMD GX-217GA, 8GB RAM, 120GB SSD + 2.7TB HDD)
 > **OS**: Debian 13.4 Trixie + Xfce 4.20
 > **同居サービス**: DennouAibou (OpenClaw v2026.4.5), episodic-claw, smart-tts-proxy
-> **最終更新**: 2026-05-08
+> **最終更新**: 2026-06-12
 
 ## 目次
 
@@ -14,6 +14,7 @@
 5. [デプロイ手順](#5-デプロイ手順)
 6. [動作確認チェックリスト](#6-動作確認チェックリスト)
 7. [緊急時対応](#7-緊急時対応)
+8. [DB自動バックアップ](#8-db自動バックアップ)
 
 ---
 
@@ -48,8 +49,8 @@ CPU               〜5% (アイドル)       〜1% (Bot待機)         無視で
 ### 失敗の連鎖
 
 ```
-1. apt install postgresql-16
-2. PostgreSQL のデータディレクトリは /var/lib/postgresql/16/main/
+1. apt install postgresql-17
+2. PostgreSQL のデータディレクトリは /var/lib/postgresql/17/main/
    → つまり / 以下にデータが溜まる
 3. Yomitan辞書のインポート
    → 辞書データが数GB〜10GBになる可能性
@@ -67,16 +68,16 @@ CPU               〜5% (アイドル)       〜1% (Bot待機)         無視で
 
 ```bash
 # インストール前（重要: cluster作成前にディレクトリを準備）
-sudo mkdir -p /home/postgresql-data/16
-sudo chown postgres:postgres /home/postgresql-data/16
+sudo mkdir -p /home/postgresql-data/17
+sudo chown postgres:postgres /home/postgresql-data/17
 
 # apt install 後に cluster 作成（デフォルトの auto-start は止めておく）
-sudo pg_dropcluster 16 main --stop   # デフォルトclusterを削除（まだデータなし）
-sudo pg_createcluster 16 main --datadir /home/postgresql-data/16/main
+sudo pg_dropcluster 17 main --stop   # デフォルトclusterを削除（まだデータなし）
+sudo pg_createcluster 17 main --datadir /home/postgresql-data/17/main
 
 # 確認
 sudo pg_lsclusters
-# → 16  main  5432  /home/postgresql-data/16/main  online
+# → 17  main  5432  /home/postgresql-data/17/main  online
 ```
 
 /homeパーティションは86GBあるため、辞書データが20GBになっても余裕。
@@ -84,7 +85,7 @@ sudo pg_lsclusters
 #### 対策B: WALサイズ制限（推奨）
 
 ```ini
-# /home/postgresql-data/16/main/postgresql.conf に追加
+# /home/postgresql-data/17/main/postgresql.conf に追加
 max_wal_size = 1GB
 min_wal_size = 256MB
 ```
@@ -259,32 +260,32 @@ pnpm --version
 # もし v25 なら、念のため nvm で v20 を準備（Step 3判断）
 ```
 
-### Step 2: PostgreSQL 16 インストール（対策①）
+### Step 2: PostgreSQL 17 インストール（対策①）
 
 ```bash
 # データディレクトリを /home に確保
-sudo mkdir -p /home/postgresql-data/16
-sudo chown postgres:postgres /home/postgresql-data/16
+sudo mkdir -p /home/postgresql-data/17
+sudo chown postgres:postgres /home/postgresql-data/17
 
 # PostgreSQL インストール
-sudo apt install -y postgresql-16
+sudo apt install -y postgresql-17
 
 # デフォルトclusterを削除（/var/lib/ に作られるため）
-sudo pg_dropcluster 16 main --stop
+sudo pg_dropcluster 17 main --stop
 
 # /home にclusterを作り直し
-sudo pg_createcluster 16 main --datadir /home/postgresql-data/16/main
+sudo pg_createcluster 17 main --datadir /home/postgresql-data/17/main
 
 # メモリ設定を反映（対策②）
 sudo sed -i "s/^#shared_buffers = 128MB/shared_buffers = 512MB/" \
-  /home/postgresql-data/16/main/postgresql.conf
+  /home/postgresql-data/17/main/postgresql.conf
 sudo sed -i "s/^#work_mem = 4MB/work_mem = 16MB/" \
-  /home/postgresql-data/16/main/postgresql.conf
+  /home/postgresql-data/17/main/postgresql.conf
 sudo sed -i "s/^#max_wal_size = 1GB/max_wal_size = 1GB/" \
-  /home/postgresql-data/16/main/postgresql.conf
+  /home/postgresql-data/17/main/postgresql.conf
 
 # PostgreSQL 再起動
-sudo systemctl restart postgresql@16-main
+sudo systemctl restart postgresql@17-main
 
 # 接続確認
 sudo -u postgres psql -c "SELECT version();"
@@ -350,8 +351,8 @@ WEB_BASE_URL=http://192.168.100.46:4321
 # /etc/systemd/system/grkd-jisho-bot.service
 [Unit]
 Description=GRKD-Jisho Discord Bot
-After=network.target postgresql@16-main.service
-Requires=postgresql@16-main.service
+After=network.target postgresql@17-main.service
+Requires=postgresql@17-main.service
 
 [Service]
 Type=simple
@@ -374,8 +375,8 @@ WantedBy=multi-user.target
 # /etc/systemd/system/grkd-jisho-web.service
 [Unit]
 Description=GRKD-Jisho Web Admin UI
-After=network.target postgresql@16-main.service
-Requires=postgresql@16-main.service
+After=network.target postgresql@17-main.service
+Requires=postgresql@17-main.service
 
 [Service]
 Type=simple
@@ -404,7 +405,7 @@ sudo systemctl status grkd-jisho-bot --no-pager
 ### Step 7: 自動起動確認
 
 ```bash
-sudo systemctl list-dependencies postgresql@16-main.service
+sudo systemctl list-dependencies postgresql@17-main.service
 # → PostgreSQL 起動後に Bot と Web が自動起動することを確認
 ```
 
@@ -442,8 +443,8 @@ sudo reboot
 ### A) PostgreSQL が落ちた
 
 ```bash
-sudo systemctl status postgresql@16-main
-sudo journalctl -u postgresql@16-main -n 50 --no-pager
+sudo systemctl status postgresql@17-main
+sudo journalctl -u postgresql@17-main -n 50 --no-pager
 
 # 典型的な原因と対処:
 # / の空き不足 → df -h / を確認し、不要ファイルを削除
@@ -485,12 +486,87 @@ free -h
 
 ```bash
 # 順序厳守:
-sudo systemctl restart postgresql@16-main       # 1. DB
+sudo systemctl restart postgresql@17-main       # 1. DB
 sleep 3
 sudo systemctl restart grkd-jisho-bot           # 2. Bot
 sudo systemctl restart grkd-jisho-web           # 3. Web
 systemctl --user restart openclaw-gateway       # 4. DennouAibou（最後。他に依存しない）
 ```
+
+---
+
+## 8. DB自動バックアップ
+
+Kasou では GRKD-Jisho の PostgreSQL を **6時間ごと** に `pg_dump --format=custom` で保存する。
+Bot/Web の通常運用とは別の保険であり、`response_cache` や `prompts` の誤削除から戻すためのもの。
+
+### 保存先
+
+`.env` に以下を設定する。
+
+```bash
+DB_BACKUP_DIR=/mnt/HDD/Drive1/GRKD-Jisho_DB_Backups/postgres
+DB_BACKUP_PREFIX=grkd-jisho
+DB_BACKUP_RETENTION_DAYS=30
+```
+
+### 手動実行
+
+```bash
+cd /home/kasou_yoshia/GRKD-Jisho
+pnpm db:backup:dry
+pnpm db:backup
+pnpm db:backup:list
+```
+
+### systemd timer 導入
+
+```bash
+cd /home/kasou_yoshia/GRKD-Jisho
+sudo mkdir -p /mnt/HDD/Drive1/GRKD-Jisho_DB_Backups/postgres
+getent group kasou_yoshia || sudo groupadd kasou_yoshia
+sudo chown -R kasou_yoshia:kasou_yoshia /mnt/HDD/Drive1/GRKD-Jisho_DB_Backups/postgres
+sudo chmod 700 /mnt/HDD/Drive1/GRKD-Jisho_DB_Backups/postgres
+sudo cp deploy/systemd/grkd-jisho-db-backup.service /etc/systemd/system/
+sudo cp deploy/systemd/grkd-jisho-db-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now grkd-jisho-db-backup.timer
+systemctl list-dependencies grkd-jisho-db-backup.service | grep postgresql@17-main
+systemctl list-timers grkd-jisho-db-backup.timer --all
+```
+
+> **exFAT注意:** `/mnt/HDD/Drive1` は exFAT のため、`chmod 700/600` は実際には効かず、mount の `fmask=0113,dmask=0002` に従う。CLI はその場合に警告を出してバックアップ自体は継続する。0600 が必須なら ext4/btrfs または LUKS 暗号化を使う。
+
+### 状態確認
+
+```bash
+sudo systemctl status grkd-jisho-db-backup.timer --no-pager
+sudo journalctl -u grkd-jisho-db-backup.service -n 80 --no-pager
+ls -lh /mnt/HDD/Drive1/GRKD-Jisho_DB_Backups/postgres
+```
+
+### 復元時の原則
+
+```bash
+# 1. 現在のDBを退避（必須）
+cd /home/kasou_yoshia/GRKD-Jisho
+pnpm db:backup
+
+# 2. 復元対象 .dump の中身を先に確認（TOCのみ。行データ破損の完全検出ではない）
+pg_restore --list /mnt/HDD/Drive1/GRKD-Jisho_DB_Backups/postgres/grkd-jisho-YYYYMMDDTHHMMSSZ.dump
+
+# 3. 復元（破壊的操作。必ず人間承認）
+export PGPASSWORD="<.env の DATABASE_URL から取り出したDBパスワード>"
+pg_restore --clean --if-exists --no-owner --no-privileges \
+  -h localhost -p 5432 -U grkd_jisho -d grkd_jisho \
+  /mnt/HDD/Drive1/GRKD-Jisho_DB_Backups/postgres/grkd-jisho-YYYYMMDDTHHMMSSZ.dump
+unset PGPASSWORD
+
+# 4. Bot/Web を再起動して動作確認
+sudo systemctl restart grkd-jisho-bot grkd-jisho-web
+```
+
+復元は破壊的なので、必ず人間承認を取る。
 
 ---
 

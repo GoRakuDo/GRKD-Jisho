@@ -19,7 +19,10 @@
     "deploy:pg-config:dry": "tsx src/bin/pg-config.ts --dry-run",
     "deploy:pg-config:show": "tsx src/bin/pg-config.ts --show",
     "deploy:check": "tsx src/bin/deploy-check.ts",
-    "deploy:check:json": "tsx src/bin/deploy-check.ts --json"
+    "deploy:check:json": "tsx src/bin/deploy-check.ts --json",
+    "db:backup": "dotenv -e ../../.env -- tsx src/bin/backup-db.ts",
+    "db:backup:dry": "dotenv -e ../../.env -- tsx src/bin/backup-db.ts --dry-run",
+    "db:backup:list": "dotenv -e ../../.env -- tsx src/bin/backup-db.ts --list"
   },
   "dependencies": {
     "adm-zip": "^0.5.10",

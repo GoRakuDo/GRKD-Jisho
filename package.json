@@ -9,6 +9,9 @@
     "db:migrate": "pnpm --filter db migrate",
     "db:import": "pnpm --filter db import-yomitan",
     "db:seed": "pnpm --filter db seed-defaults",
+    "db:backup": "pnpm --filter @grkd-jisho/db db:backup",
+    "db:backup:dry": "pnpm --filter @grkd-jisho/db db:backup:dry",
+    "db:backup:list": "pnpm --filter @grkd-jisho/db db:backup:list",
     "reindex": "pwsh -NoProfile -ExecutionPolicy Bypass -File reindex.ps1",
     "push:reindex": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/push-with-reindex.ps1"
   },

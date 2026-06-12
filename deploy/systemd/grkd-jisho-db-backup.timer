@@ -1,0 +1,11 @@
+[Unit]
+Description=Run GRKD-Jisho PostgreSQL logical backup every 6 hours
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:15:00 Asia/Jakarta
+Persistent=true
+RandomizedDelaySec=5m
+Unit=grkd-jisho-db-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=GRKD-Jisho PostgreSQL logical backup
+Wants=network-online.target postgresql@17-main.service
+After=network-online.target postgresql@17-main.service
+
+[Service]
+Type=oneshot
+User=kasou_yoshia
+Group=kasou_yoshia
+WorkingDirectory=/home/kasou_yoshia/GRKD-Jisho
+EnvironmentFile=/home/kasou_yoshia/GRKD-Jisho/.env
+ExecStart=/home/linuxbrew/.linuxbrew/bin/pnpm --filter @grkd-jisho/db db:backup
+UMask=0077
+TimeoutStartSec=45min
+NoNewPrivileges=true
+PrivateTmp=true

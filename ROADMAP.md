@@ -320,6 +320,13 @@ Phase 5: Deferred Scope               TBA
   - 90日以上古いレコードを削除するジョブ
   - pg_cron または Bot の定期タスク（`node-cron`）で実装
 
+- [x] **4-2a** PostgreSQL 自動バックアップ
+  - `pnpm db:backup` で `pg_dump --format=custom` の論理バックアップを作成
+  - `DB_BACKUP_DIR`, `DB_BACKUP_PREFIX`, `DB_BACKUP_RETENTION_DAYS` で保存先・prefix・保持日数を設定
+  - Kasou では `grkd-jisho-db-backup.timer` を systemd timer として 6時間ごとに実行する
+  - バックアップは成功後にのみ retention pruning を行い、対象prefix以外のファイルは触らない
+  - password は argv に出さず `PGPASSWORD` 経由、tmp→rename、`chmod 600`、`pg_restore --list` 検証を必須にする
+
 - [ ] **4-3** プロンプトバージョン管理
   - `v2` プロンプトの実験的導入
   - A/B テスト機能（guild 内一部ユーザーに新プロンプト適用）

@@ -166,6 +166,53 @@ pnpm db:migrate
 
 ---
 
+## 4-4. PostgreSQL Backup
+
+GRKD-Jisho の本番DBは `pg_dump --format=custom` の論理バックアップを標準にする。
+これは `response_cache` の手動編集や `prompts` のような運用データを、誤削除後に戻せる最後の安全網である。
+
+### 手動バックアップ
+
+```bash
+# .env の DATABASE_URL / DB_BACKUP_* を読む
+pnpm db:backup
+
+# 実行前の確認のみ
+pnpm db:backup:dry
+
+# 既存バックアップ一覧
+pnpm db:backup:list
+```
+
+### 環境変数
+
+| 変数 | 既定値 | 説明 |
+|---|---:|---|
+| `DB_BACKUP_DIR` | `./backups/postgres` | `.dump` の保存先 |
+| `DB_BACKUP_PREFIX` | `grkd-jisho` | ファイル名prefix。保持期間削除の対象判定にも使う |
+| `DB_BACKUP_RETENTION_DAYS` | `30` | 何日より古いバックアップを削除するか。`0` で削除無効 |
+
+### 復元の基本形
+
+```bash
+# 既存DBへ戻す場合は、必ず事前に現在のDBも別名でバックアップする
+# DATABASE_URL をそのまま argv に渡さず、host/user/db/password を分けて指定する
+export PGPASSWORD="<DB password>"
+pg_dump --format=custom --no-owner --no-privileges \
+  -h "<DB host>" -p "5432" -U "<DB user>" -d "<DB name>" \
+  -f ./backups/postgres/pre-restore-$(date -u +%Y%m%dT%H%M%SZ).dump
+
+pg_restore --list /path/to/grkd-jisho-YYYYMMDDTHHMMSSZ.dump
+pg_restore --clean --if-exists --no-owner --no-privileges \
+  -h "<DB host>" -p "5432" -U "<DB user>" -d "<DB name>" \
+  /path/to/grkd-jisho-YYYYMMDDTHHMMSSZ.dump
+unset PGPASSWORD
+```
+
+> **注意:** 復元は破壊的操作。必ず人間承認を取ってから実行する。
+
+---
+
 ## 5. Bot Token / 環境変数
 
 ### 5-1. Discord Bot Token の取得

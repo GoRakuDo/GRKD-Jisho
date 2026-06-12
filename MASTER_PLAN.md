@@ -88,6 +88,8 @@ Discord Guild
 │  ├ ops_jobs              (safe operation queue) │
 │  └ mcp_audit_logs        (agent operation audit)│
 └───────┬───────────────────────────────┬─────────┘
+        │  pg_dump custom-format backup (.dump)
+        │  └─ pnpm db:backup / systemd timer (Kasou: every 6h)
         │                               │
         │                               ▼
         │                 ┌─────────────────────────────────┐
