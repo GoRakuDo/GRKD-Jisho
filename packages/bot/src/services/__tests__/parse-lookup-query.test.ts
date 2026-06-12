@@ -20,6 +20,12 @@ describe("parseLookupQuery", () => {
     expect(result.explicitReading).toBe("じんかん");
   });
 
+  it("日本語 bracket 「」 も同じ扱い", () => {
+    const result = parseLookupQuery("人間「にんげん」");
+    expect(result.term).toBe("人間");
+    expect(result.explicitReading).toBe("にんげん");
+  });
+
   it("bracket なし → explicit reading は null、term はそのまま", () => {
     const result = parseLookupQuery("人間");
     expect(result.term).toBe("人間");

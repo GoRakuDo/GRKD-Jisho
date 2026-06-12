@@ -98,6 +98,7 @@ export type ParsedLookupQuery = {
  *
  * 例:
  *   人間[にんげん]   -> { term: "人間", explicitReading: "にんげん" }
+ *   人間「にんげん」 -> { term: "人間", explicitReading: "にんげん" }
  *   人間[  たべる  ] -> { term: "人間", explicitReading: "たべる" }   (内側空白は trim)
  *   人間             -> { term: "人間", explicitReading: null }
  *   今日は人間ですね -> { term: "今日は人間ですね", explicitReading: null }
@@ -112,8 +113,8 @@ export function parseLookupQuery(input: string): ParsedLookupQuery {
   }
 
   // 入力全体が `term[reading]` 形式かを判定する。
-  // 角括弧は ASCII `[]` または全角 `［］` を受け付ける。
-  const match = /^(\S+?)\s*[\[［]\s*(\S+?)\s*[\]］]\s*$/.exec(trimmed);
+  // 角括弧は ASCII `[]`、全角 `［］`、日本語 `「」` を受け付ける。
+  const match = /^(\S+?)\s*[\[［「]\s*(\S+?)\s*[\]］」]\s*$/.exec(trimmed);
   if (!match) {
     return { term: trimmed, explicitReading: null, rawInput: input };
   }
