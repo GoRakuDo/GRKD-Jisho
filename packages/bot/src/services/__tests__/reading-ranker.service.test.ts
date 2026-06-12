@@ -6,7 +6,7 @@ const { mockDb, mockSchema, setFrequencyRows } = vi.hoisted(() => {
   let callIndex = 0;
 
   const qb: Record<string, ReturnType<typeof vi.fn>> = {};
-  const chainMethods = ["from", "where", "limit", "orderBy", "asc"] as const;
+  const chainMethods = ["from", "where", "limit", "orderBy", "asc", "innerJoin"] as const;
   for (const k of chainMethods) {
     qb[k] = vi.fn(() => qb);
   }
@@ -29,6 +29,10 @@ const { mockDb, mockSchema, setFrequencyRows } = vi.hoisted(() => {
       frequencyValue: "tf.fv",
       frequencyMode: "tf.mode",
     },
+    dictionaries: {
+      id: "d.id",
+      isFrequencyOnly: "d.is_frequency_only",
+    },
   };
 
   return {
@@ -45,7 +49,6 @@ vi.mock("@grkd-jisho/db", () => ({
 
 import { rankTermMatchesByFrequency, filterByExplicitReading } from "../reading-ranker.service";
 
-type Dict = typeof mockSchema extends never ? never : { id: number };
 type FakeEntry = {
   id: bigint;
   createdAt: Date | null;
@@ -57,7 +60,6 @@ type FakeEntry = {
   rawJson: unknown;
 };
 
-const dict = { id: 1 } as const;
 function entry(id: bigint, term: string, reading: string): FakeEntry {
   return {
     id,
@@ -85,13 +87,13 @@ describe("rankTermMatchesByFrequency", () => {
 
   it("候補が 1件なら ranker を呼ばずにそのまま返す", async () => {
     const single = [NingenEntries[0]!];
-    const result = await rankTermMatchesByFrequency(dict, "人間", single);
+    const result = await rankTermMatchesByFrequency("人間", single);
     expect(result).toEqual(single);
   });
 
   it("Frequency データが空なら元の順序を維持", async () => {
     setFrequencyRows([]); // no rows
-    const result = await rankTermMatchesByFrequency(dict, "人間", [...NingenEntries]);
+    const result = await rankTermMatchesByFrequency("人間", [...NingenEntries]);
     expect(result[0]!.reading).toBe("にんげん");
     expect(result[1]!.reading).toBe("じんかん");
   });
@@ -101,7 +103,7 @@ describe("rankTermMatchesByFrequency", () => {
       { reading: "じんかん", frequencyValue: "12345", frequencyMode: "rank-based" },
       { reading: "にんげん", frequencyValue: "158", frequencyMode: "rank-based" },
     ]);
-    const result = await rankTermMatchesByFrequency(dict, "人間", [...NingenEntries]);
+    const result = await rankTermMatchesByFrequency("人間", [...NingenEntries]);
     expect(result[0]!.reading).toBe("にんげん");
     expect(result[1]!.reading).toBe("じんかん");
   });
@@ -111,7 +113,7 @@ describe("rankTermMatchesByFrequency", () => {
       { reading: "にんげん", frequencyValue: "50000", frequencyMode: "occurrence-based" },
       { reading: "じんかん", frequencyValue: "300", frequencyMode: "occurrence-based" },
     ]);
-    const result = await rankTermMatchesByFrequency(dict, "人間", [...NingenEntries]);
+    const result = await rankTermMatchesByFrequency("人間", [...NingenEntries]);
     expect(result[0]!.reading).toBe("にんげん");
     expect(result[1]!.reading).toBe("じんかん");
   });
@@ -122,7 +124,7 @@ describe("rankTermMatchesByFrequency", () => {
       { reading: "かん", frequencyValue: "1309", frequencyMode: "rank-based" },
       { reading: "ま", frequencyValue: "1396", frequencyMode: "rank-based" },
     ]);
-    const result = await rankTermMatchesByFrequency(dict, "間", [...MaEntries]);
+    const result = await rankTermMatchesByFrequency("間", [...MaEntries]);
     expect(result.map((e) => e.reading)).toEqual(["あいだ", "かん", "ま"]);
   });
 
@@ -134,7 +136,7 @@ describe("rankTermMatchesByFrequency", () => {
     setFrequencyRows([
       { reading: "has-score", frequencyValue: "10", frequencyMode: "rank-based" },
     ]);
-    const result = await rankTermMatchesByFrequency(dict, "X", candidates);
+    const result = await rankTermMatchesByFrequency("X", candidates);
     expect(result[0]!.reading).toBe("has-score");
     expect(result[1]!.reading).toBe("no-score");
   });
@@ -150,7 +152,7 @@ describe("rankTermMatchesByFrequency", () => {
       { reading: "かん",  frequencyValue: "50",  frequencyMode: "rank-based" },
     ]);
     const candidates: FakeEntry[] = [MaEntries[0]!, MaEntries[1]!]; // あいだ, かん
-    const result = await rankTermMatchesByFrequency(dict, "間", candidates);
+    const result = await rankTermMatchesByFrequency("間", candidates);
     expect(result[0]!.reading).toBe("かん");
     expect(result[1]!.reading).toBe("あいだ");
   });
@@ -167,7 +169,7 @@ describe("rankTermMatchesByFrequency", () => {
       { reading: "かん",   frequencyValue: "200", frequencyMode: "rank-based" },
     ]);
     const candidates: FakeEntry[] = [MaEntries[0]!, MaEntries[1]!];
-    const result = await rankTermMatchesByFrequency(dict, "間", candidates);
+    const result = await rankTermMatchesByFrequency("間", candidates);
     expect(result[0]!.reading).toBe("あいだ");
     expect(result[1]!.reading).toBe("かん");
   });
@@ -180,7 +182,7 @@ describe("rankTermMatchesByFrequency", () => {
       { reading: null, frequencyValue: "100", frequencyMode: "rank-based" },
       { reading: null, frequencyValue: "200", frequencyMode: "rank-based" },
     ]);
-    const result = await rankTermMatchesByFrequency(dict, "間", [...MaEntries]);
+    const result = await rankTermMatchesByFrequency("間", [...MaEntries]);
     expect(result.map((e) => e.reading)).toEqual(["あいだ", "かん", "ま"]);
   });
 });

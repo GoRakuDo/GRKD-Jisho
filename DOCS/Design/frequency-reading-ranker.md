@@ -446,6 +446,8 @@ type ParsedLookupQuery = {
 - `getDictionaryList()`: `not(eq(isFrequencyOnly, true))` で freq-only を除外
 - `getFrequencyDictionaries()`: freq-only 辞書のみ返す新関数
 - `dictionary.service.ts`: Bot の `lookupWord()` ループで freq-only 辞書をスキップ（hot path の無駄なクエリ排除）
+- `reading-ranker.service.ts`: `fetchFrequencyMap()` が `INNER JOIN dictionaries` で **全 freq-only 辞書から全局的に** freq データを取得。source dictionary ID ではなく `isFrequencyOnly = true` でフィルタ
+- `rankTermMatchesByFrequency()` の `dict` パラメータ削除（不要に）
 - `dictionaries.astro`: Frequency Data セクションに freq-only 辞書一覧を表示
 - Kasou 既存 Freq JPDB: `UPDATE dictionaries SET is_frequency_only = true WHERE slug LIKE 'freq-%'` で手動フラグ更新
 

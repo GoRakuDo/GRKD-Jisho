@@ -21,11 +21,11 @@ type DictionaryEntry = typeof dictionaryEntries.$inferSelect;
 const MAX_CANDIDATES = 50;
 
 /**
- * 1つの (dictionary, expression) について reading 別の Frequency をまとめて取得する。
- * reading ごとに MIN(frequency_value) を採用し、term-level (reading=NULL) も返す。
+ * 1つの expression について reading 別の Frequency をまとめて取得する。
+ * すべての freq-only 辞書から全局的に取得し、reading ごとに MIN(frequency_value) を採用する。
+ * term-level (reading=NULL) も返す。
  */
 async function fetchFrequencyMap(
-  dictionaryId: number,
   expression: string,
 ): Promise<{
   byReading: Map<string, number>;
@@ -39,9 +39,13 @@ async function fetchFrequencyMap(
       frequencyMode: schema.termFrequencies.frequencyMode,
     })
     .from(schema.termFrequencies)
+    .innerJoin(
+      schema.dictionaries,
+      eq(schema.termFrequencies.dictionaryId, schema.dictionaries.id),
+    )
     .where(
       and(
-        eq(schema.termFrequencies.dictionaryId, dictionaryId),
+        eq(schema.dictionaries.isFrequencyOnly, true),
         eq(schema.termFrequencies.expression, expression),
       ),
     );
@@ -82,13 +86,12 @@ async function fetchFrequencyMap(
  * 戻り値: 並べ替えた候補リスト（変更なしの場合は元の配列をそのまま返す）
  */
 export async function rankTermMatchesByFrequency(
-  dict: { id: number },
   expression: string,
   candidates: DictionaryEntry[],
 ): Promise<DictionaryEntry[]> {
   if (candidates.length <= 1) return candidates;
 
-  const { byReading, termLevel, frequencyMode } = await fetchFrequencyMap(dict.id, expression);
+  const { byReading, termLevel, frequencyMode } = await fetchFrequencyMap(expression);
 
   // Frequency データが一切ない → 元の順序維持
   if (byReading.size === 0 && termLevel === null) return candidates;
@@ -149,14 +152,13 @@ export function maxCandidates(): number {
 }
 
 /**
- * DB から (dictionary, expression) に対する reading → frequency のマップを取得する
+ * DB から expression に対する reading → frequency のマップを取得する
  * （テスト・デバッグ用）
  */
 export async function getReadingFrequencyMap(
-  dictionaryId: number,
   expression: string,
 ): Promise<Map<string, number>> {
-  const { byReading } = await fetchFrequencyMap(dictionaryId, expression);
+  const { byReading } = await fetchFrequencyMap(expression);
   return byReading;
 }
 

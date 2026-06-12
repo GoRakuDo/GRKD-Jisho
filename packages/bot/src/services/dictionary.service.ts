@@ -60,7 +60,7 @@ async function findExactInDictionary(
     }
 
     // 候補が 2件以上 → Frequency ranker で並べ替え
-    const ranked = await rankTermMatchesByFrequency(dict, normalizedQuery, termEntries);
+        const ranked = await rankTermMatchesByFrequency(normalizedQuery, termEntries);
     const best = ranked[0];
     if (best) {
       return {

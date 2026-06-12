@@ -7,7 +7,7 @@ const { mockDb, mockSchema, setDbResults } = vi.hoisted(() => {
 
   const qb: Record<string, ReturnType<typeof vi.fn>> = {};
   const chainMethods = [
-    "from", "where", "orderBy", "limit",
+    "from", "where", "orderBy", "limit", "innerJoin",
   ] as const;
   for (const k of chainMethods) {
     qb[k] = vi.fn(() => qb);
@@ -24,7 +24,7 @@ const { mockDb, mockSchema, setDbResults } = vi.hoisted(() => {
   };
 
   const schema = {
-    dictionaries: { enabled: "test", priority: "test" },
+    dictionaries: { enabled: "test", priority: "test", isFrequencyOnly: "test" },
     dictionaryEntries: { dictionaryId: "test", term: "test", reading: "test" },
     termFrequencies: {
       dictionaryId: "tf.dict",
