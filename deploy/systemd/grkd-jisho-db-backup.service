@@ -9,6 +9,7 @@ User=kasou_yoshia
 Group=kasou_yoshia
 WorkingDirectory=/home/kasou_yoshia/GRKD-Jisho
 EnvironmentFile=/home/kasou_yoshia/GRKD-Jisho/.env
+Environment=PATH=/home/linuxbrew/.linuxbrew/bin:/home/kasou_yoshia/.local/share/pnpm:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/home/linuxbrew/.linuxbrew/bin/pnpm --filter @grkd-jisho/db db:backup
 UMask=0077
 TimeoutStartSec=45min
