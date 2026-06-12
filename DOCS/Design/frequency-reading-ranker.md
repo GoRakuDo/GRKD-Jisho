@@ -393,35 +393,49 @@ type ParsedLookupQuery = {
 
 ### Step 2: DB schema + importer
 
-`term_frequencies` を追加し、Yomitan importer が Frequency を保存できるようにする。
+**✅ 2026-06-13 完了**。
+
+- `term_frequencies` テーブル追加 (`packages/db/src/schema/term-frequencies.ts`)
+- Migration `0017_icy_norrin_radd.sql` 生成・適用済み
+- Yomitan importer (`yomitan-import.ts`) が `term_meta_bank_*.json` を読むように拡張
+- 3フォーマット対応: BCCWJ (term-level) / CC100 (mixed) / JPDB (reading-specific)
+- `ON CONFLICT DO UPDATE SET frequency_value = LEAST(...)` で複数エントリの MIN 値を保持
 
 ### Step 3: Rankerだけ追加
 
-`lookupWord()` の責務を大きくしすぎない。
+**✅ 2026-06-13 完了**。
 
-```txt
-dictionary.service.ts
-  -> 候補取得
-  -> reading-ranker.service.ts に採点委譲
-```
+- `reading-ranker.service.ts`: `rankTermMatchesByFrequency()` を追加
+- `dictionary.service.ts`: 複数読み候補がある場合に ranker を呼び出し、最頻出 reading を選択
+- `extract-first-term.ts`: `漢字[よみ]` / `漢字［よみ］` syntax 対応
 
 ### Step 4: Query parser
 
-`漢字[よみ]` をパースし、明示読みを ranker に渡す。
+**✅ 2026-06-13 完了**。
+
+- `packages/bot/src/utils/parse-lookup-query.ts`: `parseLookupQuery()` を追加
+- `漢字[よみ]` / `漢字［よみ］` の両角 bracket に対応
+- 明示読み時は ranker をスキップして直接 `(term, reading)` 検索
 
 ### Step 5: Tests
 
-必須ケース:
+**✅ 2026-06-13 完了**。
 
-| 入力 | 期待 |
-|---|---|
-| `人間` | Frequency で `にんげん` |
-| `人間[じんかん]` | 明示読みで `じんかん` |
-| `人間［じんかん］` | 全角 bracket でも `じんかん` |
-| `じんかん` | reading search |
-| `間` | Frequency で一般読み |
-| `間[あい]` | 明示読みで `あい` |
-| `[Pre-Release TEST] #7313 食べる` | 先頭ノイズ除去は維持 |
+- frequency-parser テスト: 15件 (3フォーマット x edge cases)
+- reading-ranker テスト: 12件 (term-level only / reading-specific / mixed / rank-based / occurrence-based)
+- parse-lookup-query テスト: 12件 (半角/全角 bracket / trailing punctuation / no-bracket)
+- dictionary.service テスト: 4件 (multi-reading + ranker / explicit reading / no match / match preserved)
+- 合計 178 bot tests pass
+
+### Step 6: WebUI Frequency Import
+
+**✅ 2026-06-13 完了**。
+
+- `frequency-import.ts`: freq-only zip import service (DB client なしの pure parser を `frequency-parser.ts` に分離)
+- `POST /api/admin/frequencies/preview` — zip プレビュー (auth + CSRF + isAdmin)
+- `POST /api/admin/frequencies/import` — zip インポート (auth + CSRF + isAdmin)
+- `dictionaries.astro`: Frequency Import セクション (zip upload → preview table → Import → Enable Now)
+- `dictionaries.ts`: GET/PUT に isAdmin gate 追加 (pre-existing gap 修正)
 
 ---
 

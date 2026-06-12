@@ -76,7 +76,7 @@ Discord Guild
 │  PostgreSQL                                     │
 │  ├ dictionaries          (辞書メタ情報)          │
 │  ├ dictionary_entries    (Yomitan 元データ)      │
-│  ├ term_frequencies      (Yomitan Frequency meta; Phase 4 planned) │
+│  ├ term_frequencies      (Yomitan Frequency meta; implemented 2026-06-13) │
 │  ├ response_cache        (LLM生成済み回答)       │
 │  ├ response_edits        (編集履歴)              │
 │  ├ lookup_logs           (検索ログ)              │

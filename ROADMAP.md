@@ -360,12 +360,13 @@ Phase 5: Deferred Scope               TBA
   - 設計文書: `DOCS/Design/deinflection-system.md`
   - 実装・テスト・Kasou反映済み
 
-- [ ] **4-8a** Frequency ベースの多読み候補ランキング
+- [x] **4-8a** Frequency ベースの多読み候補ランキング
   - Yomitan `term_meta_bank_*.json` の `freq` data を読み、`term_frequencies` に保存する
   - デフォルト候補は `[Freq] JPDB (Recommended).zip`
   - 漢字 query で複数読みがある場合、reading付き Frequency を優先して自然な読みを選ぶ
   - ユーザーが特殊読みを意図する場合は `人間[じんかん]` / `間[あい]` のように明示できる
   - 設計文書: `DOCS/Design/frequency-reading-ranker.md`
+  - WebUI Frequency Import (dictionaries ページ) 対応済み
 
 - [ ] **4-9** Limited write MCP tools
   - Phase 3 では `MCP_READONLY_MODE=true` を維持し、Level 2 dry-run は `MCP_ENABLE_DRY_RUN=true` の時だけ有効化する
