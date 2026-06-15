@@ -76,10 +76,10 @@ describe("transformDefinitionForPrompt", () => {
     expect(result).toEqual({ content: "━の不良少年" });
   });
 
-  it("文字列中の '―' は置換しない（広辞苑型）", () => {
+  it("文字列中の '―' は「」内なら辞書形に置換する（「―議員」型）", () => {
     const input = { content: "①軟弱な意見の党派。「―議員」" };
     const result = transformDefinitionForPrompt(input, "軟派");
-    expect(result).toEqual({ content: "①軟弱な意見の党派。「―議員」" });
+    expect(result).toEqual({ content: "①軟弱な意見の党派。「軟派議員」" });
   });
 
   it("名・他サ のような品詞表記は分割しない", () => {
@@ -92,6 +92,58 @@ describe("transformDefinitionForPrompt", () => {
     const input = { content: "━" };
     const result = transformDefinitionForPrompt(input, "");
     expect(result).toEqual({ content: "━" });
+  });
+
+  it("「」内の ━ を辞書形に置換する", () => {
+    const input = { content: "「━の不良少年」" };
+    const result = transformDefinitionForPrompt(input, "軟派");
+    expect(result).toEqual({ content: "「軟派の不良少年」" });
+  });
+
+  it("「」内の ― を辞書形に置換する", () => {
+    const input = { content: "「それがよろしいかと―・じます」" };
+    const result = transformDefinitionForPrompt(input, "存ずる");
+    expect(result).toEqual({ content: "「それがよろしいかと存ずる・じます」" });
+  });
+
+  it("「」外の ━ / ― は置換しない", () => {
+    const input = { content: "━の不良少年・―を張る" };
+    const result = transformDefinitionForPrompt(input, "軟派");
+    // 「」で囲まれていないので置換されない
+    expect(result).toEqual({ content: "━の不良少年・―を張る" });
+  });
+
+  it("複数の「」をまとめて置換する", () => {
+    const input = { content: "①「思う」「考える」の謙譲語。「それがよろしいかと―・じます」" };
+    const result = transformDefinitionForPrompt(input, "存ずる");
+    expect(result).toEqual({ content: "①「思う」「考える」の謙譲語。「それがよろしいかと存ずる・じます」" });
+  });
+
+  it("Kasou 実データ（広辞苑 存ずる）を変換できる", () => {
+    // 実際の Kasou DB から取得した生 JSON の構造
+    const kasouData = [
+      {
+        type: "structured-content",
+        content: [
+          "ぞん・ずる 【存ずる】",
+          {
+            tag: "div",
+            content: [
+              { tag: "div", content: ["〘自サ変〙〚文〛存ず（サ変）"] },
+              { tag: "div", content: ["①「思う」「考える」の謙譲語。「それがよろしいかと―・じます」"] },
+              { tag: "div", content: ["②「知る」の謙譲語。「何も―・じません」"] },
+            ],
+          },
+        ],
+      },
+    ];
+
+    const result = transformDefinitionForPrompt(kasouData, "存ずる");
+    const resultJson = JSON.stringify(result);
+    // 「」内の ― が全て辞書形に置換されている
+    expect(resultJson).not.toContain("―・じます");
+    expect(resultJson).toContain("存ずる・じます");
+    expect(resultJson).toContain("存ずる・じません");
   });
 
   it("元オブジェクトを mutate しない", () => {
@@ -116,7 +168,7 @@ describe("transformDefinitionForPrompt", () => {
       {
         type: "structured-content",
         content: [
-          { tag: "div", content: ["①軟弱な意見の党派。「―議員」"] },
+          { tag: "div", content: ["①軟弱な意見の党派。強硬な主張をなし得ないもの。"] },
         ],
       },
     ];
@@ -176,7 +228,7 @@ describe("transformDefinitionForPrompt", () => {
     expect(matches?.length).toBe(3);
   });
 
-  it("Kasou 実データ（広辞苑 軟派）は no-op", () => {
+  it("Kasou 実データ（広辞苑 軟派）の「」内 ― を置換する", () => {
     const kobunData = [
       {
         type: "structured-content",
@@ -194,7 +246,21 @@ describe("transformDefinitionForPrompt", () => {
     ];
 
     const result = transformDefinitionForPrompt(kobunData, "軟派");
-    // 広辞苑は `content: "━"` が独立 node として存在しないので no-op
-    expect(result).toBe(kobunData);
+    // 「」内の ― が辞書形に置換されている
+    expect(result).toEqual([
+      {
+        type: "structured-content",
+        content: [
+          "なん‐ぱ 【軟派】",
+          {
+            tag: "div",
+            content: [
+              { tag: "div", content: ["①軟弱な意見の党派。強硬な主張をなし得ないもの。「軟派議員」"] },
+              { tag: "div", content: ["②文芸上エロチシズムを主とするもの。「江戸軟派」"] },
+            ],
+          },
+        ],
+      },
+    ]);
   });
 });
