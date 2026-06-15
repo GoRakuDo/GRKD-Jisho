@@ -113,6 +113,20 @@ Language guardrails は **LLM が生成した回答だけ** を検査する。
 つまり、language guardrails は「LLM が勝手に混ぜた言語」を止めるためのもの。  
 Bot が所有する固定エラー文や not-found 文を検査するものではない。
 
+### 辞書変換機能との関係
+
+`━` / `―` / `・` を含む辞書用例の誤読は、language guard ではなく **Bot 側の辞書変換機能**で先に潰す。
+
+第1段階では、LLM に渡す直前の `definition_json` で、該当する `content: "━"` / `content: "―"` がある場合だけ `dictionary_form` に置換する。該当 placeholder が無い辞書は no-op。`・` 分割や `examples_normalized` は第2段階候補として扱う。
+
+設計は `DOCS/Design/dictionary-example-normalization.md` に置く。
+
+Output Quality Guard は最後の保険として、raw の `━` / `―` が出力に残るケースや、将来の正規化済み用例を不自然に合成したケースを ReAsk する候補にできる。
+
+現行 `output-quality-guard.service.ts` には、この `━` / `―` 検出や merge phrase 検出はまだ未実装。本実装時に marker 追加と ReAsk 文言更新を行う。
+
+ただし、`とは異なり` / `一方で` のような表現は通常説明でも使えるため、常時禁止しない。第2段階で `examples_normalized` を導入し、辞書用例が短い phrase 型なのに、LLM が長い日本語例文へ変換した場合だけ強める。
+
 ---
 
 ## Bucket 別ルール

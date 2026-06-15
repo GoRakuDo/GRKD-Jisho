@@ -12,8 +12,17 @@ import { checkRateLimit, incrementUsage } from "../services/rate-limit.service.j
 import { formatReply, formatNotFound, formatError } from "../services/reply-formatter.js";
 import { traceEvent } from "../services/observability.service.js";
 import { sanitizeLookupQuery } from "@grkd-jisho/db";
+import { transformDefinitionForPrompt } from "../services/dictionary-definition-transformer.service.js";
 
 const TYPING_REFRESH_INTERVAL_MS = 8_000;
+
+/**
+ * DB の生 definitionsJson を LLM プロンプト用に変換して文字列化する。
+ * guild path と DM owner path の両方で同じ処理を使う。
+ */
+function buildDefinitionJsonForPrompt(entry: { definitionsJson: unknown; term: string }): string {
+  return JSON.stringify(transformDefinitionForPrompt(entry.definitionsJson, entry.term));
+}
 
 /**
  * recordLookup + incrementUsage をまとめて実行するヘルパー。
@@ -257,7 +266,7 @@ async function handleMessage(message: Message): Promise<void> {
         dictionaryForm: result.entry.term,
         reading: result.entry.reading,
         dictionaryName: result.dictionary.name,
-        definitionJson: JSON.stringify(result.entry.definitionsJson),
+        definitionJson: buildDefinitionJsonForPrompt(result.entry),
         promptTemplate: promptContext.promptTemplate,
         promptVersion: promptContext.promptVersion,
       });
@@ -440,7 +449,7 @@ async function handleMessage(message: Message): Promise<void> {
       dictionaryForm: result.entry.term,
       reading: result.entry.reading,
       dictionaryName: result.dictionary.name,
-      definitionJson: JSON.stringify(result.entry.definitionsJson),
+      definitionJson: buildDefinitionJsonForPrompt(result.entry),
       promptTemplate: promptContext.promptTemplate,
       promptVersion: promptContext.promptVersion,
     });
