@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const previewTbody = document.getElementById('freq-preview-tbody')!;
   const importBtn = document.getElementById('freq-import-btn') as HTMLButtonElement;
   const cancelBtn = document.getElementById('freq-cancel-btn')!;
-  const enableBtn = document.getElementById('freq-enable-btn')!;
+  const enableBtn = document.getElementById('freq-enable-btn') as HTMLButtonElement;
 
   let selectedFile: File | null = null;
   let importedDictId: string | null = null;
