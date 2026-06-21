@@ -71,3 +71,32 @@ main ブランチでは、次の 2 点を分けて直す。
 - provider-native separation に切り替え、Gemini は `part.thought`、OpenRouter は `reasoning.max_tokens` 上限 + `reasoning.exclude=true` + `message.content` を使うようにした。
 - これで reasoning 漏れがあっても、cache 保存と Discord 送信は answer 本文だけになる。
 - provider-native へ切り替えたので、`extractFinalReply()` のような text-marker 依存は廃止した。
+
+## 7. 2026-06-21 — `prompt_content_hash` を cache key から外した
+
+### 何が変わったか
+
+- `response_cache` の unique 制約を 7 要素から 6 要素に削減（`prompt_content_hash` を外した）。
+- `response-cache.service.ts` の `WHERE` 句から `prompt_content_hash` 比較を削除。
+- `prompt_content_hash` カラム自体は **DB に残す**（編集履歴・analytics メタ用）。
+
+### なぜ変えたか
+
+2026-06-12 〜 2026-06-21 の運用で観察:
+- 同じ `prompt_version` でも prompt 本文を編集するたびに `prompt_content_hash` が変わる
+- 過去 cache すべてが miss になり、再生成されていた（しみじみ・こっそり・雑用・地味など）
+- 「version 一致 + hash 不一致で hit すべき」という運用改善要望
+
+### 新しい挙動
+
+| 操作 | 旧挙動 | 新挙動 |
+|---|---|---|
+| prompt 編集 → version 同じ | 過去 cache 全部 miss | hit する（旧答えが返る） |
+| prompt 編集 → version bump | 過去 cache 全部 miss | 過去 cache 全部 miss（変化なし） |
+
+### リスク
+
+- version を bump し忘れると prompt 編集が反映されない。
+- **緩和策**: Admin UI で prompt 編集時に version bump を強制する仕組みが必要（今後のタスク）。
+
+設計詳細は `DOCS/Design/cache-key-prompt-version-only.md`。

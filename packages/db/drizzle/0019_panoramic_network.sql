@@ -1,0 +1,2 @@
+ALTER TABLE "response_cache" DROP CONSTRAINT "uq_response_cache_key";--> statement-breakpoint
+ALTER TABLE "response_cache" ADD CONSTRAINT "uq_response_cache_key" UNIQUE("normalized_query","dictionary_id","dictionary_entry_id","role_key","prompt_version","model_name");

@@ -134,6 +134,13 @@
       "when": 1781259881846,
       "tag": "0018_oval_shape",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1782053582528,
+      "tag": "0019_panoramic_network",
+      "breakpoints": true
     }
   ]
 }

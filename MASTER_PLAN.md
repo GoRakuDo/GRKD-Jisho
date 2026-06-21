@@ -248,6 +248,8 @@ CREATE TABLE response_cache (
 ```
 
 > **設計ポイント:** `is_manual_override = true` は LLM 回答より必ず優先。削除可否は別フラグ `is_delete_protected` で管理する。`UNIQUE` 制約でキャッシュの重複を DB レベルで防ぐ。
+>
+> **Note (2026-06-21):** `prompt_content_hash` は DB カラムとして保持しているが、cache key には含めない（編集履歴・analytics 用メタ情報）。prompt 編集時は **必ず `prompt_version` を bump** して cache を無効化する。設計詳細は `DOCS/Design/cache-key-prompt-version-only.md`。
 
 ---
 

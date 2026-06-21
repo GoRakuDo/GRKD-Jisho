@@ -167,6 +167,11 @@ model_name
 
 ロール別・モデル別・プロンプト別に回答が変わるため。
 
+`prompt_content_hash` は cache key に**含めない**（2026-06-21 変更）。
+DB カラムとしては残し、編集履歴・analytics のメタ情報として使う。
+prompt 編集時は **必ず `prompt_version` を bump する** 運用ルールで cache invalidation を担保する。
+詳細は `DOCS/Design/cache-key-prompt-version-only.md` を参照。
+
 ### 6-2. 手動編集の優先
 
 `response_cache.is_manual_override = true` は最優先。

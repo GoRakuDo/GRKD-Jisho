@@ -32,7 +32,6 @@ export const responseCache = pgTable(
       table.dictionaryEntryId,
       table.roleKey,
       table.promptVersion,
-      table.promptContentHash,
       table.modelName
     ),
   ]

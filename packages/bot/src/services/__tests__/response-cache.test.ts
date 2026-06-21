@@ -116,6 +116,47 @@ describe("getCachedResponse", () => {
     expect(result!.responseText).toBe("manual answer");
     expect(result!.isManualOverride).toBe(true);
   });
+
+  it("prompt_content_hash 違いでも prompt_version 一致なら hit する", async () => {
+    // 過去 prompt で生成された cache。
+    // prompt を編集しても version を bump していなければ、同じ cache を hit させる。
+    const oldHashRow = {
+      id: BigInt(10),
+      normalizedQuery: "test",
+      dictionaryId: 1,
+      dictionaryEntryId: BigInt(100),
+      roleKey: "indonesian",
+      promptVersion: "v1",
+      promptContentHash: "hash-v1-OLD",
+      modelName: PRIMARY_LLM_MODEL,
+      responseText: "old prompt answer",
+      isManualOverride: false,
+      query: "test",
+    };
+    setDbResults([oldHashRow]);
+
+    // 現在の prompt content hash は変わった (v1-OLD → v1-NEW) が
+    // promptVersion は同じ "v1" のまま。
+    const newHashKey: CacheKey = {
+      ...baseKey,
+      promptContentHash: "hash-v1-NEW",
+    };
+
+    const result = await getCachedResponse(newHashKey);
+    expect(result).not.toBeNull();
+    expect(result!.responseText).toBe("old prompt answer");
+  });
+
+  it("prompt_version 違いで miss する", async () => {
+    setDbResults([]);
+
+    const newVersionKey: CacheKey = {
+      ...baseKey,
+      promptVersion: "v2",
+    };
+    const result = await getCachedResponse(newVersionKey);
+    expect(result).toBeNull();
+  });
 });
 
 describe("saveResponse", () => {

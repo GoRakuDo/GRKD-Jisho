@@ -374,7 +374,8 @@ Phase 1.5 テスト:
 
 この変換は `definition_json` と `dictionaryForm` から決定的に作れる派生データ。cache key に追加しない。
 
-変換ロジックを変えた時に既存 cache を刷新したい場合は、既存の `prompt_content_hash` を使う。つまり prompt に「変換済み definition_json を前提にする」と明記すれば、hash が変わって自然に新規 cache になる。
+**注 (2026-06-21):** `prompt_content_hash` も cache key から外した（`AGENTS.md` §6-1 参照）。
+変換ロジックを変えたい時は、`prompt_version` を bump すれば自動的に cache invalidation される。
 
 ### B. DB raw は残すが、LLM 入力は変換済みにする
 

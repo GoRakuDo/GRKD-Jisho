@@ -13,7 +13,6 @@ export async function getCachedResponse(key: CacheKey) {
         eq(schema.responseCache.dictionaryEntryId, key.entryId),
         eq(schema.responseCache.roleKey, key.roleKey),
         eq(schema.responseCache.promptVersion, key.promptVersion),
-        eq(schema.responseCache.promptContentHash, key.promptContentHash),
         eq(schema.responseCache.modelName, key.modelName),
       ),
     )

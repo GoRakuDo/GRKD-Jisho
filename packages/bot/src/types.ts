@@ -23,6 +23,7 @@ export interface CacheKey {
   entryId: bigint;
   roleKey: RoleKey;
   promptVersion: string;
+  /** Save-only audit metadata (2026-06-21: not part of the lookup key). */
   promptContentHash: string;
   modelName: string;
 }
