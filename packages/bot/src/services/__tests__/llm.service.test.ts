@@ -218,6 +218,77 @@ describe("generate", () => {
     expect(requestBody.reasoning?.exclude).toBe(true);
   });
 
+  it("OpenRouter の JSON parse failure は retry する", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
+      .mockResolvedValueOnce(new Response("not json", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: `【これ】\n${VALID_DAILY_RESPONSE}`,
+              reasoning: "hidden reasoning",
+            },
+          },
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generate({
+      roleKey: "indonesian",
+      query: "これ",
+      dictionaryForm: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    });
+
+    expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
+    expect(result.source).toBe("openrouter");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("OpenRouter の JSON parse failure が 3 回続いたら失敗する", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
+      .mockResolvedValueOnce(new Response("not json 1", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response("not json 2", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }))
+      .mockResolvedValueOnce(new Response("not json 3", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(generate({
+      roleKey: "indonesian",
+      query: "これ",
+      dictionaryForm: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    })).rejects.toThrow(/OpenRouter response parse failed after 3\/3 attempts/i);
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
   it("OpenRouter は timeout 時に 3 回までリトライする", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))

@@ -140,6 +140,18 @@ function getProviderLabel(provider: LanguageGuardProvider): string {
   return provider === "gemini" ? "Gemini" : "OpenRouter";
 }
 
+function getOpenRouterFailureHint(message: string): string {
+  if (message.includes("parse failed")) {
+    return "Check OpenRouter response format or recent provider issues";
+  }
+
+  if (message.includes("timed out")) {
+    return "Check network stability or OpenRouter availability";
+  }
+
+  return "Check OPENROUTER_API_KEY or OpenRouter model access";
+}
+
 async function callLanguageModel(prompt: string, provider: LanguageGuardProvider): Promise<string> {
   return provider === "gemini" ? callGemini(prompt) : callOpenRouter(prompt);
 }
@@ -256,7 +268,8 @@ export async function generate(params: GenerateParams): Promise<GenerateResult> 
       const text = await callOpenRouter(prompt);
       return { text, source: "openrouter" };
     } catch (openRouterErr) {
-      console.error(`[LLM] OpenRouter failed: ${openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr)} → Check OPENROUTER_API_KEY or OpenRouter model access`);
+      const openRouterMessage = openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr);
+      console.error(`[LLM] OpenRouter failed: ${openRouterMessage} → ${getOpenRouterFailureHint(openRouterMessage)}`);
       throw openRouterErr;
     }
   }
@@ -338,7 +351,7 @@ async function callGemini(prompt: string): Promise<string> {
 }
 
 async function callOpenRouter(prompt: string): Promise<string> {
-  let lastTimeoutError: Error | null = null;
+  let lastOpenRouterError: Error | null = null;
 
   for (let attempt = 1; attempt <= OPENROUTER_MAX_ATTEMPTS; attempt += 1) {
     try {
@@ -347,21 +360,31 @@ async function callOpenRouter(prompt: string): Promise<string> {
       console.log(`[LLM] OpenRouter success → model=${FALLBACK_LLM_MODEL} attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}`);
       return text;
     } catch (err) {
-      if (!isAbortError(err)) {
-        throw err;
+      if (err instanceof SyntaxError) {
+        lastOpenRouterError = new Error(`OpenRouter response parse failed after ${attempt}/${OPENROUTER_MAX_ATTEMPTS} attempts: ${err.message}`);
+        if (attempt < OPENROUTER_MAX_ATTEMPTS) {
+          console.warn(`[LLM] OpenRouter parse failed → attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}, retrying`);
+          continue;
+        }
+
+        break;
       }
 
-      lastTimeoutError = new Error(`OpenRouter request timed out after ${OPENROUTER_TIMEOUT_MS / 1000} seconds (attempt ${attempt}/${OPENROUTER_MAX_ATTEMPTS})`);
-      if (attempt < OPENROUTER_MAX_ATTEMPTS) {
-        console.warn(`[LLM] OpenRouter timeout → attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}, retrying`);
-        continue;
+      if (isAbortError(err)) {
+        lastOpenRouterError = new Error(`OpenRouter request timed out after ${OPENROUTER_TIMEOUT_MS / 1000} seconds (attempt ${attempt}/${OPENROUTER_MAX_ATTEMPTS})`);
+        if (attempt < OPENROUTER_MAX_ATTEMPTS) {
+          console.warn(`[LLM] OpenRouter timeout → attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}, retrying`);
+          continue;
+        }
+
+        break;
       }
 
-      throw lastTimeoutError;
+      throw err;
     }
   }
 
-  throw lastTimeoutError ?? new Error(`OpenRouter request timed out after ${OPENROUTER_TIMEOUT_MS / 1000} seconds`);
+  throw lastOpenRouterError ?? new Error(`OpenRouter request failed after ${OPENROUTER_MAX_ATTEMPTS} attempts`);
 }
 
 async function callOpenRouterOnce(prompt: string): Promise<string> {

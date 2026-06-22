@@ -671,6 +671,11 @@ async function callOpenRouter(prompt: string): Promise<string> {
       if (err instanceof DOMException && err.name === "AbortError" && attempt < 3) {
         continue;
       }
+
+      if (err instanceof SyntaxError && attempt < 3) {
+        continue;
+      }
+
       throw err;
     } finally {
       clearTimeout(timeoutId);

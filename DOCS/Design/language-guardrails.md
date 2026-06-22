@@ -542,7 +542,7 @@ transport failure は既存の provider fallback / timeout retry 方針と混ぜ
 | Gemini initial + ReAsk 2回がすべて失敗 | OpenRouter fallback を呼び、OpenRouter でも同じ ReAsk を最大2回まで行う | OpenRouter |
 | OpenRouter 全試行（初期 + ReAsk ×2）が validation/quality failure | cache 保存なし、短い error reply | none |
 
-OpenRouter の transport timeout は既存どおり 150 秒 × 最大3回。  
+OpenRouter の transport timeout / JSON parse failure は既存どおり 150 秒 × 最大3回。  
 language guard の ReAsk は provider 非依存で同じ扱いにし、OpenRouter でも最大2回まで作り直す。
 
 Gemini initial が transport failure で OpenRouter へ回った場合でも、OpenRouter output が validation failure なら同じ OpenRouter ReAsk を最大2回まで行う。  
