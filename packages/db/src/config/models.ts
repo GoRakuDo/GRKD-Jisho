@@ -14,7 +14,7 @@ export const MODEL_REGISTRY: ModelDisplayInfo[] = [
     provider: "OpenRouter",
   },
   {
-    id: "google/gemini-3.1-flash-lite",
+    id: "gemini-3.1-flash-lite",
     displayName: "Gemini 3.1 Flash Lite",
     provider: "Google Gemini",
   },

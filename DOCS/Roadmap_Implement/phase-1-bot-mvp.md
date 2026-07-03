@@ -607,7 +607,7 @@ async function callGemini(prompt: string): Promise<string> {
   const timeoutId = setTimeout(() => controller.abort(), 60_000);
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${FALLBACK_LLM_MODEL}:generateContent`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
