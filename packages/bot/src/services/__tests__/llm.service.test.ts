@@ -72,13 +72,13 @@ describe("generate", () => {
     '{"notes":"用例があります"}',
     '{"items":[{"example":"foo"}]}',
   ])("JSON に example 情報があれば不足判定しない: %s", async (definitionJson) => {
+    // OpenRouter is now primary — mock OpenRouter (choices format)
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      candidates: [
+      choices: [
         {
-          content: {
-            parts: [
-              { text: `【これ】\n${VALID_DAILY_RESPONSE}`, thought: false },
-            ],
+          message: {
+            content: `【これ】\n${VALID_DAILY_RESPONSE}`,
+            reasoning: "hidden",
           },
         },
       ],
@@ -101,26 +101,29 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
-    expect(result.source).toBe("gemini");
+    expect(result.source).toBe("openrouter");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("Gemini は thought parts を分けて answer だけ返す", async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      candidates: [
-        {
-          content: {
-            parts: [
-              { text: "internal reasoning", thought: true },
-              { text: `【これ】\n${VALID_DAILY_RESPONSE}`, thought: false },
-            ],
+  it("Gemini は thought parts を分けて answer だけ返す（OpenRouter失敗→Gemini fallback）", async () => {
+    // OpenRouter fails → Gemini with thought parts
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("OpenRouter failed", { status: 500 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "internal reasoning", thought: true },
+                { text: `【これ】\n${VALID_DAILY_RESPONSE}`, thought: false },
+              ],
+            },
           },
-        },
-      ],
-    }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }));
+        ],
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }));
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -137,10 +140,10 @@ describe("generate", () => {
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
     expect(result.source).toBe("gemini");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    const firstCall = fetchMock.mock.calls[0] as unknown as [RequestInfo | URL, RequestInit?];
-    const body = firstCall[1]?.body;
+    const geminiCall = fetchMock.mock.calls[1] as unknown as [RequestInfo | URL, RequestInit?];
+    const body = geminiCall[1]?.body;
     expect(typeof body).toBe("string");
 
     const requestBody = JSON.parse(body as string) as {
@@ -165,22 +168,20 @@ describe("generate", () => {
     expect(requestBody.generationConfig?.thinkingConfig?.includeThoughts).toBe(true);
   });
 
-  it("OpenRouter fallback は reasoning.exclude=true で content だけ使う", async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        choices: [
-          {
-            message: {
-              content: `【これ】\n${VALID_DAILY_RESPONSE}`,
-              reasoning: "hidden reasoning",
-            },
+  it("OpenRouter は reasoning.exclude=true で content だけ使う（primary）", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      choices: [
+        {
+          message: {
+            content: `【これ】\n${VALID_DAILY_RESPONSE}`,
+            reasoning: "hidden reasoning",
           },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }));
+        },
+      ],
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -197,30 +198,29 @@ describe("generate", () => {
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
     expect(result.source).toBe("openrouter");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    const secondCall = fetchMock.mock.calls[1] as unknown as [RequestInfo | URL, RequestInit?];
-    const fallbackBody = secondCall[1]?.body;
-    expect(typeof fallbackBody).toBe("string");
+    const firstCall = fetchMock.mock.calls[0] as unknown as [RequestInfo | URL, RequestInit?];
+    const requestBody = firstCall[1]?.body as string;
+    expect(typeof requestBody).toBe("string");
 
-    const requestBody = JSON.parse(fallbackBody as string) as {
+    const parsed = JSON.parse(requestBody) as {
       messages: Array<{ content: string }>;
       temperature?: number;
       top_p?: number;
       reasoning?: { max_tokens?: number; exclude?: boolean };
     };
 
-    expect(requestBody.messages[0]?.content).toContain("HELLO=これ");
-    expect(requestBody.messages[0]?.content).toContain("v9");
-    expect(requestBody.temperature).toBe(DEFAULT_LLM_TEMPERATURE);
-    expect(requestBody.top_p).toBe(DEFAULT_LLM_TOP_P);
-    expect(requestBody.reasoning?.max_tokens).toBe(4096);
-    expect(requestBody.reasoning?.exclude).toBe(true);
+    expect(parsed.messages[0]?.content).toContain("HELLO=これ");
+    expect(parsed.messages[0]?.content).toContain("v9");
+    expect(parsed.temperature).toBe(DEFAULT_LLM_TEMPERATURE);
+    expect(parsed.top_p).toBe(DEFAULT_LLM_TOP_P);
+    expect(parsed.reasoning?.max_tokens).toBe(4096);
+    expect(parsed.reasoning?.exclude).toBe(true);
   });
 
-  it("OpenRouter の JSON parse failure は retry する", async () => {
+  it("OpenRouter の JSON parse failure は retry する（primary）", async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
       .mockResolvedValueOnce(new Response("not json", {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -254,12 +254,11 @@ describe("generate", () => {
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
     expect(result.source).toBe("openrouter");
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("OpenRouter の JSON parse failure が 3 回続いたら失敗する", async () => {
+  it("OpenRouter の JSON parse failure が 2 回続いたら Gemini に fallback する", async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
       .mockResolvedValueOnce(new Response("not json 1", {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -271,7 +270,9 @@ describe("generate", () => {
       .mockResolvedValueOnce(new Response("not json 3", {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }));
+      }))
+      // Gemini fallback also fails
+      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }));
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -284,14 +285,13 @@ describe("generate", () => {
       definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
       promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
       promptVersion: "v9",
-    })).rejects.toThrow(/OpenRouter response parse failed after 3\/3 attempts/i);
+    })).rejects.toThrow(/Gemini error: 500/i);
 
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
-  it("OpenRouter は timeout 時に 3 回までリトライする", async () => {
+  it("OpenRouter は timeout 時に 2 回までリトライし、Gemini に fallback してさらに 3 回リトライする", async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
       .mockRejectedValue(new DOMException("The operation was aborted.", "AbortError"));
 
     vi.stubGlobal("fetch", fetchMock);
@@ -305,20 +305,21 @@ describe("generate", () => {
       definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
       promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
       promptVersion: "v9",
-    })).rejects.toThrow(/OpenRouter request timed out after 150 seconds/i);
+    })).rejects.toThrow(/Gemini request timed out after 60 seconds/i);
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    // OpenRouter 2 attempts (1+1) + Gemini 3 attempts (1+2) = 5
+    expect(fetchMock).toHaveBeenCalledTimes(5);
   });
 
-  it("language guard 通過後に output quality guard が失敗したら Gemini で ReAsk する", async () => {
+  it("language guard 通過後に output quality guard が失敗したら OpenRouter で ReAsk する（primary）", async () => {
+    // OpenRouter primary: first response fails quality guard, reask succeeds
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        candidates: [
+        choices: [
           {
-            content: {
-              parts: [
-                { text: "The response adheres strictly to the specified format. \\boxed{Completed}", thought: false },
-              ],
+            message: {
+              content: "The response adheres strictly to the specified format. \\boxed{Completed}",
+              reasoning: "hidden",
             },
           },
         ],
@@ -327,12 +328,11 @@ describe("generate", () => {
         headers: { "Content-Type": "application/json" },
       }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        candidates: [
+        choices: [
           {
-            content: {
-              parts: [
-                { text: VALID_DAILY_RESPONSE, thought: false },
-              ],
+            message: {
+              content: VALID_DAILY_RESPONSE,
+              reasoning: "hidden",
             },
           },
         ],
@@ -355,39 +355,46 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(VALID_DAILY_RESPONSE);
-    expect(result.source).toBe("gemini");
+    expect(result.source).toBe("openrouter");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("OpenRouter fallback でも output quality guard は同じ ReAsk を使う", async () => {
+  it("OpenRouter で output quality guard 失敗 → Gemini に fallback する", async () => {
+    // OpenRouter fails quality guard + 2 reasks, then Gemini fallback (Gemini format responses)
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
+      // OpenRouter primary: initial + 2 reasks all fail quality (OpenRouter format)
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        choices: [
-          {
-            message: {
-              content: "The response adheres strictly to the specified format. \\boxed{Completed}",
-              reasoning: "hidden reasoning",
-            },
+        choices: [{
+          message: {
+            content: "The response adheres strictly to the specified format. \\boxed{Completed}",
+            reasoning: "hidden",
           },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }))
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        choices: [
-          {
-            message: {
-              content: VALID_DAILY_RESPONSE,
-              reasoning: "hidden reasoning",
-            },
+        choices: [{
+          message: {
+            content: "The response adheres strictly to the specified format. \\boxed{Completed}",
+            reasoning: "hidden",
           },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }));
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: "The response adheres strictly to the specified format. \\boxed{Completed}",
+            reasoning: "hidden",
+          },
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      // Gemini fallback initial passes (Gemini format — callGemini uses candidates)
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        candidates: [{
+          content: {
+            parts: [{ text: VALID_DAILY_RESPONSE, thought: false }],
+          },
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }));
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -403,40 +410,23 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(VALID_DAILY_RESPONSE);
-    expect(result.source).toBe("openrouter");
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result.source).toBe("gemini");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
-  it("language guard で daily-japanese の初回失敗は Gemini ReAsk で再生成する", async () => {
+  it("language guard で daily-japanese の初回失敗は OpenRouter ReAsk で再生成する", async () => {
+    // OpenRouter primary: initial fails guard, reask succeeds
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        candidates: [
-          {
-            content: {
-              parts: [
-                { text: "아니다", thought: false },
-              ],
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }))
+        choices: [{
+          message: { content: "مرحبا", reasoning: "hidden" },
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        candidates: [
-          {
-            content: {
-              parts: [
-                { text: VALID_DAILY_RESPONSE, thought: false },
-              ],
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }));
+        choices: [{
+          message: { content: VALID_DAILY_RESPONSE, reasoning: "hidden" },
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }));
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -452,93 +442,38 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(VALID_DAILY_RESPONSE);
-    expect(result.source).toBe("gemini");
+    expect(result.source).toBe("openrouter");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("language guard で Gemini ReAsk 2回 + OpenRouter ReAsk 2回 まで落ちたら LanguageGuardError を投げる", async () => {
+  it("language guard で OpenRouter ReAsk 2回 + Gemini ReAsk 2回 まで落ちたら LanguageGuardError を投げる", async () => {
+    // OpenRouter primary: initial + 2 reasks fail
+    // Gemini fallback: initial + 2 reasks also fail (Gemini format — callGemini/callLanguageModel uses candidates)
     const fetchMock = vi.fn()
+      // OpenRouter initial (fails guard)
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        candidates: [
-          {
-            content: {
-              parts: [
-                { text: "مرحبا", thought: false },
-              ],
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }))
+        choices: [{ message: { content: "مرحبا", reasoning: "hidden" } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      // OpenRouter reask 1 (fails)
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        candidates: [
-          {
-            content: {
-              parts: [
-                { text: "مرحبا مرة أخرى", thought: false },
-              ],
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }))
+        choices: [{ message: { content: "مرحبا مرة أخرى", reasoning: "hidden" } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      // OpenRouter reask 2 (fails)
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        candidates: [
-          {
-            content: {
-              parts: [
-                { text: "مرحبا ثالث", thought: false },
-              ],
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }))
+        choices: [{ message: { content: "مرحبا ثالث", reasoning: "hidden" } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      // Gemini fallback initial (fails guard) — Gemini format
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        choices: [
-          {
-            message: {
-              content: "مرحبا من fallback",
-              reasoning: "hidden",
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }))
+        candidates: [{ content: { parts: [{ text: "مرحبا من fallback", thought: false }] } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      // Gemini reask 1 (fails)
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        choices: [
-          {
-            message: {
-              content: "مرحبا من reask",
-              reasoning: "hidden",
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }))
+        candidates: [{ content: { parts: [{ text: "مرحبا من reask", thought: false }] } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      // Gemini reask 2 (fails)
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        choices: [
-          {
-            message: {
-              content: "مرحبا من reask 2",
-              reasoning: "hidden",
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }));
+        candidates: [{ content: { parts: [{ text: "مرحبا من reask 2", thought: false }] } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }));
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -556,35 +491,18 @@ describe("generate", () => {
     expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 
-  it("OpenRouter も language guard で ReAsk 2回する", async () => {
+  it("OpenRouter は language guard で ReAsk 2回する（primary）", async () => {
+    // OpenRouter primary: initial fails guard, reask 1 fails, reask 2 succeeds
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        choices: [
-          {
-            message: {
-              content: "مرحبا",
-              reasoning: "hidden",
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }))
+        choices: [{ message: { content: "مرحبا", reasoning: "hidden" } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        choices: [
-          {
-            message: {
-              content: VALID_DAILY_RESPONSE,
-              reasoning: "hidden",
-            },
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }));
+        choices: [{ message: { content: "مرحبا مرة أخرى", reasoning: "hidden" } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        choices: [{ message: { content: VALID_DAILY_RESPONSE, reasoning: "hidden" } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } }));
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -604,10 +522,10 @@ describe("generate", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it("OpenRouter の 500 エラーは即失敗し、リトライしない", async () => {
+  it("OpenRouter の 500 エラーは即失敗し、リトライしない（primary → Gemini fallback も 500）", async () => {
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }))
-      .mockResolvedValueOnce(new Response("OpenRouter failed", { status: 500 }));
+      .mockResolvedValueOnce(new Response("OpenRouter failed", { status: 500 }))
+      .mockResolvedValueOnce(new Response("Gemini failed", { status: 500 }));
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -620,7 +538,7 @@ describe("generate", () => {
       definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
       promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
       promptVersion: "v9",
-    })).rejects.toThrow(/OpenRouter error: 500/i);
+    })).rejects.toThrow(/Gemini error: 500/i);
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });

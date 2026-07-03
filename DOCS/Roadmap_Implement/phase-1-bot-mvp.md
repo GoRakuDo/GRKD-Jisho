@@ -531,11 +531,11 @@ export async function saveResponse(params: CacheKey & { responseText: string }) 
 
 > **Legacy reference only:** the snippet below reflects the older bridge template that existed before provider-native separation. For the improved v2 prompt format, see `DOCS/Prompts/prompt-v2.md`.
 >
-> **Current sampling defaults:** Gemini / OpenRouter の両方で `temperature=0.65`, `topP=0.8` を使う。`thinkingConfig` や `reasoning.exclude` とは別に、出力の揺れ幅を同じ基準で揃える。
+> **Current sampling defaults:** Gemini / OpenRouter の両方で `temperature=0.7`, `topP=0.8` を使う。`thinkingConfig` や `reasoning.exclude` とは別に、出力の揺れ幅を同じ基準で揃える。
 
 **責務:**
-- Gemini API を呼び出し
-- Gemini 失敗 → OpenRouter フォールバック
+- OpenRouter API を呼び出し（primary）
+- OpenRouter 失敗 → Gemini フォールバック
 - プロンプトテンプレート `v1` を適用（legacy reference）
 - `model_name` の追跡
 
@@ -595,10 +595,10 @@ export async function generate(params: GenerateParams): Promise<string> {
     .replace("{{definition_json}}", params.definitionJson);
 
   try {
-    return await callGemini(prompt);
-  } catch (err) {
-    console.warn("Gemini failed, falling back to OpenRouter:", err);
     return await callOpenRouter(prompt);
+  } catch (err) {
+    console.warn("OpenRouter failed, falling back to Gemini:", err);
+    return await callGemini(prompt);
   }
 }
 
@@ -607,7 +607,7 @@ async function callGemini(prompt: string): Promise<string> {
   const timeoutId = setTimeout(() => controller.abort(), 60_000);
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${PRIMARY_LLM_MODEL}:generateContent`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${FALLBACK_LLM_MODEL}:generateContent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -637,7 +637,7 @@ async function callGemini(prompt: string): Promise<string> {
 }
 
 async function callOpenRouter(prompt: string): Promise<string> {
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 150_000);
 
@@ -650,7 +650,7 @@ async function callOpenRouter(prompt: string): Promise<string> {
         },
         signal: controller.signal,
         body: JSON.stringify({
-          model: "openrouter/free",
+          model: PRIMARY_LLM_MODEL,
           messages: [{ role: "user", content: prompt }],
           reasoning: {
             exclude: true,
@@ -668,11 +668,11 @@ async function callOpenRouter(prompt: string): Promise<string> {
       if (!text) throw new Error("OpenRouter returned empty response");
       return text;
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError" && attempt < 3) {
+      if (err instanceof DOMException && err.name === "AbortError" && attempt < 2) {
         continue;
       }
 
-      if (err instanceof SyntaxError && attempt < 3) {
+      if (err instanceof SyntaxError && attempt < 2) {
         continue;
       }
 

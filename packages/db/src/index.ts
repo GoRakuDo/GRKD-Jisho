@@ -3,6 +3,8 @@ export * from "./schema/index";
 import * as schema from "./schema/index";
 export { schema };
 export { ANALYTICS_DB_PATH } from "./config/analytics-path";
+export { MODEL_REGISTRY, getModelDisplayInfo } from "./config/models";
+export type { ModelDisplayInfo } from "./config/models";
 export * from "./utils/query-cleanup";
 export * from "./utils/frequency-parser";
 

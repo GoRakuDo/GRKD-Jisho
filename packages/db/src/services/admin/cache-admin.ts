@@ -1,6 +1,7 @@
 import { eq, and, count, ilike, inArray, desc } from "drizzle-orm";
 import { db } from "../../index";
 import * as schema from "../../schema";
+import { getModelDisplayInfo } from "../../config/models";
 
 export interface CacheStats {
   total: number;
@@ -51,6 +52,8 @@ export async function searchCacheEntries(
     query: string;
     roleKey: string;
     modelName: string;
+    modelDisplayName: string;
+    modelProvider: string;
     promptVersion: string;
     isManualOverride: boolean;
     isDeleteProtected: boolean;
@@ -72,7 +75,10 @@ export async function searchCacheEntries(
     .where(ilike(schema.responseCache.normalizedQuery, `%${queryText}%`))
     .limit(limit);
 
-  return rows.map((r) => ({ ...r, id: String(r.id) }));
+  return rows.map((r) => {
+    const { displayName, provider } = getModelDisplayInfo(r.modelName);
+    return { ...r, id: String(r.id), modelDisplayName: displayName, modelProvider: provider };
+  });
 }
 
 export async function bulkDeleteCache(ids: string[], forceDeleteProtected = false): Promise<number> {
@@ -118,6 +124,8 @@ export interface RecentCacheActivityRow {
   activity: "added" | "edited";
   query: string;
   modelName: string;
+  modelDisplayName: string;
+  modelProvider: string;
   roleKey: string;
   promptVersion: string;
   createdAt: Date | null;
@@ -161,22 +169,32 @@ export async function getRecentCacheActivity(limit = 10): Promise<RecentCacheAct
   ]);
 
   const merged = [
-    ...addedRows.map((row) => ({
-      activity: "added" as const,
-      query: row.query,
-      modelName: row.modelName,
-      roleKey: row.roleKey,
-      promptVersion: row.promptVersion,
-      createdAt: row.createdAt,
-    })),
-    ...editedRows.map((row) => ({
-      activity: "edited" as const,
-      query: row.query,
-      modelName: row.modelName,
-      roleKey: row.roleKey,
-      promptVersion: row.promptVersion,
-      createdAt: row.createdAt,
-    })),
+    ...addedRows.map((row) => {
+      const { displayName, provider } = getModelDisplayInfo(row.modelName);
+      return {
+        activity: "added" as const,
+        query: row.query,
+        modelName: row.modelName,
+        modelDisplayName: displayName,
+        modelProvider: provider,
+        roleKey: row.roleKey,
+        promptVersion: row.promptVersion,
+        createdAt: row.createdAt,
+      };
+    }),
+    ...editedRows.map((row) => {
+      const { displayName, provider } = getModelDisplayInfo(row.modelName);
+      return {
+        activity: "edited" as const,
+        query: row.query,
+        modelName: row.modelName,
+        modelDisplayName: displayName,
+        modelProvider: provider,
+        roleKey: row.roleKey,
+        promptVersion: row.promptVersion,
+        createdAt: row.createdAt,
+      };
+    }),
   ].sort((a, b) => {
     const timeA = a.createdAt?.getTime() ?? 0;
     const timeB = b.createdAt?.getTime() ?? 0;

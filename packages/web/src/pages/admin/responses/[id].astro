@@ -17,6 +17,8 @@ interface ResponseDetailData {
   query: string;
   roleKey: string;
   modelName: string;
+  modelDisplayName: string;
+  modelProvider: string;
   promptVersion: string;
   isManualOverride: boolean;
   isDeleteProtected: boolean;
@@ -92,6 +94,8 @@ if (session?.isAdmin && id) {
           query={detail.query}
           outputBucketLabel={getOutputBucketLabel(detail.roleKey)}
           model={detail.modelName}
+          modelDisplayName={detail.modelDisplayName}
+          modelProvider={detail.modelProvider}
           promptVersion={detail.promptVersion}
           isOverride={detail.isManualOverride}
           isDeleteProtected={detail.isDeleteProtected}

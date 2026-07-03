@@ -1,12 +1,8 @@
 import { env } from "../config/env.js";
-import { DEFAULT_LLM_TEMPERATURE, DEFAULT_LLM_TOP_P, FALLBACK_LLM_MODEL, PRIMARY_LLM_MODEL } from "../config/llm-model.js";
+import { DEFAULT_LLM_TEMPERATURE, DEFAULT_LLM_TOP_P, FALLBACK_LLM_MODEL, GEMINI_MAX_ATTEMPTS, GEMINI_TIMEOUT_MS, OPENROUTER_MAX_ATTEMPTS, OPENROUTER_TIMEOUT_MS, PRIMARY_LLM_MODEL } from "../config/llm-model.js";
 import { buildLanguageReaskPrompt, validateOutputLanguage, type LanguageGuardResult, type LanguageGuardViolation } from "./language-guard.service.js";
 import { buildOutputQualityReaskPrompt, validateOutputQuality, type OutputQualityResult, type OutputQualityViolation } from "./output-quality-guard.service.js";
 import type { RoleKey } from "../types.js";
-
-const GEMINI_TIMEOUT_MS = 60_000;
-const OPENROUTER_TIMEOUT_MS = 150_000;
-const OPENROUTER_MAX_ATTEMPTS = 3;
 
 type LanguageGuardProvider = "gemini" | "openrouter";
 type GuardrailFailureCategory = "language" | "quality" | "mixed";
@@ -152,6 +148,18 @@ function getOpenRouterFailureHint(message: string): string {
   return "Check OPENROUTER_API_KEY or OpenRouter model access";
 }
 
+function getGeminiFailureHint(message: string): string {
+  if (message.includes("parse failed")) {
+    return "Check Gemini response format or recent provider issues";
+  }
+
+  if (message.includes("timed out")) {
+    return "Check network stability or Gemini API availability";
+  }
+
+  return "Check GEMINI_API_KEY or Gemini model access";
+}
+
 async function callLanguageModel(prompt: string, provider: LanguageGuardProvider): Promise<string> {
   return provider === "gemini" ? callGemini(prompt) : callOpenRouter(prompt);
 }
@@ -258,20 +266,25 @@ export async function generate(params: GenerateParams): Promise<GenerateResult> 
 
   const prompt = renderPromptTemplate(params.promptTemplate, params);
 
+  // 1st attempt: OpenRouter (primary)
   try {
-    console.log(`[LLM] Gemini started → model=${PRIMARY_LLM_MODEL}`);
+    console.log(`[LLM] OpenRouter started → model=${PRIMARY_LLM_MODEL}`);
+    const text = await callOpenRouter(prompt);
+    return { text, source: "openrouter" };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[LLM] OpenRouter failed: ${message} → ${getOpenRouterFailureHint(message)}, falling back to Gemini`);
+  }
+
+  // 2nd attempt: Gemini (fallback)
+  try {
+    console.log(`[LLM] Gemini started → model=${FALLBACK_LLM_MODEL}`);
     const text = await callGemini(prompt);
     return { text, source: "gemini" };
   } catch (err) {
-    console.warn(`[LLM] Gemini failed: ${err instanceof Error ? err.message : String(err)} → Check GEMINI_API_KEY or Gemma 4 model access, falling back to OpenRouter`);
-    try {
-      const text = await callOpenRouter(prompt);
-      return { text, source: "openrouter" };
-    } catch (openRouterErr) {
-      const openRouterMessage = openRouterErr instanceof Error ? openRouterErr.message : String(openRouterErr);
-      console.error(`[LLM] OpenRouter failed: ${openRouterMessage} → ${getOpenRouterFailureHint(openRouterMessage)}`);
-      throw openRouterErr;
-    }
+    const geminiMessage = err instanceof Error ? err.message : String(err);
+    console.error(`[LLM] Gemini failed: ${geminiMessage} → ${getGeminiFailureHint(geminiMessage)}`);
+    throw err;
   }
 }
 
@@ -288,17 +301,19 @@ export async function generateWithLanguageGuardrails(params: GenerateParams): Pr
     return { text: initialAttempt.text, source: initial.source };
   }
 
-  if (initial.source === "openrouter") {
+  // Gemini was the fallback already → no more providers
+  if (initial.source === "gemini") {
     throw new LanguageGuardError(params.roleKey, initial.source, initialAttempt.reaskAttempts, true, initialAttempt.validation.validation.violations, summarizeFailureCategory(initialAttempt.failureKinds));
   }
 
-  const fallbackText = await callOpenRouter(renderedPrompt);
-  const fallbackAttempt = await validateWithReaskOnProvider("openrouter", renderedPrompt, params, fallbackText);
+  // OpenRouter (primary) failed guardrails → fallback to Gemini
+  const fallbackText = await callGemini(renderedPrompt);
+  const fallbackAttempt = await validateWithReaskOnProvider("gemini", renderedPrompt, params, fallbackText);
   if (fallbackAttempt.ok) {
-    return { text: fallbackAttempt.text, source: "openrouter" };
+    return { text: fallbackAttempt.text, source: "gemini" };
   }
 
-  throw new LanguageGuardError(params.roleKey, "openrouter", fallbackAttempt.reaskAttempts, true, fallbackAttempt.validation.validation.violations, summarizeFailureCategory(fallbackAttempt.failureKinds));
+  throw new LanguageGuardError(params.roleKey, "gemini", fallbackAttempt.reaskAttempts, true, fallbackAttempt.validation.validation.violations, summarizeFailureCategory(fallbackAttempt.failureKinds));
 }
 
 function isAbortError(err: unknown): boolean {
@@ -306,11 +321,46 @@ function isAbortError(err: unknown): boolean {
 }
 
 async function callGemini(prompt: string): Promise<string> {
+  let lastGeminiError: Error | null = null;
+
+  for (let attempt = 1; attempt <= GEMINI_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      console.log(`[LLM] Gemini started → model=${FALLBACK_LLM_MODEL} attempt=${attempt}/${GEMINI_MAX_ATTEMPTS}`);
+      const text = await callGeminiOnce(prompt);
+      console.log(`[LLM] Gemini success → model=${FALLBACK_LLM_MODEL} attempt=${attempt}/${GEMINI_MAX_ATTEMPTS}`);
+      return text;
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        lastGeminiError = new Error(`Gemini response parse failed after ${attempt}/${GEMINI_MAX_ATTEMPTS} attempts: ${err.message}`);
+        if (attempt < GEMINI_MAX_ATTEMPTS) {
+          console.warn(`[LLM] Gemini parse failed → attempt=${attempt}/${GEMINI_MAX_ATTEMPTS}, retrying`);
+          continue;
+        }
+        break;
+      }
+
+      if (isAbortError(err)) {
+        lastGeminiError = new Error(`Gemini request timed out after ${GEMINI_TIMEOUT_MS / 1000} seconds (attempt ${attempt}/${GEMINI_MAX_ATTEMPTS})`);
+        if (attempt < GEMINI_MAX_ATTEMPTS) {
+          console.warn(`[LLM] Gemini timeout → attempt=${attempt}/${GEMINI_MAX_ATTEMPTS}, retrying`);
+          continue;
+        }
+        break;
+      }
+
+      throw err;
+    }
+  }
+
+  throw lastGeminiError ?? new Error(`Gemini request failed after ${GEMINI_MAX_ATTEMPTS} attempts`);
+}
+
+async function callGeminiOnce(prompt: string): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
 
   try {
-    const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${PRIMARY_LLM_MODEL}:generateContent`);
+    const url = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${FALLBACK_LLM_MODEL}:generateContent`);
 
     const response = await fetch(url, {
       method: "POST",
@@ -338,13 +388,7 @@ async function callGemini(prompt: string): Promise<string> {
 
     const data = (await response.json()) as GeminiResponse;
     const text = extractGeminiAnswer(data);
-    console.log(`[LLM] Gemini success → model=${PRIMARY_LLM_MODEL}`);
     return text;
-  } catch (err) {
-    if (isAbortError(err)) {
-      throw new Error(`Gemini request timed out after ${GEMINI_TIMEOUT_MS / 1000} seconds`);
-    }
-    throw err;
   } finally {
     clearTimeout(timeoutId);
   }
@@ -355,9 +399,9 @@ async function callOpenRouter(prompt: string): Promise<string> {
 
   for (let attempt = 1; attempt <= OPENROUTER_MAX_ATTEMPTS; attempt += 1) {
     try {
-      console.log(`[LLM] OpenRouter started → model=${FALLBACK_LLM_MODEL} attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}`);
+      console.log(`[LLM] OpenRouter started → model=${PRIMARY_LLM_MODEL} attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}`);
       const text = await callOpenRouterOnce(prompt);
-      console.log(`[LLM] OpenRouter success → model=${FALLBACK_LLM_MODEL} attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}`);
+      console.log(`[LLM] OpenRouter success → model=${PRIMARY_LLM_MODEL} attempt=${attempt}/${OPENROUTER_MAX_ATTEMPTS}`);
       return text;
     } catch (err) {
       if (err instanceof SyntaxError) {
@@ -400,7 +444,7 @@ async function callOpenRouterOnce(prompt: string): Promise<string> {
       },
       signal: controller.signal,
       body: JSON.stringify({
-        model: FALLBACK_LLM_MODEL,
+        model: PRIMARY_LLM_MODEL,
         messages: [{ role: "user", content: prompt }],
         temperature: DEFAULT_LLM_TEMPERATURE,
         top_p: DEFAULT_LLM_TOP_P,

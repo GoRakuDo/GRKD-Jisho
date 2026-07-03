@@ -2,6 +2,7 @@ import { eq, desc, sql, inArray } from "drizzle-orm";
 import { db } from "../../index";
 import * as schema from "../../schema";
 import type { ResponseEdit } from "../../schema/response-edits";
+import { getModelDisplayInfo } from "../../config/models";
 
 // ── Types ──
 
@@ -10,6 +11,8 @@ export interface SearchResult {
   query: string;
   roleKey: string;
   modelName: string;
+  modelDisplayName: string;
+  modelProvider: string;
   promptVersion: string;
   isManualOverride: boolean;
   isDeleteProtected: boolean;
@@ -48,7 +51,10 @@ export async function searchResponse(
     .orderBy(desc(schema.responseCache.isManualOverride))
     .limit(limit);
 
-  return rows.map((r) => ({ ...r, id: String(r.id) }));
+  return rows.map((r) => {
+    const { displayName, provider } = getModelDisplayInfo(r.modelName);
+    return { ...r, id: String(r.id), modelDisplayName: displayName, modelProvider: provider };
+  });
 }
 
 // ── Single response ──
@@ -81,7 +87,8 @@ export async function getResponseById(
     .limit(1);
 
   if (!row) return null;
-  return { ...row, id: String(row.id) };
+  const { displayName, provider } = getModelDisplayInfo(row.modelName);
+  return { ...row, id: String(row.id), modelDisplayName: displayName, modelProvider: provider };
 }
 
 // ── Response detail (with edits + source) ──

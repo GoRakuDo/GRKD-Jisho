@@ -5,6 +5,8 @@ export interface ResponseDetailPanelProps {
   query: string;
   outputBucketLabel: string;
   model: string;
+  modelDisplayName: string;
+  modelProvider: string;
   promptVersion: string;
   isOverride: boolean;
   isDeleteProtected: boolean;
@@ -16,6 +18,8 @@ export default function ResponseDetailPanel({
   query,
   outputBucketLabel,
   model,
+  modelDisplayName,
+  modelProvider,
   promptVersion,
   isOverride,
   isDeleteProtected: initialDeleteProtected,
@@ -213,7 +217,8 @@ export default function ResponseDetailPanel({
         </div>
         <div style={metaGroupStyle}>
           <span style={labelStyle}>Output Bucket / Model</span>
-          <span style={valueStyle}>{outputBucketLabel} &middot; {model}</span>
+          <span style={valueStyle}>{outputBucketLabel} &middot; {modelDisplayName}</span>
+          <span style={{ fontSize: '0.7rem', color: 'var(--color-graphite-500)' }}>{modelProvider}</span>
         </div>
         <div style={metaGroupStyle}>
           <span style={labelStyle}>Prompt</span>

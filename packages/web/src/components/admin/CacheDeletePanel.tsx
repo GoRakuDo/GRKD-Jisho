@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from "react";
 import CacheEditModal from "./CacheEditModal";
-import { getShortModelLabel } from "../../lib/model-label";
 
 interface CacheEntry {
   id: string;
   query: string;
   modelName: string;
+  modelDisplayName: string;
+  modelProvider: string;
   promptVersion: string;
   outputBucketLabel: string;
   isManualOverride: boolean;
@@ -237,7 +238,7 @@ export const CacheDeletePanel: React.FC<CacheDeletePanelProps> = ({
                       className="inline-flex rounded-full border border-royal-blue-100 bg-royal-blue-50 px-2.5 py-1 text-[12px] font-semibold text-royal-blue-700"
                       title={entry.modelName}
                     >
-                      {getShortModelLabel(entry.modelName)}
+                      {entry.modelDisplayName}
                     </span>
                   </td>
                   <td className="px-4 py-3">
