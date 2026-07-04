@@ -9,7 +9,7 @@
 
 ## 問題 (Background)
 
-現在 `response_cache` の cache key は 7 要素:
+現在 `response_cache` の cache key は 7 要素だったが、現在は 5 要素:
 
 ```txt
 normalized_query
@@ -40,7 +40,7 @@ model_name
 `prompt_content_hash` を **cache key から外す**。
 代わりに、prompt 編集時は **必ず version を bump する運用ルール** で同等以上の安全性を担保する。
 
-### 新しい cache key (6 要素)
+### 新しい cache key (5 要素)
 
 ```txt
 normalized_query
@@ -48,8 +48,9 @@ dictionary_id
 dictionary_entry_id
 role_key
 prompt_version
-model_name
 ```
+
+`model_name` も cache key から外す（2026-07-04 変更）。理由: プロバイダ／モデルを変更してもキャッシュを再生成せず再利用するため。`model_name` カラム自体は残し、audit 用メタ情報として使う。`prompt_content_hash` と同様、cache key の WHERE 句には使わない。
 
 ### hash フィールドの扱い
 
@@ -70,6 +71,17 @@ cache key の `WHERE` 句には使わない。
 
 新挙動のリスク: version を bump し忘れると、prompt 編集が反映されない。
 → これを **Admin UI で version bump を強制** + **運用ガイドで明示** で緩和する。
+
+### モデル／プロバイダ変更の影響
+
+| 操作 | 旧挙動 (model_name in key) | 新挙動 (model_name out of key) |
+|---|---|---|
+| LLM プロバイダ切替 (Gemini → OpenRouter) | cache 全部 miss → 全クエリ再生成 | cache hit する (旧答えが返る) |
+| モデル変更 (gemma-4 → gemini-3.1) | cache 全部 miss → 全クエリ再生成 | cache hit する (旧答えが返る) |
+
+`model_name` を cache key から外す判断は、**辞書情報はプロバイダによらず同一** という前提に基づく。
+LLM が行うのは辞書定義の「言い換え」のみで、回答の品質がプロバイダ間で大きく変わることはない。
+もし特定モデルの回答を強制したい場合は、prompt 側で指示する運用とする。
 
 ### 過去の経緯
 

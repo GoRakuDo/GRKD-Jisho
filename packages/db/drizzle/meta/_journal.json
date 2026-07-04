@@ -141,6 +141,13 @@
       "when": 1782053582528,
       "tag": "0019_panoramic_network",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1783141837383,
+      "tag": "0020_omniscient_proudstar",
+      "breakpoints": true
     }
   ]
 }

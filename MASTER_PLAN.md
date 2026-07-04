@@ -243,7 +243,7 @@ CREATE TABLE response_cache (
   created_at           TIMESTAMPTZ DEFAULT now(),
   updated_at           TIMESTAMPTZ DEFAULT now(),
 
-  UNIQUE (normalized_query, dictionary_id, dictionary_entry_id, role_key, prompt_version, model_name)
+  UNIQUE (normalized_query, dictionary_id, dictionary_entry_id, role_key, prompt_version)
 );
 ```
 

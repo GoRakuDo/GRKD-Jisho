@@ -162,12 +162,12 @@ dictionary_id
 dictionary_entry_id
 role_key
 prompt_version
-model_name
 ```
 
-ロール別・モデル別・プロンプト別に回答が変わるため。
+ロール別・プロンプト別に回答が変わるため。プロバイダ／モデルを変えてもキャッシュは再利用する（2026-07-04 変更）。
 
-`prompt_content_hash` は cache key に**含めない**（2026-06-21 変更）。
+`model_name` は DB に保存するが cache key には含めない（audit 用メタ情報）。
+`prompt_content_hash` も同様に cache key に**含めない**（2026-06-21 変更）。
 DB カラムとしては残し、編集履歴・analytics のメタ情報として使う。
 prompt 編集時は **必ず `prompt_version` を bump する** 運用ルールで cache invalidation を担保する。
 詳細は `DOCS/Design/cache-key-prompt-version-only.md` を参照。
