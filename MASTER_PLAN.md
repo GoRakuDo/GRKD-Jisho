@@ -17,7 +17,7 @@ GRKD-Jisho は、インドネシア語話者の日本語学習者が集まる Di
 
 ```
 辞書 = 根拠となる情報源 (Yomitan DB)
-LLM  = ロール別に説明を整形する係 (Gemini / OpenRouter)
+LLM  = ロール別に説明を整形する係 (models.json 優先順ルーティング / Kasou CPA)
 Cache = 生成済み回答の再利用 (Response-DB)
 WebUI = 管理・品質改善の拠点
 ```
@@ -30,8 +30,7 @@ WebUI = 管理・品質改善の拠点
 |-------|-----------|-----------|
 | Bot Runtime | Node.js 20 LTS + tsx | 成熟したエコシステム、migration が最も簡単 |
 | Discord Library | discord.js v14 | 業界標準、Slash Command対応が充実 |
-| Primary LLM | Google Gemini (gemma-4-31b-it) | コスト効率、日本語・インドネシア語の精度 |
-| Fallback LLM | OpenRouter (Claude / GPT-4o) | Gemini 障害時の自動フォールバック |
+| LLM Routing | OpenAI互換 `/v1/chat/completions` 統一 → Kasou CPA (`models.json` priority 順) | 単一呼び出し経路で provider 追加が entry 追加だけで完結。詳細は `DOCS/Design/llm-models-routing-cpa.md` |
 | Database | PostgreSQL 16 | JSONB 対応、全文検索、信頼性 |
 | ORM | Drizzle ORM | TypeSafe、軽量、migration が明確 |
 | Web UI | Astro 5 SSR + React 19 + Tailwind v4 + @astrojs/node v9 | 管理画面に適したSSRと最小限のReact islands |
@@ -40,7 +39,7 @@ WebUI = 管理・品質改善の拠点
 | Containerize | Docker + docker-compose | ローカル → クラウドのmigration が容易 |
 | Cloud Deploy | Railway (推奨) or Fly.io | Dockerfile ベースでそのまま移行可 |
 
-> **LLM sampling defaults:** Gemini / OpenRouter ともに `temperature=0.70`, `topP=0.8` を初期値として使う。回答のぶれを抑えつつ、辞書説明の自然さを少し上げる。
+> **LLM sampling defaults:** 全モデル共通で `temperature=0.70`, `topP=0.8` を初期値として使う。回答のぶれを抑えつつ、辞書説明の自然さを少し上げる。
 
 ---
 
@@ -65,7 +64,7 @@ Discord Guild
 │  └→ ResponseCacheService.get(cacheKey)          │
 │       ├─ Hit  → Discord に送信                  │
 │       └─ Miss → LLMService.generate(...)        │
-│                   └→ Gemini → (fallback) OpenRouter│
+│                   └→ models.json 優先順で CPA へ /v1/chat/completions│
 │                   └→ ResponseCacheService.save()│
 │                   └→ Discord に送信              │
 │  Slash Commands (/search-jisho, /edit-jisho...) │
@@ -237,7 +236,7 @@ CREATE TABLE response_cache (
   dictionary_entry_id  BIGINT REFERENCES dictionary_entries(id),
   role_key             TEXT NOT NULL,           -- daily-japanese / indonesian
   prompt_version       TEXT NOT NULL,           -- "v1", "v2"
-  model_name           TEXT NOT NULL,           -- "gemma-4-31b-it"
+  model_name           TEXT NOT NULL,           -- "gemini-3.7-flash-high" 等（生成モデルの audit 用）
   response_text        TEXT NOT NULL,
   is_manual_override   BOOLEAN DEFAULT false,   -- 管理者手動編集フラグ
   created_at           TIMESTAMPTZ DEFAULT now(),
@@ -376,7 +375,6 @@ function buildCacheKey(params: {
   entryId: bigint;
   roleKey: RoleKey;
   promptVersion: string;
-  modelName: string;
 }): string {
   return [
     params.normalizedQuery,
@@ -384,7 +382,6 @@ function buildCacheKey(params: {
     params.entryId.toString(),
     params.roleKey,
     params.promptVersion,
-    params.modelName,
   ].join("|");
 }
 ```
@@ -393,7 +390,7 @@ function buildCacheKey(params: {
 
 ```
 1. is_manual_override = true の回答が存在 → 即座に使用
-2. キャッシュヒット (normalized_query + dict + role + version + model 全一致) → 使用
+2. キャッシュヒット (normalized_query + dict + role + version 全一致) → 使用
 3. キャッシュミス → LLM 生成 → 保存
 ```
 
@@ -401,18 +398,26 @@ function buildCacheKey(params: {
 
 ## 9. LLM Service Design
 
-### Gemini → OpenRouter フォールバック
+### models.json 優先順ルーティング（2026-08-26 設計更新）
+
+すべてのLLM呼び出しは OpenAI 互換 `/v1/chat/completions` に統一し、
+`models.json` の priority 昇順で Kasou CPA へルーティングする。
+初期構成は `gemini-3.7-flash-high`(0) → `gemini-3-flash`(1) → `gpt-oss-120b-medium`(2)。
+詳細は `DOCS/Design/llm-models-routing-cpa.md` を参照。
 
 ```typescript
 // packages/bot/src/services/llm.service.ts
 
-export async function generate(params: GenerateParams): Promise<string> {
-  try {
-    return await callGemini(params);
-  } catch (err) {
-    console.warn("Gemini failed, falling back to OpenRouter:", err);
-    return await callOpenRouter(params);
+export async function generate(params: GenerateParams): Promise<GenerateResult> {
+  for (const model of getModelsByPriority()) {
+    try {
+      const text = await callChatCompletions(model, renderPromptTemplate(params));
+      return { text, source: model.id };
+    } catch (err) {
+      console.warn(`[LLM] ${model.id} failed → next priority`);
+    }
   }
+  throw new Error("All LLM models failed");
 }
 ```
 
@@ -510,8 +515,8 @@ DISCORD_ALLOWED_CHANNELS=channel_id_1,channel_id_2
 DATABASE_URL=postgresql://user:pass@localhost:5432/grkd_jisho
 
 # LLM
-GEMINI_API_KEY=
-OPENROUTER_API_KEY=
+CPA_API_KEY=
+# OPENROUTER_API_KEY=  # 将来 OpenRouter モデルを models.json へ追加するときに有効化
 
 # Prompt
 PROMPT_VERSION=v1
@@ -628,7 +633,7 @@ pnpm --filter db import-yomitan --file ./dicts/jmdict.zip --name "JMdict" --prio
 | 応答時間（LLM 生成） | 5秒 以内 |
 | 辞書検索（DB） | 100ms 以内 |
 | 稼働率 | 99% 以上 |
-| LLM フォールバック | Gemini 失敗から 3秒以内に OpenRouter へ切替 |
+| LLM フォールバック | priority 先頭モデル失敗時、次の priority のモデルへ自動切替 |
 | データ保持 | lookup_logs は 90日、response_cache は無期限 |
 
 ---

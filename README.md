@@ -15,7 +15,7 @@ GRKD-Jisho is a Discord bot that provides Japanese dictionary definitions tailor
 - **Bot:** Node.js 20 LTS + TypeScript + discord.js v14
 - **Database:** PostgreSQL 16 + Drizzle ORM
 - **Web UI:** Astro + React islands (Admin interface)
-- **AI/LLM:** Gemini primary / OpenRouter fallback
+- **AI/LLM:** Unified OpenAI-compatible `/v1/chat/completions` calls routed by `models.json` priority order to CLI Proxy API on Kasou
 - **Agent Control Plane:** MCP Server (Testing currently deferred)
 - **Monorepo Management:** pnpm workspaces
 

@@ -1,5 +1,10 @@
 # Analytics System
 
+> **2026-08-26 注記:** LLM ルーティングの models.json × CPA 移行後は `lookup_logs.llm_source` が
+> 任意の model id（例: `gemini-3.7-flash-high`）になる。本文書の `llm_gemini` / `llm_openrouter`
+> 列設計は当時の provider 二分割を前提としたもので、実装時に source 値の集計方法を見直すこと
+> （詳細: `DOCS/Design/llm-models-routing-cpa.md`）。
+
 ## 目的
 
 Bot の使用状況を時系列で可視化する Analytics ページを専用 SQLite に集約し、既存の PostgreSQL（辞書・キャッシュデータ）と物理分離する。

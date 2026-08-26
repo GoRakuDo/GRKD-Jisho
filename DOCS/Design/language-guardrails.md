@@ -1,5 +1,9 @@
 # Language Guardrails
 
+> **2026-08-26 注記:** 本文書中の「Gemini / OpenRouter」というプロバイダ名は、
+> `models.json` の priority エントリ（第一候補モデル / 次候補モデル）に読み替えること。
+> ReAsk・fallback のセマンティクス自体は不変。詳細は `DOCS/Design/llm-models-routing-cpa.md`。
+
 ## 目的
 
 LLM が辞書データから回答を生成したあと、Discord に送る前に出力言語・壊れた記号列・中身のない怠け出力を検査する。

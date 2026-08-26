@@ -8,6 +8,8 @@
 
 ### Changed
 
+- **LLM routing design (docs-first)** — Decided to replace direct Gemini/OpenRouter calls with unified OpenAI-compatible `/v1/chat/completions` requests routed by a new `models.json` priority list through CLI Proxy API on Kasou. Also planned: `/definisi` user-facing slash command and reply-to-bot trigger guard. Design: `DOCS/Design/llm-models-routing-cpa.md`. Implementation pending.
+
 - **Reindex pipeline** — Removed the Graphify update step and `graphify-out/` project artifact. Codebase structure indexing is now handled through `codebase-memory-mcp` instead of Graphify.
 
 ### Security

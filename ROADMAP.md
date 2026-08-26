@@ -109,6 +109,7 @@ Phase 5: Deferred Scope               TBA
   - Gemini 失敗時に OpenRouter へ自動フォールバック
   - プロンプトテンプレート `v1` 適用
   - `model_name` と `prompt_version` をレスポンスに付与
+  - ※ **2026-08-26 設計更新:** LLM 呼び出しは OpenAI 互換 `/v1/chat/completions` 統一 + `models.json` priority ルーティング（Kasou CPA 経由）へ移行。上記は当時の実装記録。詳細は `DOCS/Design/llm-models-routing-cpa.md`
 
 - [ ] **1-7** `LookupLogService.record(params)` 実装
   - `lookup_logs` に INSERT

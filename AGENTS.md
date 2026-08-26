@@ -35,7 +35,7 @@ LLMは、DBから取得した定義の説明係に限定する。
 | DB | PostgreSQL 16 |
 | ORM | Drizzle ORM |
 | Package Manager | pnpm workspaces |
-| LLM | Gemini primary / OpenRouter fallback |
+| LLM | OpenAI互換 `/v1/chat/completions` 統一。`models.json` の priority 順で Kasou CPA へルーティング（詳細: `DOCS/Design/llm-models-routing-cpa.md`） |
 | Web UI | Astro + React islands（複雑なテーブル操作・モーダルは vanilla JS `<script>` を許容） |
 | Agent Control Plane | MCP Server (Node.js + TypeScript) |
 | Local infra | Docker Compose |
@@ -111,7 +111,7 @@ Bot内の責務は小さな service に分ける。
 dictionary.service.ts       辞書検索
 role-mapper.service.ts      Discord Role -> role_key
 response-cache.service.ts   生成済み回答の取得・保存
-llm.service.ts              Gemini / OpenRouter 呼び出し
+llm.service.ts              OpenAI互換 /v1/chat/completions 呼び出し（models.json priority 順）
 lookup-log.service.ts       検索ログ保存
 rate-limit.service.ts       ユーザー別リミット
 channel-wipe.service.ts     チャンネル消去
@@ -188,6 +188,13 @@ LLMで上書きしてはいけない。
 
 LLMに自由回答させない。
 
+モデル選定は `models.json`（`packages/bot/src/config/models.json`）で管理する。
+すべてのLLM呼び出しは OpenAI 互換 `/v1/chat/completions` に統一し、Kasou 上の CLI Proxy API（CPA, port 8317）へルーティングする。
+`priority` 昇順で試行し、失敗時は次の priority へフォールバックする。
+初期構成は `gemini-3.7-flash-high`(0) → `gemini-3-flash`(1) → `gpt-oss-120b-medium`(2)。
+OpenRouter モデルは同じ models.json への entry 追加で後日組み込む。
+詳細は `DOCS/Design/llm-models-routing-cpa.md` を参照（設計確定 2026-08-26・実装前）。
+
 プロンプトでは必ず以下を渡す。
 
 - `role_key`
@@ -217,6 +224,7 @@ Botは許可チャンネルでのみ反応する。
 
 ```txt
 mention検知
+-> ボットメッセージへのReplyは無視（誤反応防止。明示的な@botタグ入力のみ反応）
 -> DM owner 判定（config の固定ユーザーIDに合致すれば DM を通す、その他 DM はブロック）
 -> query抽出
 -> channel guard（DM はスキップ）
@@ -230,6 +238,8 @@ mention検知
 ```
 
 ### 8-2. Slash Command
+
+一般ユーザー向けの辞書検索は `/definisi` で提供する（公開返信、許可チャンネル限定、rate limit はメンション経由と共有）。
 
 管理コマンドは権限ガード必須。
 
@@ -568,7 +578,7 @@ console.log（情報表示）:
 
 2. **ヒントは具体的に書く**
    - NG: `→ Error occurred`
-   - OK: `→ Check GEMINI_API_KEY in .env`
+   - OK: `→ Check CPA_API_KEY in .env`
    - OK: `→ Check bot permissions (MANAGE_MESSAGES)`
 
 3. **不明なエラーやデバッグ用の完全スタックトレースは DB（bot_events）に書き込む**
