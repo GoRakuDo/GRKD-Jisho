@@ -15,8 +15,8 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
 
   // LLM
-  GEMINI_API_KEY: z.string().min(1),
-  OPENROUTER_API_KEY: z.string().min(1),
+  CPA_API_KEY: z.string().min(1),
+  OPENROUTER_API_KEY: z.string().optional(),
 
   // Ops
   CACHE_REFRESH_MAX_ROWS: z.coerce.number().int().min(0).max(10000).default(100),

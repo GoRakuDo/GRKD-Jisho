@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PRIMARY_LLM_MODEL } from "../../config/llm-model";
 
 // ── 完全 mock: db, schema, 関数エクスポートを全てmock化 ──
 // importOriginal を使わない = postgres 接続が発生しない
@@ -27,9 +26,9 @@ const makeResult = (overrides: Partial<SearchResult> = {}): SearchResult => ({
   id: "42",
   query: "test",
   roleKey: "indonesian",
-  modelName: PRIMARY_LLM_MODEL,
-  modelDisplayName: "Gemma 4 31B",
-  modelProvider: "OpenRouter",
+  modelName: "gemini-3.7-flash-high",
+  modelDisplayName: "Gemini 3.7 Flash High",
+  modelProvider: "CPA",
   promptVersion: "v1",
   isManualOverride: false,
   isDeleteProtected: false,

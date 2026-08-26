@@ -17,12 +17,15 @@ export interface LookupResult {
   deinflectedFrom?: string;
 }
 
-export interface CacheKey {
+export interface CacheLookupKey {
   normalizedQuery: string;
   dictionaryId: number;
   entryId: bigint;
   roleKey: RoleKey;
   promptVersion: string;
+}
+
+export interface CacheKey extends CacheLookupKey {
   /** Save-only audit metadata (2026-06-21: not part of the lookup key). */
   promptContentHash: string;
   modelName: string;

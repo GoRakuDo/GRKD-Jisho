@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PRIMARY_LLM_MODEL } from "../../config/llm-model";
 
 // ── 呼び出しカウントで戻り値を切り替えられるDBモック ──
 const { mockDb, mockSchema, setDbResults } = vi.hoisted(() => {
@@ -58,7 +57,7 @@ const baseKey: CacheKey = {
   roleKey: "indonesian",
   promptVersion: "v1",
   promptContentHash: "hash-v1",
-  modelName: PRIMARY_LLM_MODEL,
+  modelName: "gemini-3.7-flash-high",
 };
 
 describe("getCachedResponse", () => {
@@ -76,7 +75,7 @@ describe("getCachedResponse", () => {
       roleKey: "indonesian",
       promptVersion: "v1",
       promptContentHash: "hash-v1",
-      modelName: PRIMARY_LLM_MODEL,
+      modelName: "gemini-3.7-flash-high",
       responseText: "answer",
       isManualOverride: false,
       query: "test",
@@ -104,7 +103,7 @@ describe("getCachedResponse", () => {
       roleKey: "indonesian",
       promptVersion: "v1",
       promptContentHash: "hash-v1",
-      modelName: PRIMARY_LLM_MODEL,
+      modelName: "gemini-3.7-flash-high",
       responseText: "manual answer",
       isManualOverride: true,
       query: "test",
@@ -128,7 +127,7 @@ describe("getCachedResponse", () => {
       roleKey: "indonesian",
       promptVersion: "v1",
       promptContentHash: "hash-v1-OLD",
-      modelName: PRIMARY_LLM_MODEL,
+      modelName: "gemini-3.7-flash-high",
       responseText: "old prompt answer",
       isManualOverride: false,
       query: "test",
@@ -184,7 +183,7 @@ describe("saveResponse", () => {
       roleKey: "indonesian",
       promptVersion: "v1",
       promptContentHash: "hash-v1",
-      modelName: PRIMARY_LLM_MODEL,
+      modelName: "gemini-3.7-flash-high",
       responseText: "saved",
       isManualOverride: false,
       query: "test",

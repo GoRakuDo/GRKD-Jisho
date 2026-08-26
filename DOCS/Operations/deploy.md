@@ -22,7 +22,7 @@
 
 - Docker / Docker Compose
 - Discord Application（Bot + OAuth2）の登録済み
-- Gemini API Key（OpenRouter は fallback）
+- CPA API Key（CLI Proxy API 経由）
 - Node.js 20 LTS（ローカル開発のみ）
 
 ---
@@ -34,7 +34,7 @@
 ```bash
 # .env を作成
 cp .env.example .env
-# .env を編集して必要な値を入力（DISCORD_TOKEN, GEMINI_API_KEY など）
+# .env を編集して必要な値を入力（DISCORD_TOKEN, CPA_API_KEY など）
 
 # DB を起動
 docker compose up -d postgres
@@ -66,7 +66,7 @@ pnpm web:dev
 | `DISCORD_GUILD_ID` | ✅ | 管理する Discord Server ID |
 | `DISCORD_ALLOWED_CHANNELS` | ✅ | Bot が応答するチャンネルID（カンマ区切り） |
 | `DATABASE_URL` | ✅ | PostgreSQL接続文字列 |
-| `GEMINI_API_KEY` | ✅ | Gemini LLM API Key |
+| `CPA_API_KEY` | ✅ | CPA (CLI Proxy API) LLM API Key |
 | `DISCORD_CLIENT_SECRET` | Web UI使用時 | Discord OAuth2 Client Secret |
 | `SESSION_SECRET` | Web UI使用時 | 32文字以上のセッション秘密鍵 |
 | `WEB_BASE_URL` | Web UI使用時 | OAuth callback の公開URL |

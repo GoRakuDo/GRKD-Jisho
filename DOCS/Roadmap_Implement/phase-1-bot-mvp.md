@@ -1751,3 +1751,38 @@ LLM の生成結果が Discord の embed description 制限（4096文字）を�
 - これは250文字以上あるため `too-short` では止まらない。文字数ではなく「辞書カードの形が壊れているか」を見る `Output Shape Guard` を追加する。
 - 初期 fail 条件は、観測済みの壊れ marker（code block wrapper, `Romaji:`, `sample translation`, `カスタムメッセージ`, `### 1. 主なポイント`, `Aturan keseluru:` など）に限定する。
 - 追加で、検索語が `これ` / `それ` / `あれ` ではないのに、本文中で `「それ」` / `「これ」` / `「あれ」` が3回以上出る場合は、別語が主役になった可能性が高いため ReAsk する。
+
+---
+
+## 26. LLM models.json × CPA Routing Implementation — 2026-08-26
+
+設計: `DOCS/Design/llm-models-routing-cpa.md`（docs-first commit `f28d242` で確定済み）。全 LLM 呼び出しを OpenAI 互換 `/v1/chat/completions` に統一し、`models.json` priority 順で Kasou CPA（127.0.0.1:8317）へルーティングする。
+
+### 実装内容
+
+- `packages/bot/src/config/models.json` 新規。初期優先順は `gemini-3.7-flash-high`(0) → `gemini-3-flash`(1) → `gpt-oss-120b-medium`(2)。全 entry に暫定 `timeoutMs: 60000` を明示（デフォルト 150s のままだと最悪系で Discord interaction token 15分を超過するため。Kasou 実測後に調整）。
+- `config/llm-models.ts` 新規。zod 検証（baseUrl は zod v3 のため `z.string().url()`、web パッケージの `z.url()` 規約とは別）・priority 昇順ソート・sampling 定数（temperature=0.70 / top_p=0.8）移管。ロード失敗時は §17 形式のヒント付き console.error 後 rethrow。
+- `services/llm.service.ts` 統一。`callGemini` / `callOpenRouter` 廃止 → `callChatCompletions(modelEntry, prompt)` 1本化。priority 昇順フォールバック、同一モデル ReAsk 最大2回 → 次 priority へ、全滅時は lastGuardError 優先 throw。`source` 型は `"gemini"|"openrouter"` ユニオンから model id 文字列へ。
+- `config/llm-model.ts` 削除。
+- env 変更: `GEMINI_API_KEY` 削除、`CPA_API_KEY` 必須追加、`OPENROUTER_API_KEY` 任意化（bot env.ts / db env-schema.ts / .env.example / Operations docs 3ファイルを同期更新）。
+- `types.ts`: `CacheLookupKey`（lookup 用5要素）と `CacheKey`（save 用 audit メタ合成）を分離。これにより `response_cache.model_name` に実際の生成モデル id が保存されるようになった（旧実装は PRIMARY 固定値を保存していた）。
+- `events/messageCreate.ts`: ボットへの Reply ガード（`reference.messageId && mentions.repliedUser.id === botId` で無視。明示的 @bot タグでも返信の場合は反応しない仕様）＋本文中 `@here` / `@everyone` の防御的 strip ＋ modelName 監査分離。
+- `commands/definisi.command.ts` 新規。一般ユーザー向け `/definisi word:<string>`（guild のみ、許可チャンネル限定、公開返信 defer→edit、rate limit はメンション経由と共有、trace_id + lookup_logs + incrementUsage 実施、messageId には interaction.id を使用）。orchestration は意図的に messageCreate から切り出さず service 関数再利用で実装（回帰リスク封じ込め。DRY 化は将来 refactor 項目）。
+- `services/analytics.service.ts`: llm_source 集計を `ilike '%gemini%'` / 非 gemini 枠へ最小修正（SQLite スキーマ維持。列名と実態の不一致は既知の許容 drift）。
+
+### 検証
+
+- `tsc --noEmit`: bot / db / mcp 全部エラーなし
+- vitest: 20 ファイル 214 テスト全パス（新規: definisi コマンド一式、models.json ローダ、priority fallback、guard ReAsk、返信ガード、@here strip、「最終モデル transport 失敗でも先行 guard error を優先 throw」）
+
+### レビュー
+
+- code-reviewer 1 回目: Approve with changes。MED-1 timeout 予算（→ timeoutMs=60000 明示で対応）、MED-2 パイプライン重複（→ 意図的トレードオフとして将来 refactor に記録）、LOW 数件（ローダエラーメッセージ・baseUrl 検証・優先 throw テストは今回対応済み）。
+- 発覚・修正済みバグ: definisi.command.ts が promptContentHash を空文字ハードコードしており saveResponse の監査メタが壊れる問題 → messageCreate と同じ sha256 計算に統一。
+
+### 残タスク
+
+- [ ] Kasou `.env` へ `CPA_API_KEY` 設定 + Bot 再起動
+- [ ] `/definisi` の Guild コマンド登録（register-commands 実行）
+- [ ] Discord 実機確認（mention path /definisi path、cache hit、fallback 切替、rate limit）
+- [ ] Kasou 実測後の `timeoutMs` 見直しと MASTER_PLAN 性能目標（LLM生成5秒以内）との整合確認

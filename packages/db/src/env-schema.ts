@@ -55,7 +55,7 @@ export const botRequiredVars = [
   "DISCORD_GUILD_ID",
   "DISCORD_ALLOWED_CHANNELS",
   "DATABASE_URL",
-  "GEMINI_API_KEY",
+  "CPA_API_KEY",
 ] as const;
 
 /**

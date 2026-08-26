@@ -29,7 +29,7 @@ Phase 2: 環境変数収集（対話式）
   1. Discord Token → 入力 or EnterでWebブラウザ起動案内
   2. Discord Client ID → 入力
   3. Discord Client Secret → 入力
-  4. GEMINI_API_KEY → 入力
+  4. CPA_API_KEY → 入力
   5. OPENROUTER_API_KEY → 空Enterでスキップ（任意）
   6. SESSION_SECRET → 空Enterで自動生成（32文字 hex）
   7. WEB_BASE_URL → 空Enterで自動検出（IP自動取得 + :4321）
@@ -123,7 +123,7 @@ DISCORD_ALLOWED_CHANNELS=123...,456...
 SESSION_SECRET=auto-generated-hex
 WEB_BASE_URL=http://192.168.100.46:4321
 DATABASE_URL=postgresql://grkd_jisho:***@localhost:5432/grkd_jisho
-GEMINI_API_KEY=***
+CPA_API_KEY=***
 ```
 
 ## 工数見積もり

@@ -1,5 +1,6 @@
 import type { Command } from "./types.js";
 import { pingCommand } from "./ping.command.js";
+import { definisiCommand } from "./definisi.command.js";
 import { searchJishoCommand } from "./search-jisho.command.js";
 import { editJishoCommand } from "./edit-jisho.command.js";
 import { refreshJishoCommand } from "./refresh-jisho.command.js";
@@ -25,6 +26,7 @@ function register(cmd: Command): void {
 
 // Step A
 register(pingCommand);
+register(definisiCommand);
 // Step B
 register(searchJishoCommand);
 register(editJishoCommand);

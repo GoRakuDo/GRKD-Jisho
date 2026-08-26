@@ -65,7 +65,8 @@ Kasou で稼働済み（2026-08-26 確認）。
 - `timeoutMs` / `maxAttempts` は entry ごとの任意フィールド。未指定時のデフォルトは
   `timeoutMs=150000` / `maxAttempts=2`（現行 OpenRouter 相当）。
   フェイルオーバー時間の予算を短くしたい場合は、初期 entry に明示的な `timeoutMs`
-  （例: 30000〜60000ms）を設定できる。初期値は実装時に実測で決定する。
+  （例: 30000〜60000ms）を設定できる。
+  **→ 2026-08-26 実装時、全 entry に暫定 `timeoutMs: 60000` を設定済み**（最悪系で Discord interaction token 15分を超過させないため）。Kasou 実測後に調整する。
 - sampling パラメータは全モデル共通で `temperature=0.70`, `top_p=0.8` を維持。
 
 ## 4. 初期優先順（確定）
@@ -146,15 +147,16 @@ Discord の Reply 機能で Bot メッセージに返信すると、明示的な
 
 ## 10. 実装チェックリスト（後続作業）
 
-- [ ] `models.json` + zod ローダ実装（priority 昇順ソート）
-- [ ] `llm.service.ts` 統一（`callChatCompletions` 化、guard 対応、source 型変更）
-- [ ] `config/llm-model.ts` の廃止（sampling defaults・timeout/attempt 定数はローダ側へ移行し二重化を防ぐ）
-- [ ] `env.ts` 更新（`CPA_API_KEY` 追加、`GEMINI_API_KEY` 削除、`OPENROUTER_API_KEY` 任意化）
-- [ ] `/definisi` コマンド追加 + `commands/index.ts` 登録
-- [ ] messageCreate 返信ガード（Bot への Reply を無視）
+- [x] `models.json` + zod ローダ実装（priority 昇順ソート）
+- [x] `llm.service.ts` 統一（`callChatCompletions` 化、guard 対応、source 型変更）
+- [x] `config/llm-model.ts` の廃止（sampling defaults・timeout/attempt 定数はローダ側へ移行し二重化を防ぐ）
+- [x] `env.ts` 更新（`CPA_API_KEY` 追加、`GEMINI_API_KEY` 削除、`OPENROUTER_API_KEY` 任意化）
+- [x] `/definisi` コマンド追加 + `commands/index.ts` 登録
+- [x] messageCreate 返信ガード（Bot への Reply を無視）
 - [ ] Kasou `.env` へ `CPA_API_KEY` 設定
-- [ ] DOCS/Operations 配下の env 記載を `CPA_API_KEY` に更新（deploy.md / deploy-kasou.md / setup-full-design.md。deploy-improvements.md は歴史記録のため対象外）
-- [ ] 実装時に MASTER_PLAN の性能目標「応答時間（LLM 生成）5秒以内」と timeout 設定の整合を見直す
+- [x] DOCS/Operations 配下の env 記載を `CPA_API_KEY` に更新（deploy.md / deploy-kasou.md / setup-full-design.md。deploy-improvements.md は歴史記録のため対象外）
+- [ ] 実装時に MASTER_PLAN の性能目標「応答時間（LLM 生成）5秒以内」と timeout 設定の整合を見直す（暫定 `timeoutMs=60000` 設定済み、Kasou 実測後に確定）
+- [ ] Discord 実機確認（mention path・/definisi・cache hit・fallback 切替・rate limit）
 
 > **対象外:** `DOCS/Roadmap_Implement/phase-*.md` の旧 provider 名・env 記載は Phase 完了済みの実装記録（歴史文書）であり、本設計の更新対象外とする。
-- [ ] 型チェック + テスト + Discord 実機確認（rate limit / cache hit / fallback 切替）
+> **実装記録:** phase-1-bot-mvp.md §26 を参照。

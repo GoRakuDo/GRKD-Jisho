@@ -1,8 +1,8 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
-import type { CacheKey } from "../types.js";
+import type { CacheKey, CacheLookupKey } from "../types.js";
 
-export async function getCachedResponse(key: CacheKey) {
+export async function getCachedResponse(key: CacheLookupKey) {
   const [row] = await db
     .select()
     .from(schema.responseCache)

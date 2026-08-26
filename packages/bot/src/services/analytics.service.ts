@@ -84,9 +84,9 @@ export async function aggregateHourly(): Promise<void> {
       cacheMisses:
         sql<number>`count(*) filter (where ${schema.lookupLogs.cacheHit} = false and ${schema.lookupLogs.responseCacheId} is not null)`,
       llmGemini:
-        sql<number>`count(*) filter (where ${schema.lookupLogs.llmSource} = 'gemini')`,
+        sql<number>`count(*) filter (where ${schema.lookupLogs.llmSource} ilike '%gemini%')`,
       llmOpenrouter:
-        sql<number>`count(*) filter (where ${schema.lookupLogs.llmSource} = 'openrouter')`,
+        sql<number>`count(*) filter (where ${schema.lookupLogs.llmSource} is not null and ${schema.lookupLogs.llmSource} not ilike '%gemini%')`,
     })
     .from(schema.lookupLogs)
     .where(and(gte(schema.lookupLogs.createdAt, since), lt(schema.lookupLogs.createdAt, until)))

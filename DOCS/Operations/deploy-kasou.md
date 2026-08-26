@@ -341,7 +341,7 @@ DISCORD_GUILD_ID=your_guild_id
 DISCORD_ALLOWED_CHANNELS=channel_id_1,channel_id_2
 DISCORD_CLIENT_SECRET=your_client_secret
 SESSION_SECRET=your_32char_random_secret
-GEMINI_API_KEY=your_gemini_api_key
+CPA_API_KEY=your_cpa_api_key
 WEB_BASE_URL=http://192.168.100.46:4321
 ```
 
