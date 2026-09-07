@@ -15,12 +15,7 @@
     "bot:register": "bun --filter @grkd-jisho/bot register-commands",
     "db:backup": "bun --filter @grkd-jisho/db db:backup",
     "db:backup:dry": "bun --filter @grkd-jisho/db db:backup:dry",
-    "db:backup:list": "bun --filter @grkd-jisho/db db:backup:list",
-    "review:approve": "node scripts/review/approve.mjs",
-    "review:check": "node scripts/review/check.mjs",
-    "hooks:install": "node scripts/hooks/install.mjs",
-    "reindex": "pwsh -NoProfile -ExecutionPolicy Bypass -File reindex.ps1",
-    "push:reindex": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/push-with-reindex.ps1"
+    "db:backup:list": "bun --filter @grkd-jisho/db db:backup:list"
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0"
