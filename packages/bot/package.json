@@ -5,12 +5,12 @@
   "main": "./src/index.ts",
   "type": "module",
   "scripts": {
-    "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
+    "dev": "bun --env-file=../../.env --watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "bun --env-file=../../.env run src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "register-commands": "dotenv -e ../../.env -- tsx src/scripts/register-commands.ts"
+    "register-commands": "bun --env-file=../../.env run src/scripts/register-commands.ts"
   },
   "dependencies": {
     "@grkd-jisho/db": "workspace:*",
