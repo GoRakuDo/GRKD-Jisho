@@ -126,6 +126,16 @@ async function callChatCompletionsOnce(
   const timeoutId = setTimeout(() => controller.abort(), modelEntry.timeoutMs);
 
   try {
+    const bodyPayload: Record<string, unknown> = {
+      model: modelEntry.id,
+      messages: [{ role: "user", content: prompt }],
+      temperature: DEFAULT_LLM_TEMPERATURE,
+      top_p: DEFAULT_LLM_TOP_P,
+    };
+    if (modelEntry.reasoningEffort) {
+      bodyPayload.reasoning_effort = modelEntry.reasoningEffort;
+    }
+
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -133,12 +143,7 @@ async function callChatCompletionsOnce(
         Authorization: `Bearer ${apiKey}`,
       },
       signal: controller.signal,
-      body: JSON.stringify({
-        model: modelEntry.id,
-        messages: [{ role: "user", content: prompt }],
-        temperature: DEFAULT_LLM_TEMPERATURE,
-        top_p: DEFAULT_LLM_TOP_P,
-      }),
+      body: JSON.stringify(bodyPayload),
     });
 
     if (!response.ok) {

@@ -1760,7 +1760,7 @@ LLM の生成結果が Discord の embed description 制限（4096文字）を�
 
 ### 実装内容
 
-- `packages/bot/src/config/models.json` 新規。初期優先順は `gemini-3.7-flash-high`(0) → `gemini-3-flash`(1) → `gpt-oss-120b-medium`(2)。全 entry に暫定 `timeoutMs: 60000` を明示（デフォルト 150s のままだと最悪系で Discord interaction token 15分を超過するため。Kasou 実測後に調整）。
+- `packages/bot/src/config/models.json` 新規。初期優先順はユーザー指定により `openreouter-grkd-jisho-gemma-4-31b-it`(0) → `google-grkd-jisho-gemini-flash-lite`(1) の2モデル構成（両モデルとも reasoningEffort: high、timeoutMs: 60000）。
 - `config/llm-models.ts` 新規。zod 検証（baseUrl は zod v3 のため `z.string().url()`、web パッケージの `z.url()` 規約とは別）・priority 昇順ソート・sampling 定数（temperature=0.70 / top_p=0.8）移管。ロード失敗時は §17 形式のヒント付き console.error 後 rethrow。
 - `services/llm.service.ts` 統一。`callGemini` / `callOpenRouter` 廃止 → `callChatCompletions(modelEntry, prompt)` 1本化。priority 昇順フォールバック、同一モデル ReAsk 最大2回 → 次 priority へ、全滅時は lastGuardError 優先 throw。`source` 型は `"gemini"|"openrouter"` ユニオンから model id 文字列へ。
 - `config/llm-model.ts` 削除。

@@ -1,7 +1,20 @@
 {
   "models": [
-    { "id": "gemini-3.7-flash-high", "priority": 0, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000 },
-    { "id": "gemini-3-flash", "priority": 1, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000 },
-    { "id": "gpt-oss-120b-medium", "priority": 2, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000 }
+    {
+      "id": "openreouter-grkd-jisho-gemma-4-31b-it",
+      "priority": 0,
+      "baseUrl": "http://127.0.0.1:8317/v1",
+      "apiKeyEnv": "CPA_API_KEY",
+      "timeoutMs": 60000,
+      "reasoningEffort": "high"
+    },
+    {
+      "id": "google-grkd-jisho-gemini-flash-lite",
+      "priority": 1,
+      "baseUrl": "http://127.0.0.1:8317/v1",
+      "apiKeyEnv": "CPA_API_KEY",
+      "timeoutMs": 60000,
+      "reasoningEffort": "high"
+    }
   ]
 }

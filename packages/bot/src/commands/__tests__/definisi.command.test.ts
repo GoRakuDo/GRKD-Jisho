@@ -149,7 +149,7 @@ describe("definisiCommand", () => {
     getCachedResponseMock.mockResolvedValue(null);
     generateWithLanguageGuardrailsMock.mockResolvedValue({
       text: "Makan makanan",
-      source: "gemini-3.7-flash-high",
+      source: "openreouter-grkd-jisho-gemma-4-31b-it",
     });
     saveResponseMock.mockResolvedValue({ id: BigInt(100) });
 
@@ -183,7 +183,7 @@ describe("definisiCommand", () => {
     expect(generateWithLanguageGuardrailsMock).toHaveBeenCalledTimes(1);
     expect(saveResponseMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        modelName: "gemini-3.7-flash-high",
+        modelName: "openreouter-grkd-jisho-gemma-4-31b-it",
         responseText: "Makan makanan",
       }),
     );
@@ -193,7 +193,7 @@ describe("definisiCommand", () => {
     expect(recordLookupMock).toHaveBeenCalledWith(
       expect.objectContaining({
         query: "食べる",
-        llmSource: "gemini-3.7-flash-high",
+        llmSource: "openreouter-grkd-jisho-gemma-4-31b-it",
         responseCacheId: BigInt(100),
       }),
     );

@@ -38,7 +38,8 @@ Kasou で稼働済み（2026-08-26 確認）。
 
 | 系統 | モデル |
 |---|---|
-| Gemini flash | `gemini-3.7-flash-high`, `gemini-3.6-flash-high`, `gemini-3-flash`, `gemini-3.1-flash-lite`, `gemini-3.5-flash-low`, `gemini-3.5-flash-extra-low` |
+| OpenRouter / Gemma | `openreouter-grkd-jisho-gemma-4-31b-it`（gemma-4-31b-it:free, reasoning high） |
+| Gemini flash | `google-grkd-jisho-gemini-flash-lite`（flash-lite-latest, reasoning high）, `gemini-3.7-flash-high`, `gemini-3.6-flash-high`, `gemini-3-flash`, `gemini-3.1-flash-lite`, `gemini-3.5-flash-low`, `gemini-3.5-flash-extra-low` |
 | Gemini pro | `gemini-3.1-pro-low`, `gemini-pro-agent` |
 | Claude | `claude-opus-4-6-thinking`, `claude-sonnet-4-6` |
 | その他 | `gpt-oss-120b-medium`, `gemini-3.1-flash-image` |
@@ -52,9 +53,8 @@ Kasou で稼働済み（2026-08-26 確認）。
 ```json
 {
   "models": [
-    { "id": "gemini-3.7-flash-high", "priority": 0, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY" },
-    { "id": "gemini-3-flash",        "priority": 1, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY" },
-    { "id": "gpt-oss-120b-medium",   "priority": 2, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY" }
+    { "id": "openreouter-grkd-jisho-gemma-4-31b-it", "priority": 0, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "reasoningEffort": "high" },
+    { "id": "google-grkd-jisho-gemini-flash-lite",    "priority": 1, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "reasoningEffort": "high" }
   ]
 }
 ```
@@ -67,15 +67,16 @@ Kasou で稼働済み（2026-08-26 確認）。
   フェイルオーバー時間の予算を短くしたい場合は、初期 entry に明示的な `timeoutMs`
   （例: 30000〜60000ms）を設定できる。
   **→ 2026-08-26 実装時、全 entry に暫定 `timeoutMs: 60000` を設定済み**（最悪系で Discord interaction token 15分を超過させないため）。Kasou 実測後に調整する。
+- `reasoningEffort` は entry ごとの任意フィールド（`"low" | "medium" | "high"`）。
+  指定時はリクエストボディに `reasoning_effort` を付与し、未指定時は省略する。
 - sampling パラメータは全モデル共通で `temperature=0.70`, `top_p=0.8` を維持。
 
 ## 4. 初期優先順（確定）
 
-| priority | モデル | 役割 |
-|---|---|---|
-| 0 | `gemini-3.7-flash-high` | 第一候補（辞書説明生成の主力） |
-| 1 | `gemini-3-flash` | 第二候補 |
-| 2 | `gpt-oss-120b-medium` | 第三候補 |
+| priority | モデル | 役割 | 備考 |
+|---|---|---|---|
+| 0 | `openreouter-grkd-jisho-gemma-4-31b-it` | 第一候補（辞書説明生成の主力） | OpenRouter経由、reasoningEffort: high |
+| 1 | `google-grkd-jisho-gemini-flash-lite` | 第二候補（高速フォールバック） | Gemini API直結、reasoningEffort: high |
 
 OpenRouter モデルは後日、同一の仕組みで優先順リストへ追加する。
 
@@ -85,7 +86,9 @@ OpenRouter モデルは後日、同一の仕組みで優先順リストへ追加
 
 - `callGemini()`（Gemini ネイティブ REST）/ `callOpenRouter()`（OpenRouter 専用）を廃止し、
   `callChatCompletions(modelEntry, prompt)` 1 本に統一する。
-- reasoning 分離: OpenRouter 固有の `reasoning.exclude` は送らない。
+- reasoning 制御: OpenRouter 固有のレガシー `reasoning.exclude` は送らない。
+  CPA 経由の thinking 制御には標準パラメータ `reasoning_effort` を使用し、
+  各モデルの `reasoningEffort` 設定（例: `"high"`）に応じてリクエストボディに付与する。
   CPA 経由の応答は `message.content` のみを採用し、壊れた出力は既存の
   Output Quality Guard が検知する。
 - Guardrail 挙動は維持: language guard / output quality guard → 同一モデルで ReAsk 最大 2 回

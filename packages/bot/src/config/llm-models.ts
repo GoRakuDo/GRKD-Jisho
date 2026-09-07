@@ -13,6 +13,7 @@ export const llmModelEntrySchema = z.object({
   apiKeyEnv: z.string().min(1),
   timeoutMs: z.number().int().positive().optional().default(150_000),
   maxAttempts: z.number().int().positive().optional().default(2),
+  reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
 });
 
 export const modelsConfigSchema = z.object({

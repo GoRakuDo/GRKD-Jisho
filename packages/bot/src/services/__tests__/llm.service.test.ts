@@ -27,7 +27,7 @@ describe("loadLlmModels", () => {
       models: [
         { id: "model-c", priority: 2, baseUrl: "http://127.0.0.1:8317/v1", apiKeyEnv: "CPA_API_KEY" },
         { id: "model-a", priority: 0, baseUrl: "http://127.0.0.1:8317/v1", apiKeyEnv: "CPA_API_KEY" },
-        { id: "model-b", priority: 1, baseUrl: "http://127.0.0.1:8317/v1", apiKeyEnv: "CPA_API_KEY", timeoutMs: 30000, maxAttempts: 3 },
+        { id: "model-b", priority: 1, baseUrl: "http://127.0.0.1:8317/v1", apiKeyEnv: "CPA_API_KEY", timeoutMs: 30000, maxAttempts: 3, reasoningEffort: "high" },
       ],
     });
 
@@ -37,11 +37,13 @@ describe("loadLlmModels", () => {
     expect(models[0]?.priority).toBe(0);
     expect(models[0]?.timeoutMs).toBe(150_000);
     expect(models[0]?.maxAttempts).toBe(2);
+    expect(models[0]?.reasoningEffort).toBeUndefined();
 
     expect(models[1]?.id).toBe("model-b");
     expect(models[1]?.priority).toBe(1);
     expect(models[1]?.timeoutMs).toBe(30000);
     expect(models[1]?.maxAttempts).toBe(3);
+    expect(models[1]?.reasoningEffort).toBe("high");
 
     expect(models[2]?.id).toBe("model-c");
     expect(models[2]?.priority).toBe(2);
@@ -130,7 +132,7 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
-    expect(result.source).toBe("gemini-3.7-flash-high");
+    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const firstCall = fetchMock.mock.calls[0] as unknown as [RequestInfo | URL, RequestInit?];
@@ -138,7 +140,7 @@ describe("generate", () => {
     expect(headers.Authorization).toBe("Bearer test-cpa-key");
   });
 
-  it("OpenAI 互換 body 形式でリクエストを送り、reasoning フィールドは含めない", async () => {
+  it("OpenAI 互換 body 形式でリクエストを送り、reasoningEffort を reasoning_effort として送る（legacy reasoning は含めない）", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       choices: [
         {
@@ -166,7 +168,7 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
-    expect(result.source).toBe("gemini-3.7-flash-high");
+    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const firstCall = fetchMock.mock.calls[0] as unknown as [RequestInfo | URL, RequestInit?];
@@ -175,10 +177,11 @@ describe("generate", () => {
       messages: Array<{ role: string; content: string }>;
       temperature?: number;
       top_p?: number;
+      reasoning_effort?: "low" | "medium" | "high";
       reasoning?: unknown;
     };
 
-    expect(requestBody.model).toBe("gemini-3.7-flash-high");
+    expect(requestBody.model).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
     expect(requestBody.messages[0]?.role).toBe("user");
     expect(requestBody.messages[0]?.content).toContain("Q=これ / これ");
     expect(requestBody.messages[0]?.content).toContain("R=これ");
@@ -187,7 +190,48 @@ describe("generate", () => {
     expect(requestBody.messages[0]?.content).toContain("VER=v9");
     expect(requestBody.temperature).toBe(DEFAULT_LLM_TEMPERATURE);
     expect(requestBody.top_p).toBe(DEFAULT_LLM_TOP_P);
+    expect(requestBody.reasoning_effort).toBe("high");
     expect(requestBody.reasoning).toBeUndefined();
+  });
+
+  it("reasoningEffort 未設定のモデルでは reasoning_effort をリクエストに含めない", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      choices: [
+        {
+          message: {
+            content: `【これ】\n${VALID_DAILY_RESPONSE}`,
+          },
+        },
+      ],
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const customModels: LlmModelEntry[] = [
+      { id: "no-reasoning-model", priority: 0, baseUrl: "http://127.0.0.1:8317/v1", apiKeyEnv: "CPA_API_KEY", timeoutMs: 5000, maxAttempts: 1 },
+    ];
+
+    const result = await generate({
+      roleKey: "indonesian",
+      query: "これ",
+      dictionaryForm: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    }, customModels);
+
+    expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
+    expect(result.source).toBe("no-reasoning-model");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const firstCall = fetchMock.mock.calls[0] as unknown as [RequestInfo | URL, RequestInit?];
+    const requestBody = JSON.parse(firstCall[1]?.body as string) as { reasoning_effort?: unknown };
+    expect(requestBody.reasoning_effort).toBeUndefined();
   });
 
   it("JSON parse failure は同一モデルで maxAttempts 回リトライする", async () => {
@@ -223,15 +267,15 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
-    expect(result.source).toBe("gemini-3.7-flash-high");
+    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("priority 0 モデルが失敗したら priority 1 モデルにフォールバックする", async () => {
     const fetchMock = vi.fn()
-      // gemini-3.7-flash-high (priority 0) fails 500
+      // openreouter-grkd-jisho-gemma-4-31b-it (priority 0) fails 500
       .mockResolvedValueOnce(new Response("Model unavailable", { status: 500 }))
-      // gemini-3-flash (priority 1) succeeds
+      // google-grkd-jisho-gemini-flash-lite (priority 1) succeeds
       .mockResolvedValueOnce(new Response(JSON.stringify({
         choices: [
           {
@@ -259,12 +303,12 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
-    expect(result.source).toBe("gemini-3-flash");
+    expect(result.source).toBe("google-grkd-jisho-gemini-flash-lite");
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     const secondCall = fetchMock.mock.calls[1] as unknown as [RequestInfo | URL, RequestInit?];
     const secondBody = JSON.parse(secondCall[1]?.body as string) as { model: string };
-    expect(secondBody.model).toBe("gemini-3-flash");
+    expect(secondBody.model).toBe("google-grkd-jisho-gemini-flash-lite");
   });
 
   it("全モデルがタイムアウトしたら全滅エラーを投げる", async () => {
@@ -284,8 +328,8 @@ describe("generate", () => {
       promptVersion: "v9",
     })).rejects.toThrow(/timed out/i);
 
-    // 3 models * 2 attempts = 6 calls
-    expect(fetchMock).toHaveBeenCalledTimes(6);
+    // 2 models * 2 attempts = 4 calls
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });
 
@@ -318,7 +362,7 @@ describe("generateWithLanguageGuardrails", () => {
     });
 
     expect(result.text).toBe(VALID_DAILY_RESPONSE);
-    expect(result.source).toBe("gemini-3.7-flash-high");
+    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -363,13 +407,13 @@ describe("generateWithLanguageGuardrails", () => {
     });
 
     expect(result.text).toBe(VALID_DAILY_RESPONSE);
-    expect(result.source).toBe("gemini-3.7-flash-high");
+    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("同一モデルで ReAsk 2回失敗したら次の priority モデルへフォールバックする", async () => {
     const fetchMock = vi.fn()
-      // gemini-3.7-flash-high: initial + 2 reasks all fail quality guard
+      // openreouter-grkd-jisho-gemma-4-31b-it: initial + 2 reasks all fail quality guard
       .mockResolvedValueOnce(new Response(JSON.stringify({
         choices: [{ message: { content: "Quality fail 1" } }],
       }), { status: 200, headers: { "Content-Type": "application/json" } }))
@@ -379,7 +423,7 @@ describe("generateWithLanguageGuardrails", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({
         choices: [{ message: { content: "Quality fail 3" } }],
       }), { status: 200, headers: { "Content-Type": "application/json" } }))
-      // gemini-3-flash (priority 1): initial succeeds
+      // google-grkd-jisho-gemini-flash-lite (priority 1): initial succeeds
       .mockResolvedValueOnce(new Response(JSON.stringify({
         choices: [{ message: { content: VALID_DAILY_RESPONSE } }],
       }), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -398,7 +442,7 @@ describe("generateWithLanguageGuardrails", () => {
     });
 
     expect(result.text).toBe(VALID_DAILY_RESPONSE);
-    expect(result.source).toBe("gemini-3-flash");
+    expect(result.source).toBe("google-grkd-jisho-gemini-flash-lite");
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 
