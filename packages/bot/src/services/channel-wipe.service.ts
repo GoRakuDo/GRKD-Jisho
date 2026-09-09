@@ -3,6 +3,11 @@ import { type TextChannel } from "discord.js";
 import { db, schema } from "@grkd-jisho/db";
 import { eq } from "drizzle-orm";
 import { traceEvent } from "./observability.service.js";
+import {
+  formatWipeGuide,
+  resolveUsageGuideImagePath,
+  WIPE_GUIDE_IMAGE_FILENAME,
+} from "./reply-formatter.js";
 
 interface WipeResult {
   deletedCount: number;
@@ -83,7 +88,27 @@ export async function wipeChannel(channel: TextChannel): Promise<WipeResult> {
       .where(eq(schema.channelSettings.channelId, channel.id));
   }
 
-  // Step 4: 観測性
+  // Step 4: 使い方ガイドを自動投稿（画像が無い場合はテキストのみでフォールバック）
+  // 投稿失敗（権限不足・レート制限等）は wipe 自体の失敗にせずエラーログに留める。
+  try {
+    const guideImagePath = resolveUsageGuideImagePath();
+    const guide = formatWipeGuide(guideImagePath);
+    if (guideImagePath) {
+      await channel.send({
+        ...guide,
+        files: [{ attachment: guideImagePath, name: WIPE_GUIDE_IMAGE_FILENAME }],
+      });
+    } else {
+      await channel.send(guide);
+    }
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[Wipe] trace_id=${traceId} guide message failed on channel=${channel.id}: ${reason} → Check SEND_MESSAGES permission`,
+    );
+  }
+
+  // Step 5: 観測性
   await traceEvent(traceId, "wipe.completed", "info", {
     channelId: channel.id,
     deletedCount: totalDeleted,
