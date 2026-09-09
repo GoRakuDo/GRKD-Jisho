@@ -31,14 +31,15 @@ LLMは、DBから取得した定義の説明係に限定する。
 
 | 領域 | 採用技術 |
 |---|---|
-| Bot | Node.js 20 LTS + TypeScript + discord.js v14 |
-| DB | PostgreSQL 16 |
-| ORM | Drizzle ORM |
-| Package Manager | pnpm workspaces |
-| LLM | OpenAI互換 `/v1/chat/completions` 統一。`models.json` の priority 順で Kasou CPA へルーティング（詳細: `DOCS/Design/llm-models-routing-cpa.md`） |
-| Web UI | Astro + React islands（複雑なテーブル操作・モーダルは vanilla JS `<script>` を許容） |
-| Agent Control Plane | MCP Server (Node.js + TypeScript) |
+| Bot Runtime | Bun 1.4.0（本番 / 開発 runtime）+ TypeScript + discord.js v14 |
+| DB | PostgreSQL 17.9（本番 Kasou）/ PostgreSQL 16-alpine（Local Docker）+ Drizzle ORM |
+| Package Manager | pnpm workspaces（依存パッケージ管理）+ Bun（実行・テスト・スクリプト） |
+| LLM | OpenAI互換 `/v1/chat/completions` 統一。`models.json` の priority 順で Kasou CPA（port 8317）へルーティング |
+| Web UI | Astro 5 + React islands + Tailwind v4 |
+| Agent Control Plane | MCP Server (Node.js / Bun + TypeScript) |
 | Local infra | Docker Compose |
+
+> **認証・秘密情報の厳守:** APIキー、パスワード、Discordトークン、シークレット類は `AGENTS.md` やコードに一切書かない。すべて環境変数（`.env`）で管理し、Gitコミットを厳禁とする。
 
 新しい技術を足す前に、既存スタックで解けない理由を書くこと。
 「便利そう」だけで依存を増やさない。
@@ -129,6 +130,19 @@ ops-job.service.ts          MCP経由の運営ジョブ処理
 - Discord ID は `string` として扱う
 - DBの `bigserial` は bigint/string 変換に注意する
 
+### 5-4. 開発コマンド
+
+日々の開発・実行は Bun を標準とする（依存管理のみ pnpm を使用）。
+
+```bash
+bun test              # 単体テスト一括実行（vitest）
+bun run dev:bot       # Bot ローカル起動（watch モード）
+bun run db:generate   # Drizzle マイグレーション生成
+bun run db:migrate    # Drizzle マイグレーション適用
+bun run bot:register  # スラッシュコマンド Discord 登録
+pnpm install          # 依存パッケージのインストール・更新
+```
+
 ---
 
 ## 6. DB方針
@@ -193,7 +207,7 @@ LLMに自由回答させない。
 `priority` 昇順で試行し、失敗時は次の priority へフォールバックする。
 初期構成は `inferx-grkd-jisho-gemma-4-31B-it`(0) → `openreouter-grkd-jisho-gemma-4-31b-it`(1) → `google-grkd-jisho-gemini-flash-lite`(2)（全モデルとも reasoningEffort: high）。
 追加の OpenRouter モデルは同じ models.json への entry 追加で組み込める。
-詳細は `DOCS/Design/llm-models-routing-cpa.md` を参照（設計確定 2026-08-26・実装前）。
+詳細は `DOCS/Design/llm-models-routing-cpa.md` を参照（2026-09-09 デプロイ完了・本番稼働中）。
 
 プロンプトでは必ず以下を渡す。
 
@@ -246,6 +260,10 @@ mention検知
 管理者以外に、編集・削除・wipe・refreshを許可しない。
 
 失敗時は基本的に ephemeral で返す。
+
+### 8-3. ユーザー返信言語
+
+BotがDiscordユーザーへ返す全メッセージ（エラー・Not Found・レートリミット超過・使い方ガイド等）は、**インドネシア語（Bahasa Indonesia）で統一**する（対象ユーザーがインドネシア語話者の学習者のため）。
 
 ---
 
@@ -302,6 +320,7 @@ Wipe対象は `channel_settings.wipe_enabled = true` のチャンネルだけ。
 ```
 
 ピン留め以外の全メッセージを100件ずつバッチ削除する。
+削除完了後、チャンネルに使い方ガイド（タグメンション＆スラッシュコマンドの説明）と添付画像（`packages/bot/assets/usage-guide.png`）を自動投稿する（画像不在時はテキストのみで安全にフォールバック）。
 
 > **戻り値:** `deletedCount` のみ。チャンネルIDは変わらないため `newChannelId` は不要。
 
@@ -569,3 +588,22 @@ console.log（情報表示）:
    - WebUI に全部出さなくてよい。人間が見やすいのは DB / console / 追跡ログ側でいい
 
 このルールは、Kasouデプロイ時に「生スタックトレースを見ても何を直せばいいかわからない」という問題を解決するために導入された。
+
+---
+
+## 18. 本番インフラ構成（Kasou MiniPC）
+
+本番環境（Kasou）の稼働構成。秘密情報は含めず、運用に必要なパス・サービス名のみを記録する。
+
+- **ホスト**: Kasou (Debian 13 Trixie)
+- **配置パス**: `/home/kasou_yoshia/GRKD-Jisho/`
+- **主要サービス**:
+  - `grkd-jisho-bot.service`: Discord Bot（Bun 1.4.0 起動、RAM 約40MB）
+  - `grkd-jisho-web.service`: Web Admin UI（Astro SSR、port 4321）
+  - `postgresql@17-main.service`: PostgreSQL 17.9（DB名: `grkd_jisho`）
+  - `grkd-jisho-db-backup.timer`: 6時間ごとの定期論理バックアップ（保存先: `/mnt/HDD/Drive1/GRKD-Jisho_DB_Backups/postgres`）
+  - `cli-proxy-api.service`: CPA（port 8317、LLMルーティングプロキシ）
+- **秘密情報・設定**:
+  - すべてホスト上の `.env` に保持し、リポジトリにはコミットしない。
+  - DB接続情報、Discordトークン、`CPA_API_KEY` 等は `.env` を参照。
+
