@@ -132,7 +132,7 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
-    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
+    expect(result.source).toBe("inferx-grkd-jisho-gemma-4-31B-it");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const firstCall = fetchMock.mock.calls[0] as unknown as [RequestInfo | URL, RequestInit?];
@@ -168,7 +168,7 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
-    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
+    expect(result.source).toBe("inferx-grkd-jisho-gemma-4-31B-it");
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     const firstCall = fetchMock.mock.calls[0] as unknown as [RequestInfo | URL, RequestInit?];
@@ -181,7 +181,7 @@ describe("generate", () => {
       reasoning?: unknown;
     };
 
-    expect(requestBody.model).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
+    expect(requestBody.model).toBe("inferx-grkd-jisho-gemma-4-31B-it");
     expect(requestBody.messages[0]?.role).toBe("user");
     expect(requestBody.messages[0]?.content).toContain("Q=これ / これ");
     expect(requestBody.messages[0]?.content).toContain("R=これ");
@@ -267,15 +267,15 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
-    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
+    expect(result.source).toBe("inferx-grkd-jisho-gemma-4-31B-it");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("priority 0 モデルが失敗したら priority 1 モデルにフォールバックする", async () => {
     const fetchMock = vi.fn()
-      // openreouter-grkd-jisho-gemma-4-31b-it (priority 0) fails 500
+      // inferx-grkd-jisho-gemma-4-31B-it (priority 0) fails 500
       .mockResolvedValueOnce(new Response("Model unavailable", { status: 500 }))
-      // google-grkd-jisho-gemini-flash-lite (priority 1) succeeds
+      // openreouter-grkd-jisho-gemma-4-31b-it (priority 1) succeeds
       .mockResolvedValueOnce(new Response(JSON.stringify({
         choices: [
           {
@@ -303,12 +303,12 @@ describe("generate", () => {
     });
 
     expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
-    expect(result.source).toBe("google-grkd-jisho-gemini-flash-lite");
+    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
     const secondCall = fetchMock.mock.calls[1] as unknown as [RequestInfo | URL, RequestInit?];
     const secondBody = JSON.parse(secondCall[1]?.body as string) as { model: string };
-    expect(secondBody.model).toBe("google-grkd-jisho-gemini-flash-lite");
+    expect(secondBody.model).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
   });
 
   it("全モデルがタイムアウトしたら全滅エラーを投げる", async () => {
@@ -328,8 +328,8 @@ describe("generate", () => {
       promptVersion: "v9",
     })).rejects.toThrow(/timed out/i);
 
-    // 2 models * 2 attempts = 4 calls
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    // 3 models * 2 attempts = 6 calls
+    expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 });
 
@@ -362,7 +362,7 @@ describe("generateWithLanguageGuardrails", () => {
     });
 
     expect(result.text).toBe(VALID_DAILY_RESPONSE);
-    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
+    expect(result.source).toBe("inferx-grkd-jisho-gemma-4-31B-it");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -407,13 +407,13 @@ describe("generateWithLanguageGuardrails", () => {
     });
 
     expect(result.text).toBe(VALID_DAILY_RESPONSE);
-    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
+    expect(result.source).toBe("inferx-grkd-jisho-gemma-4-31B-it");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("同一モデルで ReAsk 2回失敗したら次の priority モデルへフォールバックする", async () => {
     const fetchMock = vi.fn()
-      // openreouter-grkd-jisho-gemma-4-31b-it: initial + 2 reasks all fail quality guard
+      // inferx-grkd-jisho-gemma-4-31B-it: initial + 2 reasks all fail quality guard
       .mockResolvedValueOnce(new Response(JSON.stringify({
         choices: [{ message: { content: "Quality fail 1" } }],
       }), { status: 200, headers: { "Content-Type": "application/json" } }))
@@ -423,7 +423,7 @@ describe("generateWithLanguageGuardrails", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({
         choices: [{ message: { content: "Quality fail 3" } }],
       }), { status: 200, headers: { "Content-Type": "application/json" } }))
-      // google-grkd-jisho-gemini-flash-lite (priority 1): initial succeeds
+      // openreouter-grkd-jisho-gemma-4-31b-it (priority 1): initial succeeds
       .mockResolvedValueOnce(new Response(JSON.stringify({
         choices: [{ message: { content: VALID_DAILY_RESPONSE } }],
       }), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -442,7 +442,7 @@ describe("generateWithLanguageGuardrails", () => {
     });
 
     expect(result.text).toBe(VALID_DAILY_RESPONSE);
-    expect(result.source).toBe("google-grkd-jisho-gemini-flash-lite");
+    expect(result.source).toBe("openreouter-grkd-jisho-gemma-4-31b-it");
     expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 

@@ -38,6 +38,7 @@ Kasou で稼働済み（2026-08-26 確認）。
 
 | 系統 | モデル |
 |---|---|
+| Inferx / Gemma | `inferx-grkd-jisho-gemma-4-31B-it`（gemma-4-31B-it-fp8, reasoning high） |
 | OpenRouter / Gemma | `openreouter-grkd-jisho-gemma-4-31b-it`（gemma-4-31b-it:free, reasoning high） |
 | Gemini flash | `google-grkd-jisho-gemini-flash-lite`（flash-lite-latest, reasoning high）, `gemini-3.7-flash-high`, `gemini-3.6-flash-high`, `gemini-3-flash`, `gemini-3.1-flash-lite`, `gemini-3.5-flash-low`, `gemini-3.5-flash-extra-low` |
 | Gemini pro | `gemini-3.1-pro-low`, `gemini-pro-agent` |
@@ -53,8 +54,9 @@ Kasou で稼働済み（2026-08-26 確認）。
 ```json
 {
   "models": [
-    { "id": "openreouter-grkd-jisho-gemma-4-31b-it", "priority": 0, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "reasoningEffort": "high" },
-    { "id": "google-grkd-jisho-gemini-flash-lite",    "priority": 1, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "reasoningEffort": "high" }
+    { "id": "inferx-grkd-jisho-gemma-4-31B-it",      "priority": 0, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "reasoningEffort": "high" },
+    { "id": "openreouter-grkd-jisho-gemma-4-31b-it", "priority": 1, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "reasoningEffort": "high" },
+    { "id": "google-grkd-jisho-gemini-flash-lite",    "priority": 2, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "reasoningEffort": "high" }
   ]
 }
 ```
@@ -75,8 +77,9 @@ Kasou で稼働済み（2026-08-26 確認）。
 
 | priority | モデル | 役割 | 備考 |
 |---|---|---|---|
-| 0 | `openreouter-grkd-jisho-gemma-4-31b-it` | 第一候補（辞書説明生成の主力） | OpenRouter経由、reasoningEffort: high |
-| 1 | `google-grkd-jisho-gemini-flash-lite` | 第二候補（高速フォールバック） | Gemini API直結、reasoningEffort: high |
+| 0 | `inferx-grkd-jisho-gemma-4-31B-it` | 第一候補（最優先の辞書説明生成） | Inferx経由、reasoningEffort: high |
+| 1 | `openreouter-grkd-jisho-gemma-4-31b-it` | 第二候補（OpenRouterフォールバック） | OpenRouter経由、reasoningEffort: high |
+| 2 | `google-grkd-jisho-gemini-flash-lite` | 第三候補（最終フォールバック） | Gemini API直結、reasoningEffort: high |
 
 OpenRouter モデルは後日、同一の仕組みで優先順リストへ追加する。
 

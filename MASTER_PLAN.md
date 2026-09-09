@@ -402,7 +402,7 @@ function buildCacheKey(params: {
 
 すべてのLLM呼び出しは OpenAI 互換 `/v1/chat/completions` に統一し、
 `models.json` の priority 昇順で Kasou CPA へルーティングする。
-初期構成は `openreouter-grkd-jisho-gemma-4-31b-it`(0) → `google-grkd-jisho-gemini-flash-lite`(1)（両モデルとも reasoningEffort: high）。
+初期構成は `inferx-grkd-jisho-gemma-4-31B-it`(0) → `openreouter-grkd-jisho-gemma-4-31b-it`(1) → `google-grkd-jisho-gemini-flash-lite`(2)（全モデルとも reasoningEffort: high）。
 詳細は `DOCS/Design/llm-models-routing-cpa.md` を参照。
 
 ```typescript
