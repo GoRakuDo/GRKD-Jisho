@@ -66,7 +66,7 @@ async function loadActivePromptContext(
     );
     await interaction.editReply(
       formatError(
-        "有効なプロンプトが見つかりません。管理画面で Active を設定してください。",
+        "Prompt aktif tidak ditemukan. Silakan hubungi administrator.",
       ),
     );
     return null;
@@ -81,7 +81,7 @@ async function loadActivePromptContext(
     );
     await interaction.editReply(
       formatError(
-        "有効なプロンプトが空です。管理画面で内容を確認してください。",
+        "Prompt aktif kosong. Silakan hubungi administrator.",
       ),
     );
     return null;
@@ -121,7 +121,7 @@ export const definisiCommand: Command = {
     const allowedChannels = env.DISCORD_ALLOWED_CHANNELS;
     if (!allowedChannels.includes(interaction.channelId)) {
       await interaction.reply({
-        content: "Perintah ini hanya dapat digunakan di channel yang diizinkan.",
+        content: "Perintah ini hanya dapat digunakan di channel pencarian kamus yang telah ditentukan.",
         ephemeral: true,
       });
       return;
@@ -136,7 +136,7 @@ export const definisiCommand: Command = {
 
     if (!cleanedText) {
       await interaction.editReply(
-        formatError("検索語を入力してください。例: `/definisi word:可憐`"),
+        formatError("Silakan masukkan kata yang ingin dicari. Contoh: `/definisi word:可憐`"),
       );
       return;
     }
@@ -177,7 +177,7 @@ export const definisiCommand: Command = {
       );
       await interaction.editReply(
         [
-          `本日の検索上限（${limit === Infinity ? "無制限" : `${limit}回`}）に達しました。明日 00:00 GMT+7 にリセットされます。`,
+          `Batas pencarian harian Anda (${limit === Infinity ? "Tanpa Batas" : `${limit} kali`}) telah tercapai. Limit akan di-reset besok pukul 00:00 GMT+7.`,
           "",
           "Kalau Terbantu dengan Project GRKD-Jisho,",
           "bisa support kita kasih setiap harinya 10x request lbh banyak :thumbsup:",
@@ -364,7 +364,7 @@ export const definisiCommand: Command = {
         );
         await interaction.editReply(
           formatError(
-            "LLM出力が言語ルールを満たしませんでした。もう一度試してください。",
+            "Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi.",
           ),
         );
         return;
@@ -375,7 +375,7 @@ export const definisiCommand: Command = {
         `[Definisi] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA service`,
       );
       await interaction.editReply(
-        formatError("LLM生成中にエラーが発生しました。"),
+        formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."),
       );
     }
   },

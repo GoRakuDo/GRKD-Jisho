@@ -127,7 +127,7 @@ describe("definisiCommand", () => {
 
     await definisiCommand.execute(interaction as never);
     expect(reply).toHaveBeenCalledWith({
-      content: "Perintah ini hanya dapat digunakan di channel yang diizinkan.",
+      content: "Perintah ini hanya dapat digunakan di channel pencarian kamus yang telah ditentukan.",
       ephemeral: true,
     });
   });
@@ -235,7 +235,7 @@ describe("definisiCommand", () => {
 
     expect(deferReply).toHaveBeenCalled();
     expect(editReply).toHaveBeenCalledWith(
-      expect.stringContaining("本日の検索上限（5回）に達しました"),
+      expect.stringContaining("Batas pencarian harian Anda (5 kali) telah tercapai"),
     );
     expect(generateWithLanguageGuardrailsMock).not.toHaveBeenCalled();
   });

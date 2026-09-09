@@ -1,7 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 
 const DISCORD_EMBED_DESCRIPTION_LIMIT = 3900;
-const DISCORD_EMBED_TRUNCATED_SUFFIX = "\n\n…（長文のため途中で切れました。全文はキャッシュ詳細を確認してください。）";
+const DISCORD_EMBED_TRUNCATED_SUFFIX = "\n\n… (Teks terlalu panjang dan terpotong. Silakan periksa detail cache untuk teks lengkap.)";
 
 function clampDiscordEmbedDescription(text: string): string {
   if (text.length <= DISCORD_EMBED_DESCRIPTION_LIMIT) {
@@ -24,9 +24,9 @@ export function formatReply(text: string) {
 export function formatNotFound(query: string) {
   const embed = new EmbedBuilder()
     .setColor(0xffa500)
-    .setTitle("見つかりませんでした")
+    .setTitle("Kata Tidak Ditemukan")
     .setDescription(
-      `「${query}」は現在の辞書データに見つかりませんでした。\n別の単語で試すか、辞書がインポートされているか確認してください。`,
+      `"${query}" tidak ditemukan dalam data kamus saat ini.\nSilakan coba dengan kata lain, atau periksa kembali ejaan kata yang dimasukkan.`,
     )
     .setTimestamp();
 
@@ -36,8 +36,8 @@ export function formatNotFound(query: string) {
 export function formatError(reason: string) {
   const embed = new EmbedBuilder()
     .setColor(0xff0000)
-    .setTitle("エラーが発生しました")
-    .setDescription(`${reason}\nしばらく経ってからもう一度試してください。`)
+    .setTitle("Terjadi Kesalahan")
+    .setDescription(`${reason}\nSilakan coba lagi beberapa saat kemudian.`)
     .setTimestamp();
 
   return { embeds: [embed] };

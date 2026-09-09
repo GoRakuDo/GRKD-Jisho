@@ -21,7 +21,7 @@ export const interactionCreateHandler = async (
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`[Interaction] Button "${interaction.customId}" failed: ${reason} → Check interaction handler`);
       const errorReply = {
-        content: "ボタン処理中にエラーが発生しました。",
+        content: "Terjadi kesalahan saat memproses tombol.",
         ephemeral: true,
       };
       try {
@@ -46,7 +46,7 @@ export const interactionCreateHandler = async (
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`[Interaction] Modal "${interaction.customId}" failed: ${reason} → Check modal handler`);
       const errorReply = {
-        content: "モーダル処理中にエラーが発生しました。",
+        content: "Terjadi kesalahan saat memproses modal.",
         ephemeral: true,
       };
       try {
@@ -69,7 +69,7 @@ export const interactionCreateHandler = async (
   const cmd = getCommand(interaction.commandName);
   if (!cmd) {
     await interaction.reply({
-      content: "未知のコマンドです。",
+      content: "Perintah tidak dikenal.",
       ephemeral: true,
     });
     return;
@@ -77,7 +77,7 @@ export const interactionCreateHandler = async (
 
   if (cmd.requiresAdmin && !isInteractionAdmin(interaction)) {
     await interaction.reply({
-      content: "このコマンドを実行する権限がありません。",
+      content: "Anda tidak memiliki izin untuk menjalankan perintah ini (Khusus Administrator).",
       ephemeral: true,
     });
     return;
@@ -91,7 +91,7 @@ export const interactionCreateHandler = async (
       `[Interaction] Command "${interaction.commandName}" failed: ${reason} → Check command handler`,
     );
     const errorReply = {
-      content: "コマンドの実行中にエラーが発生しました。",
+      content: "Terjadi kesalahan saat menjalankan perintah.",
       ephemeral: true,
     };
     if (interaction.replied || interaction.deferred) {
@@ -111,7 +111,7 @@ async function handleButtonInteraction(
   // キャンセル
   if (customId === "wipe_now_cancel") {
     await interaction.update({
-      content: "キャンセルしました。",
+      content: "Dibatalkan.",
       components: [],
     });
     return;
@@ -124,7 +124,7 @@ async function handleButtonInteraction(
 
     if (!(channel instanceof TextChannel)) {
       await interaction.update({
-        content: "チャンネルが見つかりません。削除された可能性があります。",
+        content: "Channel tidak ditemukan. Kemungkinan channel telah dihapus.",
         components: [],
       });
       return;
@@ -142,14 +142,14 @@ async function handleButtonInteraction(
         triggeredBy: interaction.user.id,
       });
       await interaction.editReply({
-        content: `チャンネル <#${channelId}> のメッセージ ${deletedCount}件を削除しました。`,
+        content: `Berhasil menghapus ${deletedCount} pesan di channel <#${channelId}>.`,
         components: [],
       });
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`[Button] wipe-now failed for ${channelId}: ${reason} → Check permissions (MANAGE_MESSAGES)`);
       await interaction.editReply({
-        content: `削除に失敗しました。権限を確認してください。`,
+        content: "Gagal menghapus pesan. Silakan periksa izin Anda.",
         components: [],
       });
     }
@@ -158,7 +158,7 @@ async function handleButtonInteraction(
 
   // 未知のボタン
   await interaction.update({
-    content: "処理できないボタンです。",
+    content: "Tombol tidak dapat diproses.",
     components: [],
   });
 }
@@ -171,7 +171,7 @@ async function handleModalSubmit(
 
   if (!customId.startsWith("edit_jisho_")) {
     await interaction.reply({
-      content: "処理できないモーダルです。",
+      content: "Modal tidak dapat diproses.",
       ephemeral: true,
     });
     return;
@@ -179,7 +179,7 @@ async function handleModalSubmit(
 
   if (!isInteractionAdmin(interaction)) {
     await interaction.reply({
-      content: "権限がありません。",
+      content: "Anda tidak memiliki izin untuk menjalankan perintah ini (Khusus Administrator).",
       ephemeral: true,
     });
     return;
@@ -192,7 +192,7 @@ async function handleModalSubmit(
 
   if (!newText.trim()) {
     await interaction.reply({
-      content: "空のテキストは保存できません。",
+      content: "Teks kosong tidak dapat disimpan.",
       ephemeral: true,
     });
     return;
@@ -201,14 +201,14 @@ async function handleModalSubmit(
   try {
     await updateResponse(responseId, newText, interaction.user.id, reason);
     await interaction.reply({
-      content: `ID ${responseId} の回答を更新しました。\`is_manual_override = true\``,
+      content: `Pembaruan berhasil untuk ID ${responseId}. \`is_manual_override = true\``,
       ephemeral: true,
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[Modal] edit_jisho_${responseId} failed: ${reason} → Check response ID and DB`);
     await interaction.reply({
-      content: "更新中にエラーが発生しました。",
+      content: "Terjadi kesalahan saat memperbarui.",
       ephemeral: true,
     });
   }

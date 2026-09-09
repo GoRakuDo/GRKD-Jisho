@@ -179,7 +179,7 @@ describe("messageCreateHandler", () => {
       "warn",
       expect.objectContaining({ bucket: "daily-japanese", source: "gemini-3.7-flash-high", reaskAttempts: 2, fallbackUsed: true }),
     );
-    expect(reply).toHaveBeenCalledWith(expect.objectContaining({ kind: "error", reason: "LLM出力が言語ルールを満たしませんでした。もう一度試してください。" }));
+    expect(reply).toHaveBeenCalledWith(expect.objectContaining({ kind: "error", reason: "Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi." }));
     expect(saveResponseMock).not.toHaveBeenCalled();
     expect(incrementUsageMock).not.toHaveBeenCalled();
     expect(recordLookupMock).not.toHaveBeenCalled();

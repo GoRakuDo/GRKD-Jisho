@@ -72,14 +72,14 @@ async function loadActivePromptContext(message: Message, traceId: string, scopeK
   if (!activePrompt) {
     await traceEvent(traceId, "llm.error", "error", { error: "Active prompt missing" });
     console.error(`[Lookup] trace=${traceId} active prompt missing → Check prompts table and set one row active`);
-    await message.reply(formatError("有効なプロンプトが見つかりません。管理画面で Active を設定してください。"));
+    await message.reply(formatError("Prompt aktif tidak ditemukan. Silakan hubungi administrator."));
     return null;
   }
 
   if (activePrompt.content.trim().length === 0) {
     await traceEvent(traceId, "llm.error", "error", { error: `Active prompt empty: ${activePrompt.version}` });
     console.error(`[Lookup] trace=${traceId} active prompt empty → Check prompts.content for version=${activePrompt.version}`);
-    await message.reply(formatError("有効なプロンプトが空です。管理画面で内容を確認してください。"));
+    await message.reply(formatError("Prompt aktif kosong. Silakan hubungi administrator."));
     return null;
   }
 
@@ -134,7 +134,7 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[messageCreate] Unhandled error (trace_id=${traceId}): ${reason} → Check LLM/Dict config or DB`);
     try {
-      await message.reply("予期しないエラーが発生しました。");
+      await message.reply("Terjadi kesalahan yang tidak terduga. Silakan coba lagi nanti.");
     } catch {
       // reply 自体が失敗しても握りつぶす
     }
@@ -181,7 +181,7 @@ async function handleMessage(message: Message): Promise<void> {
     const rawText = message.content.replace(/@(here|everyone)\b/g, " ").trim();
     const cleanedText = sanitizeLookupQuery(rawText);
     if (!cleanedText) {
-      await message.reply("検索語を入力してください。例: `@grkd-jisho 可憐`");
+      await message.reply("Silakan masukkan kata yang ingin dicari. Contoh: `@grkd-jisho 可憐`");
       return;
     }
 
@@ -329,13 +329,13 @@ async function handleMessage(message: Message): Promise<void> {
             violations: err.violations,
           });
           console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
-          await message.reply(formatError("LLM出力が言語ルールを満たしませんでした。もう一度試してください。"));
+          await message.reply(formatError("Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi."));
           return;
         }
 
         await traceEvent(traceId, "llm.error", "error", { error: String(err) });
         console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA availability`);
-        await message.reply(formatError("LLM生成中にエラーが発生しました。"));
+        await message.reply(formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."));
       }
 
       return;
@@ -369,7 +369,7 @@ async function handleMessage(message: Message): Promise<void> {
       console.log(`[Lookup] trace=${traceId} rate limit blocked → limit=${limit}`);
       await message.reply(
         [
-          `本日の検索上限（${limit === Infinity ? "無制限" : `${limit}回`}）に達しました。明日 00:00 GMT+7 にリセットされます。`,
+          `Batas pencarian harian Anda (${limit === Infinity ? "Tanpa Batas" : `${limit} kali`}) telah tercapai. Limit akan di-reset besok pukul 00:00 GMT+7.`,
           "",
           "Kalau Terbantu dengan Project GRKD-Jisho,",
           "bisa support kita kasih setiap harinya 10x request lbh banyak :thumbsup:",
@@ -516,13 +516,13 @@ async function handleMessage(message: Message): Promise<void> {
           violations: err.violations,
         });
         console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
-        await message.reply(formatError("LLM出力が言語ルールを満たしませんでした。もう一度試してください。"));
+        await message.reply(formatError("Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi."));
         return;
       }
 
       await traceEvent(traceId, "llm.error", "error", { error: String(err) });
       console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA availability`);
-      await message.reply(formatError("LLM生成中にエラーが発生しました。"));
+      await message.reply(formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."));
     }
   });
 };

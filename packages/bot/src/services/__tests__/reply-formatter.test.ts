@@ -18,7 +18,7 @@ describe("formatReply", () => {
     const description = result.embeds?.[0]?.toJSON().description ?? "";
 
     expect(description).toContain("長長長");
-    expect(description).toContain("長文のため途中で切れました");
+    expect(description).toContain("Teks terlalu panjang dan terpotong");
     expect(description.length).toBeLessThanOrEqual(4096);
   });
 });
