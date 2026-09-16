@@ -205,8 +205,8 @@ LLMに自由回答させない。
 モデル選定は `models.json`（`packages/bot/src/config/models.json`）で管理する。
 すべてのLLM呼び出しは OpenAI 互換 `/v1/chat/completions` に統一し、Kasou 上の CLI Proxy API（CPA, port 8317）へルーティングする。
 `priority` 昇順で試行し、失敗時は次の priority へフォールバックする。
-初期構成は `inferx-grkd-jisho-gemma-4-31B-it`(0) → `openreouter-grkd-jisho-gemma-4-31b-it`(1) → `google-grkd-jisho-gemini-flash-lite`(2)（全モデルとも reasoningEffort: high）。
-追加の OpenRouter モデルは同じ models.json への entry 追加で組み込める。
+現行構成は `openreouter-grkd-jisho-gemma-4-31b-it`(0) → `google1-grkd-jisho-gemma-4-31b-it`(1) → `google1-grkd-jisho-gemini-3.1-flash-lite`(2) → `google1-grkd-jisho-gemini-3.5-flash-lite`(3) → `google-grkd-jisho-gemini-flash-lite`(4)（全モデルとも reasoningEffort: high、transport maxAttempts: 1）。
+transport の `maxAttempts` と guard ReAsk の `guardReaskMax` はモデルごとに `models.json` で変更でき、guard ReAsk の未指定時は2回。追加モデルは同じ models.json への entry 追加で組み込める。
 詳細は `DOCS/Design/llm-models-routing-cpa.md` を参照（2026-09-09 デプロイ完了・本番稼働中）。
 
 プロンプトでは必ず以下を渡す。

@@ -1,6 +1,6 @@
 # LLM models.json × CPA ルーティング設計
 
-> **Status:** 設計確定（2026-08-26）。実装は後続作業。
+> **Status:** 設計・実装済み（2026-09-16）。
 > **関連:** AGENTS.md §2 / §7、MASTER_PLAN.md §2 / §9、`DOCS/Design/cache-key-prompt-version-only.md`
 
 ---
@@ -38,9 +38,10 @@ Kasou で稼働済み（2026-08-26 確認）。
 
 | 系統 | モデル |
 |---|---|
-| Inferx / Gemma | `inferx-grkd-jisho-gemma-4-31B-it`（gemma-4-31B-it-fp8, reasoning high） |
 | OpenRouter / Gemma | `openreouter-grkd-jisho-gemma-4-31b-it`（gemma-4-31b-it:free, reasoning high） |
-| Gemini flash | `google-grkd-jisho-gemini-flash-lite`（flash-lite-latest, reasoning high）, `gemini-3.7-flash-high`, `gemini-3.6-flash-high`, `gemini-3-flash`, `gemini-3.1-flash-lite`, `gemini-3.5-flash-low`, `gemini-3.5-flash-extra-low` |
+| Google1 / Gemma | `google1-grkd-jisho-gemma-4-31b-it`（reasoning high） |
+| Google1 / Gemini flash | `google1-grkd-jisho-gemini-3.1-flash-lite`（reasoning high）, `google1-grkd-jisho-gemini-3.5-flash-lite`（reasoning high） |
+| Google / Gemini flash | `google-grkd-jisho-gemini-flash-lite`（flash-lite-latest, reasoning high） |
 | Gemini pro | `gemini-3.1-pro-low`, `gemini-pro-agent` |
 | Claude | `claude-opus-4-6-thinking`, `claude-sonnet-4-6` |
 | その他 | `gpt-oss-120b-medium`, `gemini-3.1-flash-image` |
@@ -54,9 +55,11 @@ Kasou で稼働済み（2026-08-26 確認）。
 ```json
 {
   "models": [
-    { "id": "inferx-grkd-jisho-gemma-4-31B-it",      "priority": 0, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "reasoningEffort": "high" },
-    { "id": "openreouter-grkd-jisho-gemma-4-31b-it", "priority": 1, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "reasoningEffort": "high" },
-    { "id": "google-grkd-jisho-gemini-flash-lite",    "priority": 2, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "reasoningEffort": "high" }
+    { "id": "openreouter-grkd-jisho-gemma-4-31b-it", "priority": 0, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "maxAttempts": 1, "reasoningEffort": "high" },
+    { "id": "google1-grkd-jisho-gemma-4-31b-it", "priority": 1, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "maxAttempts": 1, "reasoningEffort": "high" },
+    { "id": "google1-grkd-jisho-gemini-3.1-flash-lite", "priority": 2, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "maxAttempts": 1, "reasoningEffort": "high" },
+    { "id": "google1-grkd-jisho-gemini-3.5-flash-lite", "priority": 3, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "maxAttempts": 1, "reasoningEffort": "high" },
+    { "id": "google-grkd-jisho-gemini-flash-lite", "priority": 4, "baseUrl": "http://127.0.0.1:8317/v1", "apiKeyEnv": "CPA_API_KEY", "timeoutMs": 60000, "maxAttempts": 1, "reasoningEffort": "high" }
   ]
 }
 ```
@@ -65,23 +68,29 @@ Kasou で稼働済み（2026-08-26 確認）。
 - `baseUrl` / `apiKeyEnv` を entry ごとに持つため、**OpenRouter 追加は entry 追加だけで対応**できる
   （例: `"baseUrl": "https://openrouter.ai/api/v1", "apiKeyEnv": "OPENROUTER_API_KEY"`）。
 - `timeoutMs` / `maxAttempts` は entry ごとの任意フィールド。未指定時のデフォルトは
-  `timeoutMs=150000` / `maxAttempts=2`（現行 OpenRouter 相当）。
-  フェイルオーバー時間の予算を短くしたい場合は、初期 entry に明示的な `timeoutMs`
-  （例: 30000〜60000ms）を設定できる。
-  **→ 2026-08-26 実装時、全 entry に暫定 `timeoutMs: 60000` を設定済み**（最悪系で Discord interaction token 15分を超過させないため）。Kasou 実測後に調整する。
+  `timeoutMs=150000` / `maxAttempts=2`（現行 OpenRouter 相当）。`maxAttempts` は transport の
+  タイムアウト・レスポンス parse failure の同一モデル内リトライ回数を制御する。
+  フェイルオーバー時間の予算を短くしたい場合は、entry に明示的な `timeoutMs`
+  （例: 30000〜60000ms）と `maxAttempts` を設定できる。
+  **→ 現行5 entry は `timeoutMs: 60000` / `maxAttempts: 1` を設定済み**。
+- `temperature`（0〜2）/ `topP`（0〜1）は entry ごとの任意フィールド。未指定時は共通デフォルト
+  `temperature=0.70` / `top_p=0.8` を継承する。
+- `guardReaskMax` は entry ごとの任意フィールド（0以上の整数、未指定時2）。初回出力が language/output-quality guard に不合格だった場合の同一モデル ReAsk 回数を制御し、`maxAttempts` とは独立する。
 - `reasoningEffort` は entry ごとの任意フィールド（`"low" | "medium" | "high"`）。
   指定時はリクエストボディに `reasoning_effort` を付与し、未指定時は省略する。
-- sampling パラメータは全モデル共通で `temperature=0.70`, `top_p=0.8` を維持。
+- sampling パラメータは未指定時に共通デフォルト `temperature=0.70`, `top_p=0.8` を継承する。entry に指定した場合はモデル単位の値を使う。
 
-## 4. 初期優先順（確定）
+## 4. 現行優先順（確定）
 
 | priority | モデル | 役割 | 備考 |
 |---|---|---|---|
-| 0 | `inferx-grkd-jisho-gemma-4-31B-it` | 第一候補（最優先の辞書説明生成） | Inferx経由、reasoningEffort: high |
-| 1 | `openreouter-grkd-jisho-gemma-4-31b-it` | 第二候補（OpenRouterフォールバック） | OpenRouter経由、reasoningEffort: high |
-| 2 | `google-grkd-jisho-gemini-flash-lite` | 第三候補（最終フォールバック） | Gemini API直結、reasoningEffort: high |
+| 0 | `openreouter-grkd-jisho-gemma-4-31b-it` | 第一候補（最優先の辞書説明生成） | CPA経由、reasoningEffort: high、maxAttempts: 1 |
+| 1 | `google1-grkd-jisho-gemma-4-31b-it` | 第二候補 | CPA経由、reasoningEffort: high、maxAttempts: 1 |
+| 2 | `google1-grkd-jisho-gemini-3.1-flash-lite` | 第三候補 | CPA経由、reasoningEffort: high、maxAttempts: 1 |
+| 3 | `google1-grkd-jisho-gemini-3.5-flash-lite` | 第四候補 | CPA経由、reasoningEffort: high、maxAttempts: 1 |
+| 4 | `google-grkd-jisho-gemini-flash-lite` | 最終手段（有料） | CPA経由、reasoningEffort: high、maxAttempts: 1 |
 
-OpenRouter モデルは後日、同一の仕組みで優先順リストへ追加する。
+新しいモデルは、同じ models.json の entry 追加で優先順リストへ組み込める。
 
 ---
 
@@ -94,8 +103,9 @@ OpenRouter モデルは後日、同一の仕組みで優先順リストへ追加
   各モデルの `reasoningEffort` 設定（例: `"high"`）に応じてリクエストボディに付与する。
   CPA 経由の応答は `message.content` のみを採用し、壊れた出力は既存の
   Output Quality Guard が検知する。
-- Guardrail 挙動は維持: language guard / output quality guard → 同一モデルで ReAsk 最大 2 回
-  → 不合格なら次 priority のモデルへ。
+- Guardrail 挙動: language guard / output quality guard → entry の `guardReaskMax` 回まで同一モデルで ReAsk
+  （未指定時は最大2回）→ 不合格なら次 priority のモデルへ。`guardReaskMax: 0` なら ReAsk せず即座に次 priority へ進む。
+- `maxAttempts` は transport retry、`guardReaskMax` は guard ReAsk を制御し、両者は独立している。
 - `GenerateResult.source` は `"gemini" | "openrouter"` 型から `string`（model id）へ変更。
   `LanguageGuardError.source` も同様。
 - 保存先への影響なし: `lookup_logs.llm_source` / `response_cache.model_name` は text カラムなので

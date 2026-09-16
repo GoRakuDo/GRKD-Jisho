@@ -1,27 +1,48 @@
 {
   "models": [
     {
-      "id": "inferx-grkd-jisho-gemma-4-31B-it",
+      "id": "openreouter-grkd-jisho-gemma-4-31b-it",
       "priority": 0,
       "baseUrl": "http://127.0.0.1:8317/v1",
       "apiKeyEnv": "CPA_API_KEY",
       "timeoutMs": 60000,
+      "maxAttempts": 1,
       "reasoningEffort": "high"
     },
     {
-      "id": "openreouter-grkd-jisho-gemma-4-31b-it",
+      "id": "google1-grkd-jisho-gemma-4-31b-it",
       "priority": 1,
       "baseUrl": "http://127.0.0.1:8317/v1",
       "apiKeyEnv": "CPA_API_KEY",
       "timeoutMs": 60000,
+      "maxAttempts": 1,
       "reasoningEffort": "high"
     },
     {
-      "id": "google-grkd-jisho-gemini-flash-lite",
+      "id": "google1-grkd-jisho-gemini-3.1-flash-lite",
       "priority": 2,
       "baseUrl": "http://127.0.0.1:8317/v1",
       "apiKeyEnv": "CPA_API_KEY",
       "timeoutMs": 60000,
+      "maxAttempts": 1,
+      "reasoningEffort": "high"
+    },
+    {
+      "id": "google1-grkd-jisho-gemini-3.5-flash-lite",
+      "priority": 3,
+      "baseUrl": "http://127.0.0.1:8317/v1",
+      "apiKeyEnv": "CPA_API_KEY",
+      "timeoutMs": 60000,
+      "maxAttempts": 1,
+      "reasoningEffort": "high"
+    },
+    {
+      "id": "google-grkd-jisho-gemini-flash-lite",
+      "priority": 4,
+      "baseUrl": "http://127.0.0.1:8317/v1",
+      "apiKeyEnv": "CPA_API_KEY",
+      "timeoutMs": 60000,
+      "maxAttempts": 1,
       "reasoningEffort": "high"
     }
   ]

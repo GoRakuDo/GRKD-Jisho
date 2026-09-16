@@ -236,7 +236,7 @@ CREATE TABLE response_cache (
   dictionary_entry_id  BIGINT REFERENCES dictionary_entries(id),
   role_key             TEXT NOT NULL,           -- daily-japanese / indonesian
   prompt_version       TEXT NOT NULL,           -- "v1", "v2"
-  model_name           TEXT NOT NULL,           -- "gemini-3.7-flash-high" 等（生成モデルの audit 用）
+  model_name           TEXT NOT NULL,           -- models.json の model id（生成モデルの audit 用）
   response_text        TEXT NOT NULL,
   is_manual_override   BOOLEAN DEFAULT false,   -- 管理者手動編集フラグ
   created_at           TIMESTAMPTZ DEFAULT now(),
@@ -402,7 +402,8 @@ function buildCacheKey(params: {
 
 すべてのLLM呼び出しは OpenAI 互換 `/v1/chat/completions` に統一し、
 `models.json` の priority 昇順で Kasou CPA へルーティングする。
-初期構成は `inferx-grkd-jisho-gemma-4-31B-it`(0) → `openreouter-grkd-jisho-gemma-4-31b-it`(1) → `google-grkd-jisho-gemini-flash-lite`(2)（全モデルとも reasoningEffort: high）。
+現行構成は `openreouter-grkd-jisho-gemma-4-31b-it`(0) → `google1-grkd-jisho-gemma-4-31b-it`(1) → `google1-grkd-jisho-gemini-3.1-flash-lite`(2) → `google1-grkd-jisho-gemini-3.5-flash-lite`(3) → `google-grkd-jisho-gemini-flash-lite`(4)（全モデルとも reasoningEffort: high、transport maxAttempts: 1）。
+transport の `maxAttempts` と guard ReAsk の `guardReaskMax` は models.json の entry ごとに設定できる。
 詳細は `DOCS/Design/llm-models-routing-cpa.md` を参照。
 
 ```typescript

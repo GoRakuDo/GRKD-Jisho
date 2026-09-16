@@ -13,6 +13,9 @@ export const llmModelEntrySchema = z.object({
   apiKeyEnv: z.string().min(1),
   timeoutMs: z.number().int().positive().optional().default(150_000),
   maxAttempts: z.number().int().positive().optional().default(2),
+  temperature: z.number().min(0).max(2).optional(),
+  topP: z.number().min(0).max(1).optional(),
+  guardReaskMax: z.number().int().min(0).optional().default(2),
   reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
 });
 
@@ -20,7 +23,9 @@ export const modelsConfigSchema = z.object({
   models: z.array(llmModelEntrySchema).min(1),
 });
 
-export type LlmModelEntry = z.infer<typeof llmModelEntrySchema>;
+export type LlmModelEntry = Omit<z.infer<typeof llmModelEntrySchema>, "guardReaskMax"> & {
+  guardReaskMax?: number;
+};
 
 function resolveModelsJsonPath(): string {
   const currentDir = dirname(fileURLToPath(import.meta.url));

@@ -140,7 +140,7 @@ describe("messageCreateHandler", () => {
     generateWithLanguageGuardrailsMock.mockRejectedValue(
       new LanguageGuardErrorMock(
         "daily-japanese",
-        "gemini-3.7-flash-high",
+        "google-grkd-jisho-gemini-flash-lite",
         2,
         true,
         [{ kind: "garbage-marker", label: "Repeated at-mark", sample: "@@@" }],
@@ -177,7 +177,7 @@ describe("messageCreateHandler", () => {
       expect.any(String),
       "llm.language_guard.failed",
       "warn",
-      expect.objectContaining({ bucket: "daily-japanese", source: "gemini-3.7-flash-high", reaskAttempts: 2, fallbackUsed: true }),
+      expect.objectContaining({ bucket: "daily-japanese", source: "google-grkd-jisho-gemini-flash-lite", reaskAttempts: 2, fallbackUsed: true }),
     );
     expect(reply).toHaveBeenCalledWith(expect.objectContaining({ kind: "error", reason: "Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi." }));
     expect(saveResponseMock).not.toHaveBeenCalled();

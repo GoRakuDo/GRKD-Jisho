@@ -129,8 +129,8 @@ async function callChatCompletionsOnce(
     const bodyPayload: Record<string, unknown> = {
       model: modelEntry.id,
       messages: [{ role: "user", content: prompt }],
-      temperature: DEFAULT_LLM_TEMPERATURE,
-      top_p: DEFAULT_LLM_TOP_P,
+      temperature: modelEntry.temperature ?? DEFAULT_LLM_TEMPERATURE,
+      top_p: modelEntry.topP ?? DEFAULT_LLM_TOP_P,
     };
     if (modelEntry.reasoningEffort) {
       bodyPayload.reasoning_effort = modelEntry.reasoningEffort;
@@ -228,26 +228,27 @@ async function validateWithReaskOnModel(
 
   const failureKinds = new Set<GuardrailFailureCategory>([latestValidation.kind]);
 
+  const guardReaskMax = model.guardReaskMax ?? 2;
   let reaskAttempts = 0;
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
+  for (let attempt = 1; attempt <= guardReaskMax; attempt += 1) {
     reaskAttempts = attempt;
     const reaskPrompt = buildReaskPrompt(renderedPrompt, params.roleKey, latestValidation);
 
     try {
-      console.log(`[LLM] model=${model.id} guard reask started → attempt=${attempt}/2`);
+      console.log(`[LLM] model=${model.id} guard reask started → attempt=${attempt}/${guardReaskMax}`);
       const text = await callChatCompletions(model, reaskPrompt);
       const validation = evaluateGuardrails(text, params);
       if (!validation) {
-        console.log(`[LLM] model=${model.id} guard reask success → attempt=${attempt}/2`);
+        console.log(`[LLM] model=${model.id} guard reask success → attempt=${attempt}/${guardReaskMax}`);
         return { ok: true, text, reaskAttempts };
       }
 
       latestValidation = validation;
       failureKinds.add(validation.kind);
-      console.warn(`[LLM] model=${model.id} guard reask failed → attempt=${attempt}/2, retrying`);
+      console.warn(`[LLM] model=${model.id} guard reask failed → attempt=${attempt}/${guardReaskMax}, retrying`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[LLM] model=${model.id} guard reask transport failed → attempt=${attempt}/2, error=${message}, retrying`);
+      console.warn(`[LLM] model=${model.id} guard reask transport failed → attempt=${attempt}/${guardReaskMax}, error=${message}, retrying`);
     }
   }
 

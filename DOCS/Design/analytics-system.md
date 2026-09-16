@@ -1,8 +1,8 @@
 # Analytics System
 
-> **2026-08-26 注記:** LLM ルーティングの models.json × CPA 移行後は `lookup_logs.llm_source` が
-> 任意の model id（例: `gemini-3.7-flash-high`）になる。本文書の `llm_gemini` / `llm_openrouter`
-> 列設計は当時の provider 二分割を前提としたもので、実装時に source 値の集計方法を見直すこと
+> **2026-09-16 注記:** LLM ルーティングの models.json × CPA 構成では `lookup_logs.llm_source` が
+> 任意の model id（例: `openreouter-grkd-jisho-gemma-4-31b-it`）になる。本文書の `llm_gemini` / `llm_openrouter`
+> 列設計は provider 二分割を前提とした歴史的設計であり、実装では source 値を model id として保存する。
 > （詳細: `DOCS/Design/llm-models-routing-cpa.md`）。
 
 ## 目的
