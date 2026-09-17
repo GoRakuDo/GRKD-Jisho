@@ -18,6 +18,7 @@ import {
   saveResponse,
 } from "../services/response-cache.service.js";
 import {
+  generateFreeWithLanguageGuardrails,
   generateWithLanguageGuardrails,
   LanguageGuardError,
   normalizePromptTemplate,
@@ -25,9 +26,16 @@ import {
 import { recordLookup } from "../services/lookup-log.service.js";
 import {
   checkRateLimit,
+  commitFreePoolReservation,
   incrementUsage,
+  releaseFreePoolReservation,
+  reserveFreePool,
+  type FreePoolReservation,
 } from "../services/rate-limit.service.js";
 import {
+  formatFreeModelError,
+  formatFreePoolExhausted,
+  formatRateLimitExceeded,
   formatReply,
   formatNotFound,
   formatError,
@@ -163,34 +171,27 @@ export const definisiCommand: Command = {
     const hasAdmin =
       interaction.memberPermissions?.has("Administrator") ?? false;
 
-    const { allowed, limit } = await checkRateLimit({
+    const { allowed, limit, freeUser = false } = await checkRateLimit({
       userId: interaction.user.id,
       guildId: interaction.guildId ?? "",
       memberRoles,
       isOwner,
       hasAdminPermission: hasAdmin,
+      includeFreeUser: true,
     });
 
     if (!allowed) {
       console.log(
         `[Definisi] trace=${traceId} rate limit blocked → limit=${limit}`,
       );
-      await interaction.editReply(
-        [
-          `Batas pencarian harian Anda (${limit === Infinity ? "Tanpa Batas" : `${limit} kali`}) telah tercapai. Limit akan di-reset besok pukul 00:00 GMT+7.`,
-          "",
-          "Kalau Terbantu dengan Project GRKD-Jisho,",
-          "bisa support kita kasih setiap harinya 10x request lbh banyak :thumbsup:",
-          "",
-          "Trakteer Kopi :coffee:  https://trakteer.id/yosiakefas/showcase?menu=open",
-          "Atau dengan Membership YouTube https://www.youtube.com/@yosiakefas/join :kashiwade:",
-        ].join("\n"),
-      );
+      await interaction.editReply(formatRateLimitExceeded(limit));
       await traceEvent(traceId, "rate_limit.blocked", "warn", { limit });
       return;
     }
 
     await traceEvent(traceId, "rate_limit.checked", "info", {});
+
+    let freeReservation: FreePoolReservation | null = null;
 
     const extracted = await extractFirstTerm(cleanedText);
     const query = extracted?.term ?? cleanedText;
@@ -209,26 +210,32 @@ export const definisiCommand: Command = {
 
     if (!result) {
       console.log(`[Definisi] trace=${traceId} dictionary miss`);
+      if (freeReservation) {
+        await releaseFreePoolReservation(freeReservation);
+        freeReservation = null;
+      }
       await interaction.editReply(formatNotFound(query));
       await traceEvent(traceId, "dictionary.miss", "warn", { query });
-      await recordLookup({
-        guildId: guildContextId,
-        channelId: interaction.channelId,
-        messageId: interaction.id,
-        userId: interaction.user.id,
-        userRolesJson: memberRoles,
-        query,
-        normalizedQuery: query,
-        dictionaryIdUsed: null,
-        responseCacheId: null,
-        cacheHit: false,
-        outputBucketKey,
-        llmSource: null,
-      });
-      await incrementUsage({
-        userId: interaction.user.id,
-        guildId: guildContextId,
-      });
+      if (!freeUser) {
+        await recordLookup({
+          guildId: guildContextId,
+          channelId: interaction.channelId,
+          messageId: interaction.id,
+          userId: interaction.user.id,
+          userRolesJson: memberRoles,
+          query,
+          normalizedQuery: query,
+          dictionaryIdUsed: null,
+          responseCacheId: null,
+          cacheHit: false,
+          outputBucketKey,
+          llmSource: null,
+        });
+        await incrementUsage({
+          userId: interaction.user.id,
+          guildId: guildContextId,
+        });
+      }
       return;
     }
 
@@ -247,6 +254,10 @@ export const definisiCommand: Command = {
       outputBucketKey,
     );
     if (!promptContext) {
+      if (freeReservation) {
+        await releaseFreePoolReservation(freeReservation);
+        freeReservation = null;
+      }
       return;
     }
 
@@ -258,7 +269,7 @@ export const definisiCommand: Command = {
       promptVersion: promptContext.promptVersion,
     };
 
-    const cached = await getCachedResponse(cacheLookupKey);
+    const cached = freeUser ? null : await getCachedResponse(cacheLookupKey);
     if (cached) {
       console.log(
         `[Definisi] trace=${traceId} cache hit → cacheId=${cached.id.toString()}`,
@@ -291,6 +302,15 @@ export const definisiCommand: Command = {
     console.log(
       `[Definisi] trace=${traceId} cache miss → version=${promptContext.promptVersion}`,
     );
+    if (freeUser) {
+      freeReservation = await reserveFreePool();
+      if (!freeReservation) {
+        await interaction.editReply(formatFreePoolExhausted());
+        await traceEvent(traceId, "rate_limit.blocked", "warn", { scope: "free_pool" });
+        return;
+      }
+      await traceEvent(traceId, "rate_limit.checked", "info", { scope: "free_pool" });
+    }
     await traceEvent(traceId, "cache.miss", "info", {});
     await traceEvent(traceId, "llm.generate.started", "info", {
       promptVersion: promptContext.promptVersion,
@@ -298,7 +318,9 @@ export const definisiCommand: Command = {
 
     try {
       const { text: responseText, source: llmSource } =
-        await generateWithLanguageGuardrails({
+        await (freeUser
+          ? generateFreeWithLanguageGuardrails
+          : generateWithLanguageGuardrails)({
           roleKey: outputBucketKey,
           query,
           dictionaryForm: result.entry.term,
@@ -314,7 +336,7 @@ export const definisiCommand: Command = {
       );
       await traceEvent(traceId, "llm.generated", "info", {});
 
-      const saved = await saveResponse({
+      const saved = freeUser ? null : await saveResponse({
         ...cacheLookupKey,
         promptContentHash: promptContext.promptContentHash,
         modelName: llmSource ?? "fallback",
@@ -345,11 +367,26 @@ export const definisiCommand: Command = {
         outputBucketKey,
         llmSource,
       });
-      await incrementUsage({
-        userId: interaction.user.id,
-        guildId: guildContextId,
-      });
+      if (freeUser) {
+        if (freeReservation) {
+          await commitFreePoolReservation(freeReservation);
+          freeReservation = null;
+        }
+        await incrementUsage({
+          userId: interaction.user.id,
+          guildId: guildContextId,
+        });
+      } else {
+        await incrementUsage({
+          userId: interaction.user.id,
+          guildId: guildContextId,
+        });
+      }
     } catch (err) {
+      if (freeReservation) {
+        await releaseFreePoolReservation(freeReservation);
+        freeReservation = null;
+      }
       if (err instanceof LanguageGuardError) {
         await traceEvent(traceId, "llm.language_guard.failed", "warn", {
           bucket: err.bucket,
@@ -363,9 +400,11 @@ export const definisiCommand: Command = {
           `[Definisi] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`,
         );
         await interaction.editReply(
-          formatError(
-            "Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi.",
-          ),
+          freeUser
+            ? formatFreeModelError()
+            : formatError(
+                "Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi.",
+              ),
         );
         return;
       }
@@ -375,7 +414,9 @@ export const definisiCommand: Command = {
         `[Definisi] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA service`,
       );
       await interaction.editReply(
-        formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."),
+        freeUser
+          ? formatFreeModelError()
+          : formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."),
       );
     }
   },

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── 呼び出しカウントで戻り値を切り替えられるDBモック ──
-const { mockDb, mockSchema, setDbResults } = vi.hoisted(() => {
+const { mockDb, mockSchema, setDbResults, toGMT7DateMock } = vi.hoisted(() => {
   let resultsQueue: unknown[] = [];
   let callIndex = 0;
 
@@ -30,12 +30,14 @@ const { mockDb, mockSchema, setDbResults } = vi.hoisted(() => {
   const schema = {
     roleRateLimits: { discordRoleId: "test", dailyLimit: "test" },
     userUsage: { userId: "test", guildId: "test", usageDate: "test" as const },
+    freePoolUsage: { usageDate: "test", reservedCount: "test", count: "test" },
   };
 
   return {
     mockDb: db,
     mockSchema: schema,
     setDbResults: (...vals: unknown[][]) => { resultsQueue = vals; callIndex = 0; },
+    toGMT7DateMock: vi.fn(() => "2026-05-06"),
   };
 });
 
@@ -45,10 +47,14 @@ vi.mock("@grkd-jisho/db", () => ({
 }));
 
 vi.mock("../date-utils.js", () => ({
-  toGMT7Date: vi.fn(() => "2026-05-06"),
+  toGMT7Date: toGMT7DateMock,
 }));
 
-import { checkRateLimit, incrementUsage } from "../rate-limit.service";
+import {
+  checkRateLimit,
+  incrementUsage,
+  reserveFreePool,
+} from "../rate-limit.service";
 
 describe("checkRateLimit", () => {
   beforeEach(() => {
@@ -150,10 +156,45 @@ describe("incrementUsage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setDbResults();
+    toGMT7DateMock.mockReturnValue("2026-05-06");
   });
 
   it("INSERT + onConflictDoUpdate を呼ぶ", async () => {
     await incrementUsage({ userId: "u1", guildId: "g1" });
     expect(mockDb.insert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("reserveFreePool", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setDbResults();
+    toGMT7DateMock.mockReturnValue("2026-05-06");
+  });
+
+  it("日付が変わると翌日の共有枠として別の日付で予約する", async () => {
+    setDbResults(
+      [{ discordRoleId: "__default__", dailyLimit: 1 }],
+      [{ usageDate: "2026-05-06" }],
+      [{ discordRoleId: "__default__", dailyLimit: 1 }],
+      [{ usageDate: "2026-05-07" }],
+    );
+    toGMT7DateMock
+      .mockReturnValueOnce("2026-05-06")
+      .mockReturnValueOnce("2026-05-07");
+
+    const todayReservation = await reserveFreePool();
+    const tomorrowReservation = await reserveFreePool();
+
+    expect(todayReservation).toEqual({ usageDate: "2026-05-06" });
+    expect(tomorrowReservation).toEqual({ usageDate: "2026-05-07" });
+    expect((mockDb.insert.mock.results[0]?.value.values as ReturnType<typeof vi.fn>)).toHaveBeenNthCalledWith(
+      1,
+      { usageDate: "2026-05-06", count: 0, reservedCount: 1 },
+    );
+    expect((mockDb.insert.mock.results[0]?.value.values as ReturnType<typeof vi.fn>)).toHaveBeenNthCalledWith(
+      2,
+      { usageDate: "2026-05-07", count: 0, reservedCount: 1 },
+    );
   });
 });

@@ -45,5 +45,15 @@
       "maxAttempts": 1,
       "reasoningEffort": "high"
     }
-  ]
+  ],
+  "freeModel": {
+    "id": "google1-grkd-jisho-free-gemma-4-26b-a4b-it",
+    "priority": 0,
+    "baseUrl": "http://127.0.0.1:8317/v1",
+    "apiKeyEnv": "CPA_API_KEY",
+    "timeoutMs": 60000,
+    "maxAttempts": 1,
+    "guardReaskMax": 0,
+    "reasoningEffort": "high"
+  }
 }

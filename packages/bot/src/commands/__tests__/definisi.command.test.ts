@@ -3,12 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const {
   LanguageGuardErrorMock,
   checkRateLimitMock,
+  commitFreePoolReservationMock,
   extractFirstTermMock,
+  generateFreeWithLanguageGuardrailsMock,
   generateWithLanguageGuardrailsMock,
   getActivePromptForScopeMock,
   getCachedResponseMock,
   incrementUsageMock,
   recordLookupMock,
+  releaseFreePoolReservationMock,
+  reserveFreePoolMock,
   resolveOutputBucketKeyMock,
   sanitizeLookupQueryMock,
   saveResponseMock,
@@ -31,12 +35,16 @@ const {
   return {
     LanguageGuardErrorMock,
     checkRateLimitMock: vi.fn(),
+    commitFreePoolReservationMock: vi.fn(),
     extractFirstTermMock: vi.fn(),
+    generateFreeWithLanguageGuardrailsMock: vi.fn(),
     generateWithLanguageGuardrailsMock: vi.fn(),
     getActivePromptForScopeMock: vi.fn(),
     getCachedResponseMock: vi.fn(),
     incrementUsageMock: vi.fn(),
     recordLookupMock: vi.fn(),
+    releaseFreePoolReservationMock: vi.fn(),
+    reserveFreePoolMock: vi.fn(),
     resolveOutputBucketKeyMock: vi.fn(),
     sanitizeLookupQueryMock: vi.fn(),
     saveResponseMock: vi.fn(),
@@ -53,6 +61,7 @@ vi.mock("../../config/env.js", () => ({
 }));
 
 vi.mock("../../services/llm.service.js", () => ({
+  generateFreeWithLanguageGuardrails: generateFreeWithLanguageGuardrailsMock,
   generateWithLanguageGuardrails: generateWithLanguageGuardrailsMock,
   LanguageGuardError: LanguageGuardErrorMock,
   normalizePromptTemplate: (prompt: string) => prompt.trim(),
@@ -77,10 +86,16 @@ vi.mock("../../services/lookup-log.service.js", () => ({
 
 vi.mock("../../services/rate-limit.service.js", () => ({
   checkRateLimit: checkRateLimitMock,
+  commitFreePoolReservation: commitFreePoolReservationMock,
   incrementUsage: incrementUsageMock,
+  releaseFreePoolReservation: releaseFreePoolReservationMock,
+  reserveFreePool: reserveFreePoolMock,
 }));
 
 vi.mock("../../services/reply-formatter.js", () => ({
+  formatFreeModelError: () => "free-model-error",
+  formatFreePoolExhausted: () => "free-pool-exhausted",
+  formatRateLimitExceeded: (limit: number) => `rate-limit-${limit}`,
   formatReply: (text: string) => ({ kind: "reply", text }),
   formatNotFound: (query: string) => ({ kind: "notfound", query }),
   formatError: (reason: string) => ({ kind: "error", reason }),
@@ -201,6 +216,144 @@ describe("definisiCommand", () => {
       userId: "user-1",
       guildId: "guild-1",
     });
+    expect(reserveFreePoolMock).not.toHaveBeenCalled();
+  });
+
+  it("無料ユーザーは共有枠があれば専用モデルで一度だけ生成する", async () => {
+    sanitizeLookupQueryMock.mockReturnValue("食べる");
+    extractFirstTermMock.mockResolvedValue({
+      term: "食べる",
+      result: {
+        dictionary: { id: 1, name: "JMdict" },
+        entry: { id: BigInt(10), term: "食べる", reading: "たべる", definitionsJson: {} },
+        matchedBy: "term",
+        normalizedQuery: "食べる",
+      },
+    });
+    resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
+    checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10, freeUser: true });
+    getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    reserveFreePoolMock.mockResolvedValue({ usageDate: "2026-05-06" });
+    generateFreeWithLanguageGuardrailsMock.mockResolvedValue({
+      text: "Makan makanan",
+      source: "google1-grkd-jisho-free-gemma-4-26b-a4b-it",
+    });
+
+    const deferReply = vi.fn().mockResolvedValue(undefined);
+    const editReply = vi.fn().mockResolvedValue(undefined);
+    const interaction = {
+      id: "interaction-free-1",
+      inGuild: () => true,
+      guildId: "guild-1",
+      channelId: "channel-1",
+      user: { id: "free-user-1" },
+      options: { getString: () => "食べる" },
+      member: { roles: { cache: { map: () => [] } } },
+      memberPermissions: { has: () => false },
+      guild: { ownerId: "owner-2" },
+      deferReply,
+      editReply,
+    };
+
+    await definisiCommand.execute(interaction as never);
+
+    expect(checkRateLimitMock).toHaveBeenCalledWith(
+      expect.objectContaining({ memberRoles: [], includeFreeUser: true }),
+    );
+    expect(generateFreeWithLanguageGuardrailsMock).toHaveBeenCalledTimes(1);
+    expect(generateWithLanguageGuardrailsMock).not.toHaveBeenCalled();
+    expect(getCachedResponseMock).not.toHaveBeenCalled();
+    expect(saveResponseMock).not.toHaveBeenCalled();
+    expect(commitFreePoolReservationMock).toHaveBeenCalledWith({ usageDate: "2026-05-06" });
+    expect(incrementUsageMock).toHaveBeenCalledWith({
+      userId: "free-user-1",
+      guildId: "guild-1",
+    });
+    expect(editReply).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "reply", text: "Makan makanan" }),
+    );
+  });
+
+  it("無料共有枠が切れている場合は生成せず専用メッセージを返す", async () => {
+    sanitizeLookupQueryMock.mockReturnValue("食べる");
+    extractFirstTermMock.mockResolvedValue({
+      term: "食べる",
+      result: {
+        dictionary: { id: 1, name: "JMdict" },
+        entry: { id: BigInt(10), term: "食べる", reading: "たべる", definitionsJson: {} },
+        matchedBy: "term",
+        normalizedQuery: "食べる",
+      },
+    });
+    resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
+    checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10, freeUser: true });
+    getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    reserveFreePoolMock.mockResolvedValue(null);
+
+    const deferReply = vi.fn().mockResolvedValue(undefined);
+    const editReply = vi.fn().mockResolvedValue(undefined);
+    const interaction = {
+      id: "interaction-free-2",
+      inGuild: () => true,
+      guildId: "guild-1",
+      channelId: "channel-1",
+      user: { id: "free-user-2" },
+      options: { getString: () => "食べる" },
+      member: { roles: { cache: { map: () => [] } } },
+      memberPermissions: { has: () => false },
+      guild: { ownerId: "owner-2" },
+      deferReply,
+      editReply,
+    };
+
+    await definisiCommand.execute(interaction as never);
+
+    expect(editReply).toHaveBeenCalledWith("free-pool-exhausted");
+    expect(generateFreeWithLanguageGuardrailsMock).not.toHaveBeenCalled();
+    expect(commitFreePoolReservationMock).not.toHaveBeenCalled();
+    expect(incrementUsageMock).not.toHaveBeenCalled();
+  });
+
+  it("無料モデルの生成失敗時は枠を解放し、使用量を増やさない", async () => {
+    sanitizeLookupQueryMock.mockReturnValue("食べる");
+    extractFirstTermMock.mockResolvedValue({
+      term: "食べる",
+      result: {
+        dictionary: { id: 1, name: "JMdict" },
+        entry: { id: BigInt(10), term: "食べる", reading: "たべる", definitionsJson: {} },
+        matchedBy: "term",
+        normalizedQuery: "食べる",
+      },
+    });
+    resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
+    checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10, freeUser: true });
+    getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    reserveFreePoolMock.mockResolvedValue({ usageDate: "2026-05-06" });
+    generateFreeWithLanguageGuardrailsMock.mockRejectedValue(new Error("CPA unavailable"));
+
+    const deferReply = vi.fn().mockResolvedValue(undefined);
+    const editReply = vi.fn().mockResolvedValue(undefined);
+    const interaction = {
+      id: "interaction-free-3",
+      inGuild: () => true,
+      guildId: "guild-1",
+      channelId: "channel-1",
+      user: { id: "free-user-3" },
+      options: { getString: () => "食べる" },
+      member: { roles: { cache: { map: () => [] } } },
+      memberPermissions: { has: () => false },
+      guild: { ownerId: "owner-2" },
+      deferReply,
+      editReply,
+    };
+
+    await definisiCommand.execute(interaction as never);
+
+    expect(editReply).toHaveBeenCalledWith("free-model-error");
+    expect(releaseFreePoolReservationMock).toHaveBeenCalledWith({ usageDate: "2026-05-06" });
+    expect(commitFreePoolReservationMock).not.toHaveBeenCalled();
+    expect(incrementUsageMock).not.toHaveBeenCalled();
+    expect(recordLookupMock).not.toHaveBeenCalled();
   });
 
   it("rate limit 上限到達時は案内メッセージを返す", async () => {
@@ -234,9 +387,7 @@ describe("definisiCommand", () => {
     await definisiCommand.execute(interaction as never);
 
     expect(deferReply).toHaveBeenCalled();
-    expect(editReply).toHaveBeenCalledWith(
-      expect.stringContaining("Batas pencarian harian Anda (5 kali) telah tercapai"),
-    );
+    expect(editReply).toHaveBeenCalledWith("rate-limit-5");
     expect(generateWithLanguageGuardrailsMock).not.toHaveBeenCalled();
   });
 });

@@ -5,10 +5,24 @@ import { env } from "../config/env.js";
 import { extractFirstTerm } from "../services/extract-first-term.js";
 import { resolveOutputBucketKey } from "../services/role-mapper.service.js";
 import { getCachedResponse, saveResponse } from "../services/response-cache.service.js";
-import { generateWithLanguageGuardrails, LanguageGuardError, normalizePromptTemplate } from "../services/llm.service.js";
+import { generateFreeWithLanguageGuardrails, generateWithLanguageGuardrails, LanguageGuardError, normalizePromptTemplate } from "../services/llm.service.js";
 import { recordLookup } from "../services/lookup-log.service.js";
-import { checkRateLimit, incrementUsage } from "../services/rate-limit.service.js";
-import { formatReply, formatNotFound, formatError } from "../services/reply-formatter.js";
+import {
+  checkRateLimit,
+  commitFreePoolReservation,
+  incrementUsage,
+  releaseFreePoolReservation,
+  reserveFreePool,
+  type FreePoolReservation,
+} from "../services/rate-limit.service.js";
+import {
+  formatFreeModelError,
+  formatFreePoolExhausted,
+  formatRateLimitExceeded,
+  formatReply,
+  formatNotFound,
+  formatError,
+} from "../services/reply-formatter.js";
 import { traceEvent } from "../services/observability.service.js";
 import { sanitizeLookupQuery } from "@grkd-jisho/db";
 import { transformDefinitionForPrompt } from "../services/dictionary-definition-transformer.service.js";
@@ -40,6 +54,7 @@ async function finalizeLookup(
     llmSource?: string | null;
     normalizedQueryOverride?: string;
     guildIdOverride?: string;
+    incrementPersonalUsage?: boolean;
   },
 ): Promise<void> {
   const guildId = params.guildIdOverride ?? message.guildId ?? "";
@@ -57,7 +72,9 @@ async function finalizeLookup(
     outputBucketKey: params.outputBucketKey,
     llmSource: params.llmSource ?? null,
   });
-  await incrementUsage({ userId: message.author.id, guildId });
+  if (params.incrementPersonalUsage !== false) {
+    await incrementUsage({ userId: message.author.id, guildId });
+  }
 }
 
 type ActivePromptContext = {
@@ -357,49 +374,48 @@ async function handleMessage(message: Message): Promise<void> {
     // ロールIDを取得して rate-limit と role mapping の両方へ渡す
     const roleIds = safeMember.roles.cache.map((r) => r.id);
 
-    const { allowed, limit } = await checkRateLimit({
+    const { allowed, limit, freeUser = false } = await checkRateLimit({
       userId: message.author.id,
       guildId: message.guildId ?? "",
       memberRoles: roleIds,
       isOwner,
       hasAdminPermission: hasAdmin,
+      includeFreeUser: true,
     });
 
     if (!allowed) {
       console.log(`[Lookup] trace=${traceId} rate limit blocked → limit=${limit}`);
-      await message.reply(
-        [
-          `Batas pencarian harian Anda (${limit === Infinity ? "Tanpa Batas" : `${limit} kali`}) telah tercapai. Limit akan di-reset besok pukul 00:00 GMT+7.`,
-          "",
-          "Kalau Terbantu dengan Project GRKD-Jisho,",
-          "bisa support kita kasih setiap harinya 10x request lbh banyak :thumbsup:",
-          "",
-          "Trakteer Kopi :coffee:  https://trakteer.id/yosiakefas/showcase?menu=open",
-          "Atau dengan Membership YouTube https://www.youtube.com/@yosiakefas/join :kashiwade:",
-        ].join("\n"),
-      );
+      await message.reply(formatRateLimitExceeded(limit));
       await traceEvent(traceId, "rate_limit.blocked", "warn", { limit });
       return;
     }
     await traceEvent(traceId, "rate_limit.checked", "info", {});
     console.log(`[Lookup] trace=${traceId} rate limit passed`);
 
+    let freeReservation: FreePoolReservation | null = null;
+
     const outputBucketKey = await resolveOutputBucketKey(roleIds, guildContextId);
     console.log(`[Lookup] trace=${traceId} output bucket resolved → ${outputBucketKey}`);
 
     if (!result) {
       console.log(`[Lookup] trace=${traceId} dictionary miss`);
+      if (freeReservation) {
+        await releaseFreePoolReservation(freeReservation);
+        freeReservation = null;
+      }
       await message.reply(formatNotFound(query));
       await traceEvent(traceId, "dictionary.miss", "warn", { query });
-      await finalizeLookup(message, traceId, {
-        query,
-        roleIds,
-        dictionaryIdUsed: null,
-        responseCacheId: null,
-        cacheHit: false,
-        outputBucketKey,
-        guildIdOverride: guildContextId,
-      });
+      if (!freeUser) {
+        await finalizeLookup(message, traceId, {
+          query,
+          roleIds,
+          dictionaryIdUsed: null,
+          responseCacheId: null,
+          cacheHit: false,
+          outputBucketKey,
+          guildIdOverride: guildContextId,
+        });
+      }
       return;
     }
     console.log(`[Lookup] trace=${traceId} dictionary hit → ${result.dictionary.name}`);
@@ -411,6 +427,10 @@ async function handleMessage(message: Message): Promise<void> {
 
     const promptContext = await loadActivePromptContext(message, traceId, outputBucketKey);
     if (!promptContext) {
+      if (freeReservation) {
+        await releaseFreePoolReservation(freeReservation);
+        freeReservation = null;
+      }
       return;
     }
 
@@ -422,7 +442,7 @@ async function handleMessage(message: Message): Promise<void> {
       promptVersion: promptContext.promptVersion,
     };
 
-    const cached = await getCachedResponse(cacheLookupKey);
+    const cached = freeUser ? null : await getCachedResponse(cacheLookupKey);
     if (cached) {
       console.log(`[Lookup] trace=${traceId} cache hit → cacheId=${cached.id.toString()}`);
       await message.reply(formatReply(cached.responseText));
@@ -440,6 +460,16 @@ async function handleMessage(message: Message): Promise<void> {
       return;
     }
     console.log(`[Lookup] trace=${traceId} cache miss → version=${promptContext.promptVersion} hash=${promptContext.promptContentHash.slice(0, 8)}`);
+    if (freeUser) {
+      freeReservation = await reserveFreePool();
+      if (!freeReservation) {
+        console.log(`[Lookup] trace=${traceId} free pool blocked`);
+        await message.reply(formatFreePoolExhausted());
+        await traceEvent(traceId, "rate_limit.blocked", "warn", { scope: "free_pool" });
+        return;
+      }
+      await traceEvent(traceId, "rate_limit.checked", "info", { scope: "free_pool" });
+    }
     await traceEvent(traceId, "cache.miss", "info", {});
 
     await traceEvent(traceId, "llm.generate.started", "info", {
@@ -448,7 +478,9 @@ async function handleMessage(message: Message): Promise<void> {
     });
     console.log(`[Lookup] trace=${traceId} llm.generate.started`);
     try {
-      const { text: responseText, source: llmSource } = await generateWithLanguageGuardrails({
+      const { text: responseText, source: llmSource } = await (freeUser
+        ? generateFreeWithLanguageGuardrails
+        : generateWithLanguageGuardrails)({
         roleKey: outputBucketKey,
         query,
         dictionaryForm: result.entry.term,
@@ -461,13 +493,13 @@ async function handleMessage(message: Message): Promise<void> {
       console.log(`[Lookup] trace=${traceId} llm.generate.success source=${llmSource ?? "fallback"}`);
       await traceEvent(traceId, "llm.generated", "info", {});
 
-      const saved = await saveResponse({
+      const saved = freeUser ? null : await saveResponse({
         ...cacheLookupKey,
         promptContentHash: promptContext.promptContentHash,
         modelName: llmSource ?? "fallback",
         responseText,
       });
-      if (!saved) {
+      if (!saved && !freeUser) {
         // save に失敗しても lookup ログと使用量カウントは残す
         console.log(`[Lookup] trace=${traceId} cache save failed/skip`);
         await finalizeLookup(message, traceId, {
@@ -486,26 +518,50 @@ async function handleMessage(message: Message): Promise<void> {
         console.log(`[Lookup] trace=${traceId} reply.sent (cache skipped)`);
         return;
       }
-      await traceEvent(traceId, "cache.saved", "info", { cacheId: saved.id.toString() });
-      console.log(`[Lookup] trace=${traceId} cache saved → cacheId=${saved.id.toString()}`);
+      if (saved) {
+        await traceEvent(traceId, "cache.saved", "info", { cacheId: saved.id.toString() });
+        console.log(`[Lookup] trace=${traceId} cache saved → cacheId=${saved.id.toString()}`);
+      }
 
       await message.reply(formatReply(responseText));
       await traceEvent(traceId, "reply.sent", "info", {});
       console.log(`[Lookup] trace=${traceId} reply.sent`);
 
-      await finalizeLookup(message, traceId, {
-        query,
-        roleIds,
-        dictionaryIdUsed: result.dictionary.id,
-        responseCacheId: saved.id,
-        cacheHit: false,
-        outputBucketKey,
-        llmSource,
-        normalizedQueryOverride: cacheLookupKey.normalizedQuery,
-        guildIdOverride: guildContextId,
-      });
+      if (freeUser) {
+        if (freeReservation) {
+          await commitFreePoolReservation(freeReservation);
+          freeReservation = null;
+        }
+        await finalizeLookup(message, traceId, {
+          query,
+          roleIds,
+          dictionaryIdUsed: result.dictionary.id,
+          responseCacheId: null,
+          cacheHit: false,
+          outputBucketKey,
+          llmSource,
+          normalizedQueryOverride: cacheLookupKey.normalizedQuery,
+          guildIdOverride: guildContextId,
+        });
+      } else {
+        await finalizeLookup(message, traceId, {
+          query,
+          roleIds,
+          dictionaryIdUsed: result.dictionary.id,
+          responseCacheId: saved!.id,
+          cacheHit: false,
+          outputBucketKey,
+          llmSource,
+          normalizedQueryOverride: cacheLookupKey.normalizedQuery,
+          guildIdOverride: guildContextId,
+        });
+      }
       console.log(`[Lookup] trace=${traceId} finalizeLookup done`);
     } catch (err) {
+      if (freeReservation) {
+        await releaseFreePoolReservation(freeReservation);
+        freeReservation = null;
+      }
       if (err instanceof LanguageGuardError) {
         await traceEvent(traceId, "llm.language_guard.failed", "warn", {
           bucket: err.bucket,
@@ -516,13 +572,17 @@ async function handleMessage(message: Message): Promise<void> {
           violations: err.violations,
         });
         console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
-        await message.reply(formatError("Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi."));
+        await message.reply(freeUser
+          ? formatFreeModelError()
+          : formatError("Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi."));
         return;
       }
 
       await traceEvent(traceId, "llm.error", "error", { error: String(err) });
       console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA availability`);
-      await message.reply(formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."));
+      await message.reply(freeUser
+        ? formatFreeModelError()
+        : formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."));
     }
   });
 };

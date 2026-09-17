@@ -3,12 +3,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const {
   LanguageGuardErrorMock,
   checkRateLimitMock,
+  commitFreePoolReservationMock,
   extractFirstTermMock,
+  generateFreeWithLanguageGuardrailsMock,
   generateWithLanguageGuardrailsMock,
   getActivePromptForScopeMock,
   getCachedResponseMock,
   incrementUsageMock,
   recordLookupMock,
+  releaseFreePoolReservationMock,
+  reserveFreePoolMock,
   resolveOutputBucketKeyMock,
   sanitizeLookupQueryMock,
   saveResponseMock,
@@ -31,12 +35,16 @@ const {
   return {
     LanguageGuardErrorMock,
     checkRateLimitMock: vi.fn(),
+    commitFreePoolReservationMock: vi.fn(),
     extractFirstTermMock: vi.fn(),
+    generateFreeWithLanguageGuardrailsMock: vi.fn(),
     generateWithLanguageGuardrailsMock: vi.fn(),
     getActivePromptForScopeMock: vi.fn(),
     getCachedResponseMock: vi.fn(),
     incrementUsageMock: vi.fn(),
     recordLookupMock: vi.fn(),
+    releaseFreePoolReservationMock: vi.fn(),
+    reserveFreePoolMock: vi.fn(),
     resolveOutputBucketKeyMock: vi.fn(),
     sanitizeLookupQueryMock: vi.fn(),
     saveResponseMock: vi.fn(),
@@ -53,6 +61,7 @@ vi.mock("../../config/env.js", () => ({
 }));
 
 vi.mock("../../services/llm.service.js", () => ({
+  generateFreeWithLanguageGuardrails: generateFreeWithLanguageGuardrailsMock,
   generateWithLanguageGuardrails: generateWithLanguageGuardrailsMock,
   LanguageGuardError: LanguageGuardErrorMock,
   normalizePromptTemplate: (prompt: string) => prompt.trim(),
@@ -77,10 +86,16 @@ vi.mock("../../services/lookup-log.service.js", () => ({
 
 vi.mock("../../services/rate-limit.service.js", () => ({
   checkRateLimit: checkRateLimitMock,
+  commitFreePoolReservation: commitFreePoolReservationMock,
   incrementUsage: incrementUsageMock,
+  releaseFreePoolReservation: releaseFreePoolReservationMock,
+  reserveFreePool: reserveFreePoolMock,
 }));
 
 vi.mock("../../services/reply-formatter.js", () => ({
+  formatFreeModelError: () => "free-model-error",
+  formatFreePoolExhausted: () => "free-pool-exhausted",
+  formatRateLimitExceeded: (limit: number) => `rate-limit-${limit}`,
   formatReply: (text: string) => ({ kind: "reply", text }),
   formatNotFound: (query: string) => ({ kind: "notfound", query }),
   formatError: (reason: string) => ({ kind: "error", reason }),
@@ -182,6 +197,7 @@ describe("messageCreateHandler", () => {
     expect(reply).toHaveBeenCalledWith(expect.objectContaining({ kind: "error", reason: "Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi." }));
     expect(saveResponseMock).not.toHaveBeenCalled();
     expect(incrementUsageMock).not.toHaveBeenCalled();
+    expect(reserveFreePoolMock).not.toHaveBeenCalled();
     expect(recordLookupMock).not.toHaveBeenCalled();
   });
 
@@ -228,5 +244,149 @@ describe("messageCreateHandler", () => {
 
     expect(sanitizeLookupQueryMock).toHaveBeenCalledWith("<@bot-1>   食べる");
     expect(reply).toHaveBeenCalledWith(expect.objectContaining({ kind: "reply", text: "Makan" }));
+    expect(reserveFreePoolMock).not.toHaveBeenCalled();
+  });
+
+  it("無料ユーザーは共有枠があれば専用モデルで生成し、成功時だけ使用量を増やす", async () => {
+    sanitizeLookupQueryMock.mockReturnValue("食べる");
+    extractFirstTermMock.mockResolvedValue({
+      term: "食べる",
+      result: {
+        dictionary: { id: 1, name: "JMdict" },
+        entry: { id: BigInt(1), term: "食べる", reading: "たべる", definitionsJson: {} },
+        matchedBy: "term",
+        normalizedQuery: "食べる",
+      },
+    });
+    resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
+    checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10, freeUser: true });
+    getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    reserveFreePoolMock.mockResolvedValue({ usageDate: "2026-05-06" });
+    generateFreeWithLanguageGuardrailsMock.mockResolvedValue({
+      text: "Makan",
+      source: "google1-grkd-jisho-free-gemma-4-26b-a4b-it",
+    });
+
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const sendTyping = vi.fn().mockResolvedValue(undefined);
+    const guildMember = {
+      roles: { cache: { size: 0, map: () => [] } },
+      permissions: { has: () => false },
+    };
+
+    await messageCreateHandler({
+      author: { bot: false, id: "free-user-1" },
+      client: { user: { id: "bot-1" } },
+      guildId: "guild-1",
+      channelId: "channel-1",
+      content: "<@bot-1> 食べる",
+      mentions: { has: (id: string) => id === "bot-1" },
+      channel: { sendTyping },
+      member: guildMember,
+      guild: {
+        ownerId: "owner-2",
+        members: { fetch: vi.fn().mockResolvedValue(guildMember) },
+      },
+      reply,
+    } as never);
+
+    expect(generateFreeWithLanguageGuardrailsMock).toHaveBeenCalledTimes(1);
+    expect(generateWithLanguageGuardrailsMock).not.toHaveBeenCalled();
+    expect(saveResponseMock).not.toHaveBeenCalled();
+    expect(commitFreePoolReservationMock).toHaveBeenCalledWith({ usageDate: "2026-05-06" });
+    expect(incrementUsageMock).toHaveBeenCalledWith({ userId: "free-user-1", guildId: "guild-1" });
+    expect(reply).toHaveBeenCalledWith(expect.objectContaining({ kind: "reply", text: "Makan" }));
+  });
+
+  it("無料共有枠が切れている場合は生成せず専用メッセージを返す", async () => {
+    sanitizeLookupQueryMock.mockReturnValue("食べる");
+    extractFirstTermMock.mockResolvedValue({
+      term: "食べる",
+      result: {
+        dictionary: { id: 1, name: "JMdict" },
+        entry: { id: BigInt(1), term: "食べる", reading: "たべる", definitionsJson: {} },
+        matchedBy: "term",
+        normalizedQuery: "食べる",
+      },
+    });
+    resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
+    checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10, freeUser: true });
+    getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    reserveFreePoolMock.mockResolvedValue(null);
+
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const sendTyping = vi.fn().mockResolvedValue(undefined);
+    const guildMember = {
+      roles: { cache: { size: 0, map: () => [] } },
+      permissions: { has: () => false },
+    };
+
+    await messageCreateHandler({
+      author: { bot: false, id: "free-user-2" },
+      client: { user: { id: "bot-1" } },
+      guildId: "guild-1",
+      channelId: "channel-1",
+      content: "<@bot-1> 食べる",
+      mentions: { has: (id: string) => id === "bot-1" },
+      channel: { sendTyping },
+      member: guildMember,
+      guild: {
+        ownerId: "owner-2",
+        members: { fetch: vi.fn().mockResolvedValue(guildMember) },
+      },
+      reply,
+    } as never);
+
+    expect(reply).toHaveBeenCalledWith("free-pool-exhausted");
+    expect(generateFreeWithLanguageGuardrailsMock).not.toHaveBeenCalled();
+    expect(commitFreePoolReservationMock).not.toHaveBeenCalled();
+    expect(incrementUsageMock).not.toHaveBeenCalled();
+  });
+
+  it("無料モデルの生成失敗時は障害メッセージを返し、枠と使用量を戻す", async () => {
+    sanitizeLookupQueryMock.mockReturnValue("食べる");
+    extractFirstTermMock.mockResolvedValue({
+      term: "食べる",
+      result: {
+        dictionary: { id: 1, name: "JMdict" },
+        entry: { id: BigInt(1), term: "食べる", reading: "たべる", definitionsJson: {} },
+        matchedBy: "term",
+        normalizedQuery: "食べる",
+      },
+    });
+    resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
+    checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10, freeUser: true });
+    getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    reserveFreePoolMock.mockResolvedValue({ usageDate: "2026-05-06" });
+    generateFreeWithLanguageGuardrailsMock.mockRejectedValue(new Error("CPA unavailable"));
+
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const sendTyping = vi.fn().mockResolvedValue(undefined);
+    const guildMember = {
+      roles: { cache: { size: 0, map: () => [] } },
+      permissions: { has: () => false },
+    };
+
+    await messageCreateHandler({
+      author: { bot: false, id: "free-user-3" },
+      client: { user: { id: "bot-1" } },
+      guildId: "guild-1",
+      channelId: "channel-1",
+      content: "<@bot-1> 食べる",
+      mentions: { has: (id: string) => id === "bot-1" },
+      channel: { sendTyping },
+      member: guildMember,
+      guild: {
+        ownerId: "owner-2",
+        members: { fetch: vi.fn().mockResolvedValue(guildMember) },
+      },
+      reply,
+    } as never);
+
+    expect(reply).toHaveBeenCalledWith("free-model-error");
+    expect(releaseFreePoolReservationMock).toHaveBeenCalledWith({ usageDate: "2026-05-06" });
+    expect(commitFreePoolReservationMock).not.toHaveBeenCalled();
+    expect(incrementUsageMock).not.toHaveBeenCalled();
+    expect(recordLookupMock).not.toHaveBeenCalled();
   });
 });

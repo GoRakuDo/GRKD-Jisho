@@ -1,4 +1,4 @@
-import { DEFAULT_LLM_TEMPERATURE, DEFAULT_LLM_TOP_P, LLM_MODELS, type LlmModelEntry } from "../config/llm-models.js";
+import { DEFAULT_LLM_TEMPERATURE, DEFAULT_LLM_TOP_P, FREE_MODEL, LLM_MODELS, type LlmModelEntry } from "../config/llm-models.js";
 import { buildLanguageReaskPrompt, validateOutputLanguage, type LanguageGuardResult, type LanguageGuardViolation } from "./language-guard.service.js";
 import { buildOutputQualityReaskPrompt, validateOutputQuality, type OutputQualityResult, type OutputQualityViolation } from "./output-quality-guard.service.js";
 import type { RoleKey } from "../types.js";
@@ -385,4 +385,15 @@ export async function generateWithLanguageGuardrails(
   }
 
   throw lastTransportError ?? new Error("All LLM models failed");
+}
+
+/**
+ * Free users get exactly one model attempt. The model entry itself carries
+ * maxAttempts=1 and guardReaskMax=0, while the one-element array prevents
+ * fallback to the paid cascade.
+ */
+export async function generateFreeWithLanguageGuardrails(
+  params: GenerateParams,
+): Promise<GenerateResult> {
+  return generateWithLanguageGuardrails(params, [FREE_MODEL]);
 }

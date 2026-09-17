@@ -52,6 +52,38 @@ export function formatNotFound(query: string) {
   return { embeds: [embed] };
 }
 
+export const SUPPORT_GUIDANCE = [
+  "Kalau Terbantu dengan Project GRKD-Jisho,",
+  "bisa support kita kasih setiap harinya 10x request lbh banyak :thumbsup:",
+  "",
+  "Trakteer Kopi :coffee:  https://trakteer.id/yosiakefas/showcase?menu=open",
+  "Atau dengan Membership YouTube https://www.youtube.com/@yosiakefas/join :kashiwade:",
+].join("\n");
+
+export function formatRateLimitExceeded(limit: number): string {
+  return [
+    `Batas pencarian harian Anda (${limit === Infinity ? "Tanpa Batas" : `${limit} kali`}) telah tercapai. Limit akan di-reset besok pukul 00:00 GMT+7.`,
+    "",
+    SUPPORT_GUIDANCE,
+  ].join("\n");
+}
+
+export function formatFreePoolExhausted(): string {
+  return [
+    "Kuota gratis hari ini telah habis. Jadilah member untuk terus menggunakan bot, atau tunggu hingga reset pukul 00:00 GMT+7.",
+    "",
+    SUPPORT_GUIDANCE,
+  ].join("\n");
+}
+
+export function formatFreeModelError(): string {
+  return [
+    "Model gratis sedang sering mengalami gangguan. Silakan coba lagi dalam 5 menit, atau jadilah member untuk penggunaan tanpa gangguan.",
+    "",
+    SUPPORT_GUIDANCE,
+  ].join("\n");
+}
+
 export function formatError(reason: string) {
   const embed = new EmbedBuilder()
     .setColor(0xff0000)
@@ -64,7 +96,7 @@ export function formatError(reason: string) {
 
 // usage-guide.png の絶対パスを import.meta.url 基準で解決する。
 // dev (src/services) では packages/bot/assets/、build (dist/services) では dist/assets/ に展開される前提。
-// 見つからない場合は undefined を返し、呼び出し側は画像なし（テキストのみ）でフォールバックする。
+// 見つからない場合は undefined を返し、呼び出し側は画像なし（テキストのみ）でフォールバック。
 export function resolveUsageGuideImagePath(): string | undefined {
   const currentDir = dirname(fileURLToPath(import.meta.url));
   const candidate = resolve(currentDir, "..", "..", "assets", WIPE_GUIDE_IMAGE_FILENAME);

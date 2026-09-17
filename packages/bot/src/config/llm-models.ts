@@ -21,6 +21,7 @@ export const llmModelEntrySchema = z.object({
 
 export const modelsConfigSchema = z.object({
   models: z.array(llmModelEntrySchema).min(1),
+  freeModel: llmModelEntrySchema.optional(),
 });
 
 export type LlmModelEntry = Omit<z.infer<typeof llmModelEntrySchema>, "guardReaskMax"> & {
@@ -38,23 +39,40 @@ function resolveModelsJsonPath(): string {
   return sameDirPath;
 }
 
+function loadModelsConfig(jsonContent?: string): z.infer<typeof modelsConfigSchema> {
+  let raw: unknown;
+  if (jsonContent !== undefined) {
+    raw = JSON.parse(jsonContent);
+  } else {
+    const filePath = resolveModelsJsonPath();
+    const content = readFileSync(filePath, "utf-8");
+    raw = JSON.parse(content);
+  }
+
+  return modelsConfigSchema.parse(raw);
+}
+
 export function loadLlmModels(jsonContent?: string): LlmModelEntry[] {
   try {
-    let raw: unknown;
-    if (jsonContent !== undefined) {
-      raw = JSON.parse(jsonContent);
-    } else {
-      const filePath = resolveModelsJsonPath();
-      const content = readFileSync(filePath, "utf-8");
-      raw = JSON.parse(content);
-    }
-
-    const parsed = modelsConfigSchema.parse(raw);
-    return [...parsed.models].sort((a, b) => a.priority - b.priority);
+    return [...loadModelsConfig(jsonContent).models].sort((a, b) => a.priority - b.priority);
   } catch (err) {
     console.error(`[Config] models.json load failed: ${err instanceof Error ? err.message : String(err)} → Check packages/bot/src/config/models.json schema (models[].id/priority/baseUrl/apiKeyEnv)`);
     throw err;
   }
 }
 
+export function loadFreeModel(jsonContent?: string): LlmModelEntry {
+  try {
+    const freeModel = loadModelsConfig(jsonContent).freeModel;
+    if (!freeModel) {
+      throw new Error("freeModel is missing");
+    }
+    return freeModel;
+  } catch (err) {
+    console.error(`[Config] free model load failed: ${err instanceof Error ? err.message : String(err)} → Check models.json freeModel schema`);
+    throw err;
+  }
+}
+
 export const LLM_MODELS: LlmModelEntry[] = loadLlmModels();
+export const FREE_MODEL: LlmModelEntry = loadFreeModel();
