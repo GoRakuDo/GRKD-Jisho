@@ -11,6 +11,7 @@ export const llmModelEntrySchema = z.object({
   priority: z.number().int(),
   baseUrl: z.string().url(),
   apiKeyEnv: z.string().min(1),
+  // 接続タイムアウト（リクエスト送信〜レスポンスヘッダー受信まで）。応答ボディの生成待ちは打ち切らない。
   timeoutMs: z.number().int().positive().optional().default(150_000),
   maxAttempts: z.number().int().positive().optional().default(2),
   temperature: z.number().min(0).max(2).optional(),

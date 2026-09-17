@@ -70,6 +70,8 @@ Kasou で稼働済み（2026-08-26 確認）。
 - `timeoutMs` / `maxAttempts` は entry ごとの任意フィールド。未指定時のデフォルトは
   `timeoutMs=150000` / `maxAttempts=2`（現行 OpenRouter 相当）。`maxAttempts` は transport の
   タイムアウト・レスポンス parse failure の同一モデル内リトライ回数を制御する。
+  `timeoutMs` は**接続タイムアウト**（リクエスト送信〜レスポンスヘッダー受信まで）であり、
+  応答ボディの生成待ちは打ち切らない（生成に `timeoutMs` 超かかるモデルでも成功扱いになる）。
   フェイルオーバー時間の予算を短くしたい場合は、entry に明示的な `timeoutMs`
   （例: 30000〜60000ms）と `maxAttempts` を設定できる。
   **→ 現行5 entry は `timeoutMs: 60000` / `maxAttempts: 1` を設定済み**。

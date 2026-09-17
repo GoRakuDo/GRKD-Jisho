@@ -348,6 +348,71 @@ describe("generate", () => {
     // 5 models * 1 attempt = 5 calls
     expect(fetchMock).toHaveBeenCalledTimes(5);
   });
+
+  it("接続（レスポンスヘッダー受信）が timeoutMs を超えたら abort してタイムアウト扱いにする", async () => {
+    const connectTimeoutModels: LlmModelEntry[] = [
+      { id: "slow-connect-model", priority: 0, baseUrl: "http://127.0.0.1:8317/v1", apiKeyEnv: "CPA_API_KEY", timeoutMs: 20, maxAttempts: 1 },
+    ];
+
+    const signals: AbortSignal[] = [];
+    const fetchMock = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((resolve, reject) => {
+      const signal = init?.signal ?? undefined;
+      if (signal) signals.push(signal);
+      const timer = setTimeout(() => resolve(new Response(JSON.stringify({
+        choices: [{ message: { content: "too late" } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } })), 5000);
+      signal?.addEventListener("abort", () => {
+        clearTimeout(timer);
+        reject(new DOMException("The operation was aborted.", "AbortError"));
+      });
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(generate({
+      roleKey: "indonesian",
+      query: "これ",
+      dictionaryForm: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    }, connectTimeoutModels)).rejects.toThrow(/timed out/i);
+
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it("ヘッダー受信後はボディ生成が timeoutMs を超えても打ち切られない", async () => {
+    const slowBodyModels: LlmModelEntry[] = [
+      { id: "slow-body-model", priority: 0, baseUrl: "http://127.0.0.1:8317/v1", apiKeyEnv: "CPA_API_KEY", timeoutMs: 20, maxAttempts: 1 },
+    ];
+
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        return { choices: [{ message: { content: `【これ】\n${VALID_DAILY_RESPONSE}` } }] };
+      },
+    } as unknown as Response));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generate({
+      roleKey: "indonesian",
+      query: "これ",
+      dictionaryForm: "これ",
+      reading: "これ",
+      dictionaryName: "test dictionary",
+      definitionJson: JSON.stringify({ meanings: ["near the listener"] }),
+      promptTemplate: "SYSTEM\nHELLO={{query}}\n{{prompt_version}}",
+      promptVersion: "v9",
+    }, slowBodyModels);
+
+    expect(result.text).toBe(`【これ】\n${VALID_DAILY_RESPONSE}`);
+    expect(result.source).toBe("slow-body-model");
+  });
 });
 
 describe("generateWithLanguageGuardrails", () => {

@@ -123,7 +123,7 @@ async function callChatCompletionsOnce(
   prompt: string,
 ): Promise<string> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), modelEntry.timeoutMs);
+  let connectionTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
   try {
     const bodyPayload: Record<string, unknown> = {
@@ -136,7 +136,7 @@ async function callChatCompletionsOnce(
       bodyPayload.reasoning_effort = modelEntry.reasoningEffort;
     }
 
-    const response = await fetch(url, {
+    const connection = fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -146,6 +146,22 @@ async function callChatCompletionsOnce(
       body: JSON.stringify(bodyPayload),
     });
 
+    // timeoutMs は「接続タイムアウト」: リクエスト送信〜レスポンスヘッダー受信までのみを打ち切る。
+    // 応答ボディの生成待ちはモデル側の生成時間に依存するため無制限に待つ。
+    const connectionTimeout = new Promise<never>((_, reject) => {
+      connectionTimeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new DOMException(`${modelEntry.id} request timed out after ${modelEntry.timeoutMs / 1000} seconds`, "AbortError"));
+      }, modelEntry.timeoutMs);
+    });
+
+    const response = await Promise.race([connection, connectionTimeout]);
+
+    // ヘッダー受信で接続フェーズは完了。ここでタイマーを止めないとボディ受信中の abort が
+    // ボディストリームを切ってしまうため、必ず解除してからボディを読む。
+    clearTimeout(connectionTimeoutId);
+    connectionTimeoutId = undefined;
+
     if (!response.ok) {
       throw new Error(`${modelEntry.id} error: ${response.status} ${await response.text()}`);
     }
@@ -153,7 +169,9 @@ async function callChatCompletionsOnce(
     const data = (await response.json()) as ChatCompletionResponse;
     return extractChatCompletionAnswer(data, modelEntry.id);
   } finally {
-    clearTimeout(timeoutId);
+    if (connectionTimeoutId !== undefined) {
+      clearTimeout(connectionTimeoutId);
+    }
   }
 }
 
