@@ -17,7 +17,9 @@ import {
 } from "../services/rate-limit.service.js";
 import {
   formatFreeModelError,
+  formatFreeModelErrorForMember,
   formatFreePoolExhausted,
+  formatMemberPoolExhausted,
   formatRateLimitExceeded,
   formatReply,
   formatNotFound,
@@ -374,7 +376,12 @@ async function handleMessage(message: Message): Promise<void> {
     // ロールIDを取得して rate-limit と role mapping の両方へ渡す
     const roleIds = safeMember.roles.cache.map((r) => r.id);
 
-    const { allowed, limit, freeUser = false } = await checkRateLimit({
+    const {
+      allowed,
+      limit,
+      freeUser = false,
+      freePoolFallback = false,
+    } = await checkRateLimit({
       userId: message.author.id,
       guildId: message.guildId ?? "",
       memberRoles: roleIds,
@@ -382,8 +389,9 @@ async function handleMessage(message: Message): Promise<void> {
       hasAdminPermission: hasAdmin,
       includeFreeUser: true,
     });
+    const useFreeModel = freeUser || freePoolFallback;
 
-    if (!allowed) {
+    if (!allowed && !freePoolFallback) {
       console.log(`[Lookup] trace=${traceId} rate limit blocked → limit=${limit}`);
       await message.reply(formatRateLimitExceeded(limit));
       await traceEvent(traceId, "rate_limit.blocked", "warn", { limit });
@@ -405,7 +413,7 @@ async function handleMessage(message: Message): Promise<void> {
       }
       await message.reply(formatNotFound(query));
       await traceEvent(traceId, "dictionary.miss", "warn", { query });
-      if (!freeUser) {
+      if (!useFreeModel) {
         await finalizeLookup(message, traceId, {
           query,
           roleIds,
@@ -442,7 +450,7 @@ async function handleMessage(message: Message): Promise<void> {
       promptVersion: promptContext.promptVersion,
     };
 
-    const cached = freeUser ? null : await getCachedResponse(cacheLookupKey);
+    const cached = useFreeModel ? null : await getCachedResponse(cacheLookupKey);
     if (cached) {
       console.log(`[Lookup] trace=${traceId} cache hit → cacheId=${cached.id.toString()}`);
       await message.reply(formatReply(cached.responseText));
@@ -460,11 +468,11 @@ async function handleMessage(message: Message): Promise<void> {
       return;
     }
     console.log(`[Lookup] trace=${traceId} cache miss → version=${promptContext.promptVersion} hash=${promptContext.promptContentHash.slice(0, 8)}`);
-    if (freeUser) {
+    if (useFreeModel) {
       freeReservation = await reserveFreePool();
       if (!freeReservation) {
         console.log(`[Lookup] trace=${traceId} free pool blocked`);
-        await message.reply(formatFreePoolExhausted());
+        await message.reply(freeUser ? formatFreePoolExhausted() : formatMemberPoolExhausted(limit));
         await traceEvent(traceId, "rate_limit.blocked", "warn", { scope: "free_pool" });
         return;
       }
@@ -478,7 +486,7 @@ async function handleMessage(message: Message): Promise<void> {
     });
     console.log(`[Lookup] trace=${traceId} llm.generate.started`);
     try {
-      const { text: responseText, source: llmSource } = await (freeUser
+      const { text: responseText, source: llmSource } = await (useFreeModel
         ? generateFreeWithLanguageGuardrails
         : generateWithLanguageGuardrails)({
         roleKey: outputBucketKey,
@@ -493,13 +501,13 @@ async function handleMessage(message: Message): Promise<void> {
       console.log(`[Lookup] trace=${traceId} llm.generate.success source=${llmSource ?? "fallback"}`);
       await traceEvent(traceId, "llm.generated", "info", {});
 
-      const saved = freeUser ? null : await saveResponse({
+      const saved = useFreeModel ? null : await saveResponse({
         ...cacheLookupKey,
         promptContentHash: promptContext.promptContentHash,
         modelName: llmSource ?? "fallback",
         responseText,
       });
-      if (!saved && !freeUser) {
+      if (!saved && !useFreeModel) {
         // save に失敗しても lookup ログと使用量カウントは残す
         console.log(`[Lookup] trace=${traceId} cache save failed/skip`);
         await finalizeLookup(message, traceId, {
@@ -527,7 +535,7 @@ async function handleMessage(message: Message): Promise<void> {
       await traceEvent(traceId, "reply.sent", "info", {});
       console.log(`[Lookup] trace=${traceId} reply.sent`);
 
-      if (freeUser) {
+      if (useFreeModel) {
         if (freeReservation) {
           await commitFreePoolReservation(freeReservation);
           freeReservation = null;
@@ -572,16 +580,16 @@ async function handleMessage(message: Message): Promise<void> {
           violations: err.violations,
         });
         console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
-        await message.reply(freeUser
-          ? formatFreeModelError()
+        await message.reply(useFreeModel
+          ? (freePoolFallback ? formatFreeModelErrorForMember() : formatFreeModelError())
           : formatError("Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi."));
         return;
       }
 
       await traceEvent(traceId, "llm.error", "error", { error: String(err) });
       console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA availability`);
-      await message.reply(freeUser
-        ? formatFreeModelError()
+      await message.reply(useFreeModel
+        ? (freePoolFallback ? formatFreeModelErrorForMember() : formatFreeModelError())
         : formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."));
     }
   });

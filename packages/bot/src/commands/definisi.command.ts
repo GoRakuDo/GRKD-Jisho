@@ -34,7 +34,9 @@ import {
 } from "../services/rate-limit.service.js";
 import {
   formatFreeModelError,
+  formatFreeModelErrorForMember,
   formatFreePoolExhausted,
+  formatMemberPoolExhausted,
   formatRateLimitExceeded,
   formatReply,
   formatNotFound,
@@ -171,7 +173,12 @@ export const definisiCommand: Command = {
     const hasAdmin =
       interaction.memberPermissions?.has("Administrator") ?? false;
 
-    const { allowed, limit, freeUser = false } = await checkRateLimit({
+    const {
+      allowed,
+      limit,
+      freeUser = false,
+      freePoolFallback = false,
+    } = await checkRateLimit({
       userId: interaction.user.id,
       guildId: interaction.guildId ?? "",
       memberRoles,
@@ -179,8 +186,9 @@ export const definisiCommand: Command = {
       hasAdminPermission: hasAdmin,
       includeFreeUser: true,
     });
+    const useFreeModel = freeUser || freePoolFallback;
 
-    if (!allowed) {
+    if (!allowed && !freePoolFallback) {
       console.log(
         `[Definisi] trace=${traceId} rate limit blocked → limit=${limit}`,
       );
@@ -216,7 +224,7 @@ export const definisiCommand: Command = {
       }
       await interaction.editReply(formatNotFound(query));
       await traceEvent(traceId, "dictionary.miss", "warn", { query });
-      if (!freeUser) {
+      if (!useFreeModel) {
         await recordLookup({
           guildId: guildContextId,
           channelId: interaction.channelId,
@@ -269,7 +277,7 @@ export const definisiCommand: Command = {
       promptVersion: promptContext.promptVersion,
     };
 
-    const cached = freeUser ? null : await getCachedResponse(cacheLookupKey);
+    const cached = useFreeModel ? null : await getCachedResponse(cacheLookupKey);
     if (cached) {
       console.log(
         `[Definisi] trace=${traceId} cache hit → cacheId=${cached.id.toString()}`,
@@ -302,10 +310,10 @@ export const definisiCommand: Command = {
     console.log(
       `[Definisi] trace=${traceId} cache miss → version=${promptContext.promptVersion}`,
     );
-    if (freeUser) {
+    if (useFreeModel) {
       freeReservation = await reserveFreePool();
       if (!freeReservation) {
-        await interaction.editReply(formatFreePoolExhausted());
+        await interaction.editReply(freeUser ? formatFreePoolExhausted() : formatMemberPoolExhausted(limit));
         await traceEvent(traceId, "rate_limit.blocked", "warn", { scope: "free_pool" });
         return;
       }
@@ -318,7 +326,7 @@ export const definisiCommand: Command = {
 
     try {
       const { text: responseText, source: llmSource } =
-        await (freeUser
+        await (useFreeModel
           ? generateFreeWithLanguageGuardrails
           : generateWithLanguageGuardrails)({
           roleKey: outputBucketKey,
@@ -336,7 +344,7 @@ export const definisiCommand: Command = {
       );
       await traceEvent(traceId, "llm.generated", "info", {});
 
-      const saved = freeUser ? null : await saveResponse({
+      const saved = useFreeModel ? null : await saveResponse({
         ...cacheLookupKey,
         promptContentHash: promptContext.promptContentHash,
         modelName: llmSource ?? "fallback",
@@ -367,7 +375,7 @@ export const definisiCommand: Command = {
         outputBucketKey,
         llmSource,
       });
-      if (freeUser) {
+      if (useFreeModel) {
         if (freeReservation) {
           await commitFreePoolReservation(freeReservation);
           freeReservation = null;
@@ -400,8 +408,8 @@ export const definisiCommand: Command = {
           `[Definisi] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`,
         );
         await interaction.editReply(
-          freeUser
-            ? formatFreeModelError()
+          useFreeModel
+            ? (freePoolFallback ? formatFreeModelErrorForMember() : formatFreeModelError())
             : formatError(
                 "Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi.",
               ),
@@ -414,8 +422,8 @@ export const definisiCommand: Command = {
         `[Definisi] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA service`,
       );
       await interaction.editReply(
-        freeUser
-          ? formatFreeModelError()
+        useFreeModel
+          ? (freePoolFallback ? formatFreeModelErrorForMember() : formatFreeModelError())
           : formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."),
       );
     }

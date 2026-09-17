@@ -84,6 +84,22 @@ export function formatFreeModelError(): string {
   ].join("\n");
 }
 
+export function formatFreeModelErrorForMember(): string {
+  return [
+    "Model gratis sedang mengalami gangguan. Coba lagi dalam 5 menit, atau upgrade membership agar bisa digunakan tanpa gangguan.",
+    "",
+    SUPPORT_GUIDANCE,
+  ].join("\n");
+}
+
+export function formatMemberPoolExhausted(limit: number): string {
+  return [
+    `Batas harian Anda (${limit} kali) telah tercapai dan kuota gratis bersama juga telah habis. Upgrade membership untuk limit lebih besar, atau tunggu hingga reset pukul 00:00 GMT+7.`,
+    "",
+    SUPPORT_GUIDANCE,
+  ].join("\n");
+}
+
 export function formatError(reason: string) {
   const embed = new EmbedBuilder()
     .setColor(0xff0000)

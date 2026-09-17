@@ -17,6 +17,8 @@ interface RateLimitResult {
   limit: number;
   /** true only when no member role row matched; Owner/Admin omit this flag */
   freeUser?: boolean;
+  /** true when a member role holder reached their personal limit and may use the shared pool */
+  freePoolFallback?: boolean;
 }
 
 export interface FreePoolReservation {
@@ -74,7 +76,12 @@ export async function checkRateLimit(
     allowed,
     remaining: Math.max(0, limit - currentCount),
     limit,
-    ...(params.includeFreeUser ? { freeUser: !hasMemberRole } : {}),
+    ...(params.includeFreeUser
+      ? {
+          freeUser: !hasMemberRole,
+          ...(hasMemberRole && !allowed ? { freePoolFallback: true } : {}),
+        }
+      : {}),
   };
 }
 

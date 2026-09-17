@@ -150,6 +150,26 @@ describe("checkRateLimit", () => {
     expect(result.remaining).toBe(0);
     expect(result.limit).toBe(10);
   });
+
+  it("メンバーが個人上限に達すると共有プールフォールバックを許可する", async () => {
+    setDbResults(
+      [{ discordRoleId: "role_member", dailyLimit: 5 }],
+      [{ count: 5 }],
+    );
+
+    const result = await checkRateLimit({
+      userId: "8", guildId: "1", memberRoles: ["role_member"],
+      isOwner: false, hasAdminPermission: false, includeFreeUser: true,
+    });
+
+    expect(result).toEqual({
+      allowed: false,
+      remaining: 0,
+      limit: 5,
+      freeUser: false,
+      freePoolFallback: true,
+    });
+  });
 });
 
 describe("incrementUsage", () => {

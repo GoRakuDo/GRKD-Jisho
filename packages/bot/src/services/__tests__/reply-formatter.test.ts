@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatFreeModelErrorForMember,
+  formatMemberPoolExhausted,
   formatReply,
   formatWipeGuide,
   WIPE_GUIDE_IMAGE_FILENAME,
@@ -24,6 +26,29 @@ describe("formatReply", () => {
     expect(description).toContain("長長長");
     expect(description).toContain("Teks terlalu panjang dan terpotong");
     expect(description.length).toBeLessThanOrEqual(4096);
+  });
+});
+
+describe("formatFreeModelErrorForMember", () => {
+  it("メンバー向けにアップグレード誘導を含む障害文言を返す", () => {
+    const result = formatFreeModelErrorForMember();
+
+    expect(result).toContain(
+      "Model gratis sedang mengalami gangguan. Coba lagi dalam 5 menit, atau upgrade membership agar bisa digunakan tanpa gangguan.",
+    );
+    expect(result).not.toContain("menjadi member");
+    expect(result).toContain("Trakteer Kopi");
+  });
+});
+
+describe("formatMemberPoolExhausted", () => {
+  it("メンバー上限と共有無料枠枯渇を案内し、サポート案内を含める", () => {
+    const result = formatMemberPoolExhausted(5);
+
+    expect(result).toContain(
+      "Batas harian Anda (5 kali) telah tercapai dan kuota gratis bersama juga telah habis. Upgrade membership untuk limit lebih besar, atau tunggu hingga reset pukul 00:00 GMT+7.",
+    );
+    expect(result).toContain("Trakteer Kopi");
   });
 });
 
