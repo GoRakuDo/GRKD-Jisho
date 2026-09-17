@@ -98,9 +98,10 @@ vi.mock("../../services/reply-formatter.js", () => ({
   formatFreePoolExhausted: () => "free-pool-exhausted",
   formatMemberPoolExhausted: (limit: number) => `member-pool-exhausted-${limit}`,
   formatRateLimitExceeded: (limit: number) => `rate-limit-${limit}`,
-  formatReply: (text: string) => ({ kind: "reply", text }),
-  formatNotFound: (query: string) => ({ kind: "notfound", query }),
-  formatError: (reason: string) => ({ kind: "error", reason }),
+  // 実物と同じく embeds を返す（wipe で返信先が消えたときの再送経路を再現するため）
+  formatReply: (text: string) => ({ kind: "reply", text, embeds: [{ description: text }] }),
+  formatNotFound: (query: string) => ({ kind: "notfound", query, embeds: [{ description: query }] }),
+  formatError: (reason: string) => ({ kind: "error", reason, embeds: [{ description: reason }] }),
 }));
 
 vi.mock("../../services/observability.service.js", () => ({
@@ -530,5 +531,142 @@ describe("messageCreateHandler", () => {
     expect(releaseFreePoolReservationMock).toHaveBeenCalledWith({ usageDate: "2026-05-06" });
     expect(commitFreePoolReservationMock).not.toHaveBeenCalled();
     expect(incrementUsageMock).not.toHaveBeenCalled();
+  });
+
+  it("返信先が wipe で消えた場合（code 10008）はユーザータグ付きで再送する", async () => {
+    sanitizeLookupQueryMock.mockReturnValue("食べる");
+    extractFirstTermMock.mockResolvedValue({
+      term: "食べる",
+      result: {
+        dictionary: { id: 1, name: "JMdict" },
+        entry: { id: BigInt(1), term: "食べる", reading: "たべる", definitionsJson: {} },
+        matchedBy: "term",
+        normalizedQuery: "食べる",
+      },
+    });
+    resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
+    checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10 });
+    getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    getCachedResponseMock.mockResolvedValue(null);
+    generateWithLanguageGuardrailsMock.mockResolvedValue({ text: "Makan", source: "model-1" });
+    saveResponseMock.mockResolvedValue({ id: BigInt(7) });
+
+    const reply = vi.fn().mockRejectedValue({ code: 10008, message: "Unknown Message" });
+    const send = vi.fn().mockResolvedValue(undefined);
+    const sendTyping = vi.fn().mockResolvedValue(undefined);
+    const guildMember = {
+      roles: { cache: { size: 1, map: () => ["role-1"] } },
+      permissions: { has: () => false },
+    };
+
+    await messageCreateHandler({
+      author: { bot: false, id: "user-1" },
+      client: { user: { id: "bot-1" } },
+      guildId: "guild-1",
+      channelId: "channel-1",
+      content: "<@bot-1> 食べる",
+      mentions: { has: (id: string) => id === "bot-1" },
+      channel: { send, sendTyping },
+      member: guildMember,
+      guild: {
+        ownerId: "owner-2",
+        members: { fetch: vi.fn().mockResolvedValue(guildMember) },
+      },
+      reply,
+    } as never);
+
+    expect(reply).toHaveBeenCalledWith(expect.objectContaining({ kind: "reply", text: "Makan" }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ content: "<@user-1>", embeds: expect.any(Array) }));
+  });
+
+  it("MESSAGE_REFERENCE_UNKNOWN_MESSAGE（code 50035）でもタグ付きで再送する", async () => {
+    sanitizeLookupQueryMock.mockReturnValue("食べる");
+    extractFirstTermMock.mockResolvedValue({
+      term: "食べる",
+      result: {
+        dictionary: { id: 1, name: "JMdict" },
+        entry: { id: BigInt(1), term: "食べる", reading: "たべる", definitionsJson: {} },
+        matchedBy: "term",
+        normalizedQuery: "食べる",
+      },
+    });
+    checkRateLimitMock.mockResolvedValue({ allowed: false, limit: 5 });
+
+    const reply = vi.fn().mockRejectedValue({
+      code: 50035,
+      message: "Invalid Form Body\nmessage_reference: MESSAGE_REFERENCE_UNKNOWN_MESSAGE",
+    });
+    const send = vi.fn().mockResolvedValue(undefined);
+    const sendTyping = vi.fn().mockResolvedValue(undefined);
+    const guildMember = {
+      roles: { cache: { size: 1, map: () => ["role-1"] } },
+      permissions: { has: () => false },
+    };
+
+    await messageCreateHandler({
+      author: { bot: false, id: "user-1" },
+      client: { user: { id: "bot-1" } },
+      guildId: "guild-1",
+      channelId: "channel-1",
+      content: "<@bot-1> 食べる",
+      mentions: { has: (id: string) => id === "bot-1" },
+      channel: { send, sendTyping },
+      member: guildMember,
+      guild: {
+        ownerId: "owner-2",
+        members: { fetch: vi.fn().mockResolvedValue(guildMember) },
+      },
+      reply,
+    } as never);
+
+    expect(reply).toHaveBeenCalledWith("rate-limit-5");
+    expect(send).toHaveBeenCalledWith("<@user-1> rate-limit-5");
+  });
+
+  it("返信先消失以外のエラーでは再送しない", async () => {
+    sanitizeLookupQueryMock.mockReturnValue("食べる");
+    extractFirstTermMock.mockResolvedValue({
+      term: "食べる",
+      result: {
+        dictionary: { id: 1, name: "JMdict" },
+        entry: { id: BigInt(1), term: "食べる", reading: "たべる", definitionsJson: {} },
+        matchedBy: "term",
+        normalizedQuery: "食べる",
+      },
+    });
+    checkRateLimitMock.mockResolvedValue({ allowed: false, limit: 5 });
+
+    const reply = vi.fn().mockRejectedValue({ code: 50013, message: "Missing Permissions" });
+    const send = vi.fn().mockResolvedValue(undefined);
+    const sendTyping = vi.fn().mockResolvedValue(undefined);
+    const guildMember = {
+      roles: { cache: { size: 1, map: () => ["role-1"] } },
+      permissions: { has: () => false },
+    };
+
+    await messageCreateHandler({
+      author: { bot: false, id: "user-1" },
+      client: { user: { id: "bot-1" } },
+      guildId: "guild-1",
+      channelId: "channel-1",
+      content: "<@bot-1> 食べる",
+      mentions: { has: (id: string) => id === "bot-1" },
+      channel: { send, sendTyping },
+      member: guildMember,
+      guild: {
+        ownerId: "owner-2",
+        members: { fetch: vi.fn().mockResolvedValue(guildMember) },
+      },
+      reply,
+    } as never);
+
+    expect(reply).toHaveBeenCalledWith("rate-limit-5");
+    expect(send).not.toHaveBeenCalled();
+    expect(traceEventMock).toHaveBeenCalledWith(
+      expect.any(String),
+      "reply.error",
+      "error",
+      expect.objectContaining({ channelId: "channel-1", userId: "user-1" }),
+    );
   });
 });

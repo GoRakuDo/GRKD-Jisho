@@ -31,6 +31,66 @@ import { transformDefinitionForPrompt } from "../services/dictionary-definition-
 
 const TYPING_REFRESH_INTERVAL_MS = 8_000;
 
+type DiscordErrorLike = {
+  code?: unknown;
+  message?: unknown;
+};
+
+type MessageReplyPayload = Parameters<Message["reply"]>[0];
+
+function isDeletedReplyReferenceError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) {
+    return false;
+  }
+
+  const discordError = err as DiscordErrorLike;
+  return discordError.code === 10008
+    || (discordError.code === 50035
+      && typeof discordError.message === "string"
+      && discordError.message.includes("MESSAGE_REFERENCE_UNKNOWN_MESSAGE"));
+}
+
+/**
+ * 返信先が wipe で削除された場合だけ、ユーザータグ付きの通常送信へ切り替える。
+ * それ以外の Discord エラーは従来どおり呼び出し元へ返す。
+ */
+async function replyToMessage(message: Message, payload: MessageReplyPayload): Promise<void> {
+  try {
+    await message.reply(payload);
+    return;
+  } catch (err) {
+    if (!isDeletedReplyReferenceError(err)) {
+      throw err;
+    }
+
+    const mention = `<@${message.author.id}>`;
+
+    // PartialGroupDMChannel など send を持たないチャンネルでは元の例外を再送出する
+    const channel = message.channel;
+    if (!("send" in channel)) {
+      throw err;
+    }
+
+    console.warn(`[Lookup] reply target unavailable: ${message.id} → Send a channel message mentioning the user`);
+
+    if (typeof payload === "string") {
+      await channel.send(`${mention} ${payload}`);
+      return;
+    }
+
+    if ("embeds" in payload) {
+      const content = "content" in payload && typeof payload.content === "string" ? payload.content : "";
+      await channel.send({
+        content: [mention, content].filter(Boolean).join(" "),
+        embeds: payload.embeds,
+      });
+      return;
+    }
+
+    await channel.send(mention);
+  }
+}
+
 /**
  * DB の生 definitionsJson を LLM プロンプト用に変換して文字列化する。
  * guild path と DM owner path の両方で同じ処理を使う。
@@ -91,14 +151,14 @@ async function loadActivePromptContext(message: Message, traceId: string, scopeK
   if (!activePrompt) {
     await traceEvent(traceId, "llm.error", "error", { error: "Active prompt missing" });
     console.error(`[Lookup] trace=${traceId} active prompt missing → Check prompts table and set one row active`);
-    await message.reply(formatError("Prompt aktif tidak ditemukan. Silakan hubungi administrator."));
+    await replyToMessage(message, formatError("Prompt aktif tidak ditemukan. Silakan hubungi administrator."));
     return null;
   }
 
   if (activePrompt.content.trim().length === 0) {
     await traceEvent(traceId, "llm.error", "error", { error: `Active prompt empty: ${activePrompt.version}` });
     console.error(`[Lookup] trace=${traceId} active prompt empty → Check prompts.content for version=${activePrompt.version}`);
-    await message.reply(formatError("Prompt aktif kosong. Silakan hubungi administrator."));
+    await replyToMessage(message, formatError("Prompt aktif kosong. Silakan hubungi administrator."));
     return null;
   }
 
@@ -153,7 +213,7 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[messageCreate] Unhandled error (trace_id=${traceId}): ${reason} → Check LLM/Dict config or DB`);
     try {
-      await message.reply("Terjadi kesalahan yang tidak terduga. Silakan coba lagi nanti.");
+      await replyToMessage(message, "Terjadi kesalahan yang tidak terduga. Silakan coba lagi nanti.");
     } catch {
       // reply 自体が失敗しても握りつぶす
     }
@@ -200,7 +260,7 @@ async function handleMessage(message: Message): Promise<void> {
     const rawText = message.content.replace(/@(here|everyone)\b/g, " ").trim();
     const cleanedText = sanitizeLookupQuery(rawText);
     if (!cleanedText) {
-      await message.reply("Silakan masukkan kata yang ingin dicari. Contoh: `@grkd-jisho 可憐`");
+      await replyToMessage(message, "Silakan masukkan kata yang ingin dicari. Contoh: `@grkd-jisho 可憐`");
       return;
     }
 
@@ -219,7 +279,7 @@ async function handleMessage(message: Message): Promise<void> {
 
       if (!result) {
         console.log(`[Lookup] trace=${traceId} dictionary miss`);
-        await message.reply(formatNotFound(query));
+        await replyToMessage(message, formatNotFound(query));
         await traceEvent(traceId, "dictionary.miss", "warn", { query });
         await finalizeLookup(message, traceId, {
           query,
@@ -256,7 +316,7 @@ async function handleMessage(message: Message): Promise<void> {
       const cached = await getCachedResponse(cacheLookupKey);
       if (cached) {
         console.log(`[Lookup] trace=${traceId} cache hit → cacheId=${cached.id.toString()}`);
-        await message.reply(formatReply(cached.responseText));
+        await replyToMessage(message, formatReply(cached.responseText));
         await traceEvent(traceId, "cache.hit", "info", { cacheId: cached.id.toString() });
         await finalizeLookup(message, traceId, {
           query,
@@ -313,7 +373,7 @@ async function handleMessage(message: Message): Promise<void> {
             normalizedQueryOverride: cacheLookupKey.normalizedQuery,
             guildIdOverride: guildContextId,
           });
-          await message.reply(formatReply(responseText));
+          await replyToMessage(message, formatReply(responseText));
           await traceEvent(traceId, "reply.sent", "info", {});
           console.log(`[Lookup] trace=${traceId} reply.sent (cache skipped)`);
           return;
@@ -321,7 +381,7 @@ async function handleMessage(message: Message): Promise<void> {
 
         await traceEvent(traceId, "cache.saved", "info", { cacheId: saved.id.toString() });
         console.log(`[Lookup] trace=${traceId} cache saved → cacheId=${saved.id.toString()}`);
-        await message.reply(formatReply(responseText));
+        await replyToMessage(message, formatReply(responseText));
         await traceEvent(traceId, "reply.sent", "info", {});
         console.log(`[Lookup] trace=${traceId} reply.sent`);
 
@@ -348,13 +408,13 @@ async function handleMessage(message: Message): Promise<void> {
             violations: err.violations,
           });
           console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
-          await message.reply(formatError("Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi."));
+          await replyToMessage(message, formatError("Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi."));
           return;
         }
 
         await traceEvent(traceId, "llm.error", "error", { error: String(err) });
         console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA availability`);
-        await message.reply(formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."));
+        await replyToMessage(message, formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."));
       }
 
       return;
@@ -393,7 +453,7 @@ async function handleMessage(message: Message): Promise<void> {
 
     if (!allowed && !freePoolFallback) {
       console.log(`[Lookup] trace=${traceId} rate limit blocked → limit=${limit}`);
-      await message.reply(formatRateLimitExceeded(limit));
+      await replyToMessage(message, formatRateLimitExceeded(limit));
       await traceEvent(traceId, "rate_limit.blocked", "warn", { limit });
       return;
     }
@@ -411,7 +471,7 @@ async function handleMessage(message: Message): Promise<void> {
         await releaseFreePoolReservation(freeReservation);
         freeReservation = null;
       }
-      await message.reply(formatNotFound(query));
+      await replyToMessage(message, formatNotFound(query));
       await traceEvent(traceId, "dictionary.miss", "warn", { query });
       if (!useFreeModel) {
         await finalizeLookup(message, traceId, {
@@ -453,7 +513,7 @@ async function handleMessage(message: Message): Promise<void> {
     const cached = useFreeModel ? null : await getCachedResponse(cacheLookupKey);
     if (cached) {
       console.log(`[Lookup] trace=${traceId} cache hit → cacheId=${cached.id.toString()}`);
-      await message.reply(formatReply(cached.responseText));
+      await replyToMessage(message, formatReply(cached.responseText));
       await traceEvent(traceId, "cache.hit", "info", { cacheId: cached.id.toString() });
       await finalizeLookup(message, traceId, {
         query,
@@ -472,7 +532,7 @@ async function handleMessage(message: Message): Promise<void> {
       freeReservation = await reserveFreePool();
       if (!freeReservation) {
         console.log(`[Lookup] trace=${traceId} free pool blocked`);
-        await message.reply(freeUser ? formatFreePoolExhausted() : formatMemberPoolExhausted(limit));
+        await replyToMessage(message, freeUser ? formatFreePoolExhausted() : formatMemberPoolExhausted(limit));
         await traceEvent(traceId, "rate_limit.blocked", "warn", { scope: "free_pool" });
         return;
       }
@@ -521,7 +581,7 @@ async function handleMessage(message: Message): Promise<void> {
           normalizedQueryOverride: cacheLookupKey.normalizedQuery,
           guildIdOverride: guildContextId,
         });
-        await message.reply(formatReply(responseText));
+        await replyToMessage(message, formatReply(responseText));
         await traceEvent(traceId, "reply.sent", "info", {});
         console.log(`[Lookup] trace=${traceId} reply.sent (cache skipped)`);
         return;
@@ -531,7 +591,7 @@ async function handleMessage(message: Message): Promise<void> {
         console.log(`[Lookup] trace=${traceId} cache saved → cacheId=${saved.id.toString()}`);
       }
 
-      await message.reply(formatReply(responseText));
+      await replyToMessage(message, formatReply(responseText));
       await traceEvent(traceId, "reply.sent", "info", {});
       console.log(`[Lookup] trace=${traceId} reply.sent`);
 
@@ -580,7 +640,7 @@ async function handleMessage(message: Message): Promise<void> {
           violations: err.violations,
         });
         console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
-        await message.reply(useFreeModel
+        await replyToMessage(message, useFreeModel
           ? (freePoolFallback ? formatFreeModelErrorForMember() : formatFreeModelError())
           : formatError("Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi."));
         return;
@@ -588,7 +648,7 @@ async function handleMessage(message: Message): Promise<void> {
 
       await traceEvent(traceId, "llm.error", "error", { error: String(err) });
       console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA availability`);
-      await message.reply(useFreeModel
+      await replyToMessage(message, useFreeModel
         ? (freePoolFallback ? formatFreeModelErrorForMember() : formatFreeModelError())
         : formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."));
     }
