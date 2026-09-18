@@ -1,0 +1,167 @@
+{
+  "notFound": {
+    "title": "Kata Tidak Ditemukan",
+    "description": "\"{{query}}\" tidak ditemukan dalam data kamus saat ini.\nSilakan coba dengan kata lain, atau periksa kembali ejaan kata yang dimasukkan.",
+    "image": null
+  },
+  "error": {
+    "title": "Terjadi Kesalahan",
+    "description": "{{reason}}\nSilakan coba lagi beberapa saat kemudian.",
+    "image": null
+  },
+  "supportGuidance": {
+    "title": null,
+    "description": "Kalau Terbantu dengan Project GRKD-Jisho,\nbisa support kita kasih setiap harinya 10x request lbh banyak :thumbsup:\n\nTrakteer Kopi :coffee:  https://trakteer.id/yosiakefas/showcase?menu=open\nAtau dengan Membership YouTube https://www.youtube.com/@yosiakefas/join :kashiwade:",
+    "image": null
+  },
+  "rateLimitExceeded": {
+    "title": null,
+    "description": "Batas pencarian harian Anda ({{limit}}) telah tercapai. Limit akan di-reset besok pukul 00:00 GMT+7.\n\n{{support}}",
+    "image": null
+  },
+  "freePoolExhausted": {
+    "title": null,
+    "description": "Kuota gratis hari ini telah habis. Jadilah member untuk terus menggunakan bot, atau tunggu hingga reset pukul 00:00 GMT+7.\n\n{{support}}",
+    "image": null
+  },
+  "freeModelError": {
+    "title": null,
+    "description": "Model gratis sedang sering mengalami gangguan. Silakan coba lagi dalam 5 menit, atau jadilah member untuk penggunaan tanpa gangguan.\n\n{{support}}",
+    "image": null
+  },
+  "freeModelErrorForMember": {
+    "title": null,
+    "description": "Model gratis sedang mengalami gangguan. Coba lagi dalam 5 menit, atau upgrade membership agar bisa digunakan tanpa gangguan.\n\n{{support}}",
+    "image": null
+  },
+  "memberPoolExhausted": {
+    "title": null,
+    "description": "Batas harian Anda ({{limit}} kali) telah tercapai dan kuota gratis bersama juga telah habis. Upgrade membership untuk limit lebih besar, atau tunggu hingga reset pukul 00:00 GMT+7.\n\n{{support}}",
+    "image": null
+  },
+  "truncatedSuffix": {
+    "title": null,
+    "description": "\n\n… (Teks terlalu panjang dan terpotong. Silakan periksa detail cache untuk teks lengkap.)",
+    "image": null
+  },
+  "wipeGuide": {
+    "title": "Panduan Penggunaan GRKD-Jisho",
+    "description": "Kanal ini telah dibersihkan secara otomatis.\nKamu bisa mencari arti kata bahasa Jepang dengan 2 cara:\n\n1. **Tag / Mention Bot**\n   `@GRKD-Jisho <kata>`\n   Contoh: `@GRKD-Jisho 重ね重ね`\n\n2. **Slash Command**\n   `/definisi word:<kata>`\n   Contoh: `/definisi word:重ね重ね`\n\nPenjelasan kartu kamus akan dibuat dengan nuansa bahasa Indonesia alami!",
+    "image": null
+  },
+  "unexpectedError": {
+    "title": null,
+    "description": "Terjadi kesalahan yang tidak terduga. Silakan coba lagi nanti.",
+    "image": null
+  },
+  "missingQueryMention": {
+    "title": null,
+    "description": "Silakan masukkan kata yang ingin dicari. Contoh: `@grkd-jisho 可憐`",
+    "image": null
+  },
+  "missingQuerySlash": {
+    "title": null,
+    "description": "Silakan masukkan kata yang ingin dicari. Contoh: `/definisi word:可憐`",
+    "image": null
+  },
+  "promptMissing": {
+    "title": null,
+    "description": "Prompt aktif tidak ditemukan. Silakan hubungi administrator.",
+    "image": null
+  },
+  "promptEmpty": {
+    "title": null,
+    "description": "Prompt aktif kosong. Silakan hubungi administrator.",
+    "image": null
+  },
+  "languageGuardFailed": {
+    "title": null,
+    "description": "Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi.",
+    "image": null
+  },
+  "llmGenerationError": {
+    "title": null,
+    "description": "Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi.",
+    "image": null
+  },
+  "commandGuildOnly": {
+    "title": null,
+    "description": "Perintah ini hanya dapat digunakan di server.",
+    "image": null
+  },
+  "commandChannelOnly": {
+    "title": null,
+    "description": "Perintah ini hanya dapat digunakan di channel pencarian kamus yang telah ditentukan.",
+    "image": null
+  },
+  "buttonProcessingError": {
+    "title": null,
+    "description": "Terjadi kesalahan saat memproses tombol.",
+    "image": null
+  },
+  "modalProcessingError": {
+    "title": null,
+    "description": "Terjadi kesalahan saat memproses modal.",
+    "image": null
+  },
+  "unknownCommand": {
+    "title": null,
+    "description": "Perintah tidak dikenal.",
+    "image": null
+  },
+  "adminOnly": {
+    "title": null,
+    "description": "Anda tidak memiliki izin untuk menjalankan perintah ini (Khusus Administrator).",
+    "image": null
+  },
+  "commandExecutionError": {
+    "title": null,
+    "description": "Terjadi kesalahan saat menjalankan perintah.",
+    "image": null
+  },
+  "wipeCancelled": {
+    "title": null,
+    "description": "Dibatalkan.",
+    "image": null
+  },
+  "wipeChannelNotFound": {
+    "title": null,
+    "description": "Channel tidak ditemukan. Kemungkinan channel telah dihapus.",
+    "image": null
+  },
+  "wipeSuccess": {
+    "title": null,
+    "description": "Berhasil menghapus {{count}} pesan di channel <#{{channel}}>.",
+    "image": null
+  },
+  "wipeFailed": {
+    "title": null,
+    "description": "Gagal menghapus pesan. Silakan periksa izin Anda.",
+    "image": null
+  },
+  "buttonUnhandled": {
+    "title": null,
+    "description": "Tombol tidak dapat diproses.",
+    "image": null
+  },
+  "modalUnhandled": {
+    "title": null,
+    "description": "Modal tidak dapat diproses.",
+    "image": null
+  },
+  "emptyTextNotSaved": {
+    "title": null,
+    "description": "Teks kosong tidak dapat disimpan.",
+    "image": null
+  },
+  "editSuccess": {
+    "title": null,
+    "description": "Pembaruan berhasil untuk ID {{id}}. `is_manual_override = true`",
+    "image": null
+  },
+  "updateFailed": {
+    "title": null,
+    "description": "Terjadi kesalahan saat memperbarui.",
+    "image": null
+  }
+}

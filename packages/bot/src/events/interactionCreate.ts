@@ -5,6 +5,7 @@ import {
   TextChannel,
 } from "discord.js";
 import { getCommand } from "../commands/index.js";
+import { renderMessage } from "../config/messages.js";
 import { isInteractionAdmin } from "../services/admin-permission.service.js";
 import { updateResponse } from "../services/response-admin.service.js";
 import { wipeChannel } from "../services/channel-wipe.service.js";
@@ -21,7 +22,7 @@ export const interactionCreateHandler = async (
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`[Interaction] Button "${interaction.customId}" failed: ${reason} → Check interaction handler`);
       const errorReply = {
-        content: "Terjadi kesalahan saat memproses tombol.",
+        content: renderMessage("buttonProcessingError"),
         ephemeral: true,
       };
       try {
@@ -46,7 +47,7 @@ export const interactionCreateHandler = async (
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`[Interaction] Modal "${interaction.customId}" failed: ${reason} → Check modal handler`);
       const errorReply = {
-        content: "Terjadi kesalahan saat memproses modal.",
+        content: renderMessage("modalProcessingError"),
         ephemeral: true,
       };
       try {
@@ -69,7 +70,7 @@ export const interactionCreateHandler = async (
   const cmd = getCommand(interaction.commandName);
   if (!cmd) {
     await interaction.reply({
-      content: "Perintah tidak dikenal.",
+      content: renderMessage("unknownCommand"),
       ephemeral: true,
     });
     return;
@@ -77,7 +78,7 @@ export const interactionCreateHandler = async (
 
   if (cmd.requiresAdmin && !isInteractionAdmin(interaction)) {
     await interaction.reply({
-      content: "Anda tidak memiliki izin untuk menjalankan perintah ini (Khusus Administrator).",
+      content: renderMessage("adminOnly"),
       ephemeral: true,
     });
     return;
@@ -91,7 +92,7 @@ export const interactionCreateHandler = async (
       `[Interaction] Command "${interaction.commandName}" failed: ${reason} → Check command handler`,
     );
     const errorReply = {
-      content: "Terjadi kesalahan saat menjalankan perintah.",
+      content: renderMessage("commandExecutionError"),
       ephemeral: true,
     };
     if (interaction.replied || interaction.deferred) {
@@ -111,7 +112,7 @@ async function handleButtonInteraction(
   // キャンセル
   if (customId === "wipe_now_cancel") {
     await interaction.update({
-      content: "Dibatalkan.",
+      content: renderMessage("wipeCancelled"),
       components: [],
     });
     return;
@@ -124,7 +125,7 @@ async function handleButtonInteraction(
 
     if (!(channel instanceof TextChannel)) {
       await interaction.update({
-        content: "Channel tidak ditemukan. Kemungkinan channel telah dihapus.",
+        content: renderMessage("wipeChannelNotFound"),
         components: [],
       });
       return;
@@ -142,14 +143,14 @@ async function handleButtonInteraction(
         triggeredBy: interaction.user.id,
       });
       await interaction.editReply({
-        content: `Berhasil menghapus ${deletedCount} pesan di channel <#${channelId}>.`,
+        content: renderMessage("wipeSuccess", { count: deletedCount, channel: channelId }),
         components: [],
       });
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       console.error(`[Button] wipe-now failed for ${channelId}: ${reason} → Check permissions (MANAGE_MESSAGES)`);
       await interaction.editReply({
-        content: "Gagal menghapus pesan. Silakan periksa izin Anda.",
+        content: renderMessage("wipeFailed"),
         components: [],
       });
     }
@@ -158,7 +159,7 @@ async function handleButtonInteraction(
 
   // 未知のボタン
   await interaction.update({
-    content: "Tombol tidak dapat diproses.",
+    content: renderMessage("buttonUnhandled"),
     components: [],
   });
 }
@@ -171,7 +172,7 @@ async function handleModalSubmit(
 
   if (!customId.startsWith("edit_jisho_")) {
     await interaction.reply({
-      content: "Modal tidak dapat diproses.",
+      content: renderMessage("modalUnhandled"),
       ephemeral: true,
     });
     return;
@@ -179,7 +180,7 @@ async function handleModalSubmit(
 
   if (!isInteractionAdmin(interaction)) {
     await interaction.reply({
-      content: "Anda tidak memiliki izin untuk menjalankan perintah ini (Khusus Administrator).",
+      content: renderMessage("adminOnly"),
       ephemeral: true,
     });
     return;
@@ -192,7 +193,7 @@ async function handleModalSubmit(
 
   if (!newText.trim()) {
     await interaction.reply({
-      content: "Teks kosong tidak dapat disimpan.",
+      content: renderMessage("emptyTextNotSaved"),
       ephemeral: true,
     });
     return;
@@ -201,14 +202,14 @@ async function handleModalSubmit(
   try {
     await updateResponse(responseId, newText, interaction.user.id, reason);
     await interaction.reply({
-      content: `Pembaruan berhasil untuk ID ${responseId}. \`is_manual_override = true\``,
+      content: renderMessage("editSuccess", { id: responseId }),
       ephemeral: true,
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[Modal] edit_jisho_${responseId} failed: ${reason} → Check response ID and DB`);
     await interaction.reply({
-      content: "Terjadi kesalahan saat memperbarui.",
+      content: renderMessage("updateFailed"),
       ephemeral: true,
     });
   }

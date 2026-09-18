@@ -10,6 +10,7 @@ import {
   type PromptScopeKey,
 } from "@grkd-jisho/db";
 import { env } from "../config/env.js";
+import { renderMessage } from "../config/messages.js";
 import type { Command } from "./types.js";
 import { extractFirstTerm } from "../services/extract-first-term.js";
 import { resolveOutputBucketKey } from "../services/role-mapper.service.js";
@@ -76,7 +77,7 @@ async function loadActivePromptContext(
     );
     await interaction.editReply(
       formatError(
-        "Prompt aktif tidak ditemukan. Silakan hubungi administrator.",
+        renderMessage("promptMissing"),
       ),
     );
     return null;
@@ -91,7 +92,7 @@ async function loadActivePromptContext(
     );
     await interaction.editReply(
       formatError(
-        "Prompt aktif kosong. Silakan hubungi administrator.",
+        renderMessage("promptEmpty"),
       ),
     );
     return null;
@@ -122,7 +123,7 @@ export const definisiCommand: Command = {
   async execute(interaction: ChatInputCommandInteraction): Promise<void> {
     if (!interaction.inGuild() || !interaction.channelId) {
       await interaction.reply({
-        content: "Perintah ini hanya dapat digunakan di server.",
+        content: renderMessage("commandGuildOnly"),
         ephemeral: true,
       });
       return;
@@ -131,7 +132,7 @@ export const definisiCommand: Command = {
     const allowedChannels = env.DISCORD_ALLOWED_CHANNELS;
     if (!allowedChannels.includes(interaction.channelId)) {
       await interaction.reply({
-        content: "Perintah ini hanya dapat digunakan di channel pencarian kamus yang telah ditentukan.",
+        content: renderMessage("commandChannelOnly"),
         ephemeral: true,
       });
       return;
@@ -146,7 +147,7 @@ export const definisiCommand: Command = {
 
     if (!cleanedText) {
       await interaction.editReply(
-        formatError("Silakan masukkan kata yang ingin dicari. Contoh: `/definisi word:可憐`"),
+        formatError(renderMessage("missingQuerySlash")),
       );
       return;
     }
@@ -411,7 +412,7 @@ export const definisiCommand: Command = {
           useFreeModel
             ? (freePoolFallback ? formatFreeModelErrorForMember() : formatFreeModelError())
             : formatError(
-                "Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi.",
+                renderMessage("languageGuardFailed"),
               ),
         );
         return;
@@ -424,7 +425,7 @@ export const definisiCommand: Command = {
       await interaction.editReply(
         useFreeModel
           ? (freePoolFallback ? formatFreeModelErrorForMember() : formatFreeModelError())
-          : formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."),
+          : formatError(renderMessage("llmGenerationError")),
       );
     }
   },

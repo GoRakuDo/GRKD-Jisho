@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { type Message } from "discord.js";
 import { getActivePromptForScope, type PromptScopeKey } from "@grkd-jisho/db";
 import { env } from "../config/env.js";
+import { renderMessage } from "../config/messages.js";
 import { extractFirstTerm } from "../services/extract-first-term.js";
 import { resolveOutputBucketKey } from "../services/role-mapper.service.js";
 import { getCachedResponse, saveResponse } from "../services/response-cache.service.js";
@@ -151,14 +152,14 @@ async function loadActivePromptContext(message: Message, traceId: string, scopeK
   if (!activePrompt) {
     await traceEvent(traceId, "llm.error", "error", { error: "Active prompt missing" });
     console.error(`[Lookup] trace=${traceId} active prompt missing → Check prompts table and set one row active`);
-    await replyToMessage(message, formatError("Prompt aktif tidak ditemukan. Silakan hubungi administrator."));
+    await replyToMessage(message, formatError(renderMessage("promptMissing")));
     return null;
   }
 
   if (activePrompt.content.trim().length === 0) {
     await traceEvent(traceId, "llm.error", "error", { error: `Active prompt empty: ${activePrompt.version}` });
     console.error(`[Lookup] trace=${traceId} active prompt empty → Check prompts.content for version=${activePrompt.version}`);
-    await replyToMessage(message, formatError("Prompt aktif kosong. Silakan hubungi administrator."));
+    await replyToMessage(message, formatError(renderMessage("promptEmpty")));
     return null;
   }
 
@@ -213,7 +214,7 @@ export const messageCreateHandler = async (message: Message): Promise<void> => {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(`[messageCreate] Unhandled error (trace_id=${traceId}): ${reason} → Check LLM/Dict config or DB`);
     try {
-      await replyToMessage(message, "Terjadi kesalahan yang tidak terduga. Silakan coba lagi nanti.");
+      await replyToMessage(message, renderMessage("unexpectedError"));
     } catch {
       // reply 自体が失敗しても握りつぶす
     }
@@ -260,7 +261,7 @@ async function handleMessage(message: Message): Promise<void> {
     const rawText = message.content.replace(/@(here|everyone)\b/g, " ").trim();
     const cleanedText = sanitizeLookupQuery(rawText);
     if (!cleanedText) {
-      await replyToMessage(message, "Silakan masukkan kata yang ingin dicari. Contoh: `@grkd-jisho 可憐`");
+      await replyToMessage(message, renderMessage("missingQueryMention"));
       return;
     }
 
@@ -408,13 +409,13 @@ async function handleMessage(message: Message): Promise<void> {
             violations: err.violations,
           });
           console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
-          await replyToMessage(message, formatError("Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi."));
+          await replyToMessage(message, formatError(renderMessage("languageGuardFailed")));
           return;
         }
 
         await traceEvent(traceId, "llm.error", "error", { error: String(err) });
         console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA availability`);
-        await replyToMessage(message, formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."));
+        await replyToMessage(message, formatError(renderMessage("llmGenerationError")));
       }
 
       return;
@@ -642,7 +643,7 @@ async function handleMessage(message: Message): Promise<void> {
         console.warn(`[Lookup] trace=${traceId} language guard failed → bucket=${err.bucket} source=${err.source} attempts=${err.reaskAttempts}`);
         await replyToMessage(message, useFreeModel
           ? (freePoolFallback ? formatFreeModelErrorForMember() : formatFreeModelError())
-          : formatError("Hasil generasi AI tidak memenuhi aturan bahasa. Silakan coba lagi."));
+          : formatError(renderMessage("languageGuardFailed")));
         return;
       }
 
@@ -650,7 +651,7 @@ async function handleMessage(message: Message): Promise<void> {
       console.error(`[Lookup] trace=${traceId} failed: ${err instanceof Error ? err.message : String(err)} → Check CPA_API_KEY in .env or CPA availability`);
       await replyToMessage(message, useFreeModel
         ? (freePoolFallback ? formatFreeModelErrorForMember() : formatFreeModelError())
-        : formatError("Terjadi kesalahan saat AI membuat penjelasan. Silakan coba lagi."));
+        : formatError(renderMessage("llmGenerationError")));
     }
   });
 };

@@ -2,25 +2,12 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { EmbedBuilder } from "discord.js";
+import { getMessage, renderMessage } from "../config/messages.js";
 
 const DISCORD_EMBED_DESCRIPTION_LIMIT = 3900;
-const DISCORD_EMBED_TRUNCATED_SUFFIX = "\n\n… (Teks terlalu panjang dan terpotong. Silakan periksa detail cache untuk teks lengkap.)";
 
 // Wipe 後ガイドの添付画像（packages/bot/assets/ 配下）
 export const WIPE_GUIDE_IMAGE_FILENAME = "usage-guide.png";
-
-const WIPE_GUIDE_DESCRIPTION = `Kanal ini telah dibersihkan secara otomatis.
-Kamu bisa mencari arti kata bahasa Jepang dengan 2 cara:
-
-1. **Tag / Mention Bot**
-   \`@GRKD-Jisho <kata>\`
-   Contoh: \`@GRKD-Jisho 重ね重ね\`
-
-2. **Slash Command**
-   \`/definisi word:<kata>\`
-   Contoh: \`/definisi word:重ね重ね\`
-
-Penjelasan kartu kamus akan dibuat dengan nuansa bahasa Indonesia alami!`;
 
 function clampDiscordEmbedDescription(text: string): string {
   if (text.length <= DISCORD_EMBED_DESCRIPTION_LIMIT) {
@@ -28,7 +15,7 @@ function clampDiscordEmbedDescription(text: string): string {
   }
 
   const trimmed = text.slice(0, DISCORD_EMBED_DESCRIPTION_LIMIT).trimEnd();
-  return `${trimmed}${DISCORD_EMBED_TRUNCATED_SUFFIX}`;
+  return `${trimmed}${renderMessage("truncatedSuffix")}`;
 }
 
 export function formatReply(text: string) {
@@ -43,68 +30,43 @@ export function formatReply(text: string) {
 export function formatNotFound(query: string) {
   const embed = new EmbedBuilder()
     .setColor(0xffa500)
-    .setTitle("Kata Tidak Ditemukan")
-    .setDescription(
-      `"${query}" tidak ditemukan dalam data kamus saat ini.\nSilakan coba dengan kata lain, atau periksa kembali ejaan kata yang dimasukkan.`,
-    )
+    .setTitle(getMessage("notFound").title)
+    .setDescription(renderMessage("notFound", { query }))
     .setTimestamp();
 
   return { embeds: [embed] };
 }
 
-export const SUPPORT_GUIDANCE = [
-  "Kalau Terbantu dengan Project GRKD-Jisho,",
-  "bisa support kita kasih setiap harinya 10x request lbh banyak :thumbsup:",
-  "",
-  "Trakteer Kopi :coffee:  https://trakteer.id/yosiakefas/showcase?menu=open",
-  "Atau dengan Membership YouTube https://www.youtube.com/@yosiakefas/join :kashiwade:",
-].join("\n");
+export const SUPPORT_GUIDANCE = renderMessage("supportGuidance");
 
 export function formatRateLimitExceeded(limit: number): string {
-  return [
-    `Batas pencarian harian Anda (${limit === Infinity ? "Tanpa Batas" : `${limit} kali`}) telah tercapai. Limit akan di-reset besok pukul 00:00 GMT+7.`,
-    "",
-    SUPPORT_GUIDANCE,
-  ].join("\n");
+  return renderMessage("rateLimitExceeded", {
+    limit: limit === Infinity ? "Tanpa Batas" : `${limit} kali`,
+    support: SUPPORT_GUIDANCE,
+  });
 }
 
 export function formatFreePoolExhausted(): string {
-  return [
-    "Kuota gratis hari ini telah habis. Jadilah member untuk terus menggunakan bot, atau tunggu hingga reset pukul 00:00 GMT+7.",
-    "",
-    SUPPORT_GUIDANCE,
-  ].join("\n");
+  return renderMessage("freePoolExhausted", { support: SUPPORT_GUIDANCE });
 }
 
 export function formatFreeModelError(): string {
-  return [
-    "Model gratis sedang sering mengalami gangguan. Silakan coba lagi dalam 5 menit, atau jadilah member untuk penggunaan tanpa gangguan.",
-    "",
-    SUPPORT_GUIDANCE,
-  ].join("\n");
+  return renderMessage("freeModelError", { support: SUPPORT_GUIDANCE });
 }
 
 export function formatFreeModelErrorForMember(): string {
-  return [
-    "Model gratis sedang mengalami gangguan. Coba lagi dalam 5 menit, atau upgrade membership agar bisa digunakan tanpa gangguan.",
-    "",
-    SUPPORT_GUIDANCE,
-  ].join("\n");
+  return renderMessage("freeModelErrorForMember", { support: SUPPORT_GUIDANCE });
 }
 
 export function formatMemberPoolExhausted(limit: number): string {
-  return [
-    `Batas harian Anda (${limit} kali) telah tercapai dan kuota gratis bersama juga telah habis. Upgrade membership untuk limit lebih besar, atau tunggu hingga reset pukul 00:00 GMT+7.`,
-    "",
-    SUPPORT_GUIDANCE,
-  ].join("\n");
+  return renderMessage("memberPoolExhausted", { limit, support: SUPPORT_GUIDANCE });
 }
 
 export function formatError(reason: string) {
   const embed = new EmbedBuilder()
     .setColor(0xff0000)
-    .setTitle("Terjadi Kesalahan")
-    .setDescription(`${reason}\nSilakan coba lagi beberapa saat kemudian.`)
+    .setTitle(getMessage("error").title)
+    .setDescription(renderMessage("error", { reason }))
     .setTimestamp();
 
   return { embeds: [embed] };
@@ -121,10 +83,11 @@ export function resolveUsageGuideImagePath(): string | undefined {
 
 // Wipe 完了後に投稿する使い方ガイド。imagePath があれば attachment 画像を付与する。
 export function formatWipeGuide(imagePath?: string) {
+  const message = getMessage("wipeGuide");
   const embed = new EmbedBuilder()
     .setColor(0x00b7c3)
-    .setTitle("Panduan Penggunaan GRKD-Jisho")
-    .setDescription(WIPE_GUIDE_DESCRIPTION)
+    .setTitle(message.title)
+    .setDescription(message.description)
     .setTimestamp();
 
   if (imagePath) {
