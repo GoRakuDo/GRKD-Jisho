@@ -250,6 +250,52 @@ describe("messageCreateHandler", () => {
     expect(reserveFreePoolMock).not.toHaveBeenCalled();
   });
 
+  it("無料ユーザーはキャッシュヒット時に生成せずプールも使用量も消費しない", async () => {
+    sanitizeLookupQueryMock.mockReturnValue("食べる");
+    extractFirstTermMock.mockResolvedValue({
+      term: "食べる",
+      result: {
+        dictionary: { id: 1, name: "JMdict" },
+        entry: { id: BigInt(1), term: "食べる", reading: "たべる", definitionsJson: {} },
+        matchedBy: "term",
+        normalizedQuery: "食べる",
+      },
+    });
+    resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
+    checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10, freeUser: true });
+    getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    getCachedResponseMock.mockResolvedValue({ id: BigInt(77), responseText: "Makan" });
+
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const sendTyping = vi.fn().mockResolvedValue(undefined);
+    const guildMember = {
+      roles: { cache: { size: 0, map: () => [] } },
+      permissions: { has: () => false },
+    };
+
+    await messageCreateHandler({
+      author: { bot: false, id: "free-user-9" },
+      client: { user: { id: "bot-1" } },
+      guildId: "guild-1",
+      channelId: "channel-1",
+      content: "<@bot-1> 食べる",
+      mentions: { has: (id: string) => id === "bot-1" },
+      channel: { sendTyping },
+      member: guildMember,
+      guild: {
+        ownerId: "owner-2",
+        members: { fetch: vi.fn().mockResolvedValue(guildMember) },
+      },
+      reply,
+    } as never);
+
+    expect(reply).toHaveBeenCalledWith(expect.objectContaining({ kind: "reply", text: "Makan" }));
+    expect(generateFreeWithLanguageGuardrailsMock).not.toHaveBeenCalled();
+    expect(reserveFreePoolMock).not.toHaveBeenCalled();
+    expect(commitFreePoolReservationMock).not.toHaveBeenCalled();
+    expect(incrementUsageMock).not.toHaveBeenCalled();
+  });
+
   it("無料ユーザーは共有枠があれば専用モデルで生成し、成功時だけ使用量を増やす", async () => {
     sanitizeLookupQueryMock.mockReturnValue("食べる");
     extractFirstTermMock.mockResolvedValue({
@@ -264,6 +310,7 @@ describe("messageCreateHandler", () => {
     resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
     checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10, freeUser: true });
     getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    getCachedResponseMock.mockResolvedValue(null);
     reserveFreePoolMock.mockResolvedValue({ usageDate: "2026-05-06" });
     generateFreeWithLanguageGuardrailsMock.mockResolvedValue({
       text: "Makan",
@@ -295,7 +342,13 @@ describe("messageCreateHandler", () => {
 
     expect(generateFreeWithLanguageGuardrailsMock).toHaveBeenCalledTimes(1);
     expect(generateWithLanguageGuardrailsMock).not.toHaveBeenCalled();
-    expect(saveResponseMock).not.toHaveBeenCalled();
+    expect(getCachedResponseMock).toHaveBeenCalledTimes(1);
+    expect(saveResponseMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelName: "google1-grkd-jisho-free-gemma-4-26b-a4b-it",
+        responseText: "Makan",
+      }),
+    );
     expect(commitFreePoolReservationMock).toHaveBeenCalledWith({ usageDate: "2026-05-06" });
     expect(incrementUsageMock).toHaveBeenCalledWith({ userId: "free-user-1", guildId: "guild-1" });
     expect(reply).toHaveBeenCalledWith(expect.objectContaining({ kind: "reply", text: "Makan" }));
@@ -315,6 +368,7 @@ describe("messageCreateHandler", () => {
     resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
     checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10, freeUser: true });
     getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    getCachedResponseMock.mockResolvedValue(null);
     reserveFreePoolMock.mockResolvedValue(null);
 
     const reply = vi.fn().mockResolvedValue(undefined);
@@ -360,6 +414,7 @@ describe("messageCreateHandler", () => {
     resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
     checkRateLimitMock.mockResolvedValue({ allowed: true, limit: 10, freeUser: true });
     getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    getCachedResponseMock.mockResolvedValue(null);
     reserveFreePoolMock.mockResolvedValue({ usageDate: "2026-05-06" });
     generateFreeWithLanguageGuardrailsMock.mockRejectedValue(new Error("CPA unavailable"));
 
@@ -407,6 +462,7 @@ describe("messageCreateHandler", () => {
     resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
     checkRateLimitMock.mockResolvedValue({ allowed: false, limit: 5, freeUser: false, freePoolFallback: true });
     getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    getCachedResponseMock.mockResolvedValue(null);
     reserveFreePoolMock.mockResolvedValue({ usageDate: "2026-05-06" });
     generateFreeWithLanguageGuardrailsMock.mockResolvedValue({
       text: "Makan",
@@ -457,6 +513,7 @@ describe("messageCreateHandler", () => {
     resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
     checkRateLimitMock.mockResolvedValue({ allowed: false, limit: 5, freeUser: false, freePoolFallback: true });
     getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    getCachedResponseMock.mockResolvedValue(null);
     reserveFreePoolMock.mockResolvedValue(null);
 
     const reply = vi.fn().mockResolvedValue(undefined);
@@ -501,6 +558,7 @@ describe("messageCreateHandler", () => {
     resolveOutputBucketKeyMock.mockResolvedValue("indonesian");
     checkRateLimitMock.mockResolvedValue({ allowed: false, limit: 5, freeUser: false, freePoolFallback: true });
     getActivePromptForScopeMock.mockResolvedValue({ content: "PROMPT", version: "v1" });
+    getCachedResponseMock.mockResolvedValue(null);
     reserveFreePoolMock.mockResolvedValue({ usageDate: "2026-05-06" });
     generateFreeWithLanguageGuardrailsMock.mockRejectedValue(new Error("CPA unavailable"));
 

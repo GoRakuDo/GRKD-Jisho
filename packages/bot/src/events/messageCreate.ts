@@ -511,7 +511,7 @@ async function handleMessage(message: Message): Promise<void> {
       promptVersion: promptContext.promptVersion,
     };
 
-    const cached = useFreeModel ? null : await getCachedResponse(cacheLookupKey);
+    const cached = await getCachedResponse(cacheLookupKey);
     if (cached) {
       console.log(`[Lookup] trace=${traceId} cache hit → cacheId=${cached.id.toString()}`);
       await replyToMessage(message, formatReply(cached.responseText));
@@ -525,6 +525,9 @@ async function handleMessage(message: Message): Promise<void> {
         outputBucketKey,
         normalizedQueryOverride: cacheLookupKey.normalizedQuery,
         guildIdOverride: guildContextId,
+        // キャッシュヒットは生成していないため、無料経路では個人使用量も共有枠も消費しない。
+        // メンバー経路は従来どおり使用量を記録する。
+        incrementPersonalUsage: !useFreeModel,
       });
       return;
     }
@@ -562,7 +565,7 @@ async function handleMessage(message: Message): Promise<void> {
       console.log(`[Lookup] trace=${traceId} llm.generate.success source=${llmSource ?? "fallback"}`);
       await traceEvent(traceId, "llm.generated", "info", {});
 
-      const saved = useFreeModel ? null : await saveResponse({
+      const saved = await saveResponse({
         ...cacheLookupKey,
         promptContentHash: promptContext.promptContentHash,
         modelName: llmSource ?? "fallback",
@@ -605,7 +608,7 @@ async function handleMessage(message: Message): Promise<void> {
           query,
           roleIds,
           dictionaryIdUsed: result.dictionary.id,
-          responseCacheId: null,
+          responseCacheId: saved?.id ?? null,
           cacheHit: false,
           outputBucketKey,
           llmSource,

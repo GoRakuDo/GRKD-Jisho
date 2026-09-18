@@ -278,7 +278,7 @@ export const definisiCommand: Command = {
       promptVersion: promptContext.promptVersion,
     };
 
-    const cached = useFreeModel ? null : await getCachedResponse(cacheLookupKey);
+    const cached = await getCachedResponse(cacheLookupKey);
     if (cached) {
       console.log(
         `[Definisi] trace=${traceId} cache hit → cacheId=${cached.id.toString()}`,
@@ -301,10 +301,14 @@ export const definisiCommand: Command = {
         outputBucketKey,
         llmSource: null,
       });
-      await incrementUsage({
-        userId: interaction.user.id,
-        guildId: guildContextId,
-      });
+      // キャッシュヒットは生成していないため、無料経路では個人使用量も共有枠も消費しない。
+      // メンバー経路は従来どおり使用量を記録する。
+      if (!useFreeModel) {
+        await incrementUsage({
+          userId: interaction.user.id,
+          guildId: guildContextId,
+        });
+      }
       return;
     }
 
@@ -345,7 +349,7 @@ export const definisiCommand: Command = {
       );
       await traceEvent(traceId, "llm.generated", "info", {});
 
-      const saved = useFreeModel ? null : await saveResponse({
+      const saved = await saveResponse({
         ...cacheLookupKey,
         promptContentHash: promptContext.promptContentHash,
         modelName: llmSource ?? "fallback",

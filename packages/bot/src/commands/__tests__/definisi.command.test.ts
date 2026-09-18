@@ -264,8 +264,13 @@ describe("definisiCommand", () => {
     );
     expect(generateFreeWithLanguageGuardrailsMock).toHaveBeenCalledTimes(1);
     expect(generateWithLanguageGuardrailsMock).not.toHaveBeenCalled();
-    expect(getCachedResponseMock).not.toHaveBeenCalled();
-    expect(saveResponseMock).not.toHaveBeenCalled();
+    expect(getCachedResponseMock).toHaveBeenCalledTimes(1);
+    expect(saveResponseMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modelName: "google1-grkd-jisho-free-gemma-4-26b-a4b-it",
+        responseText: "Makan makanan",
+      }),
+    );
     expect(commitFreePoolReservationMock).toHaveBeenCalledWith({ usageDate: "2026-05-06" });
     expect(incrementUsageMock).toHaveBeenCalledWith({
       userId: "free-user-1",
