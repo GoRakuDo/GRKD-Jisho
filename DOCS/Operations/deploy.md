@@ -254,7 +254,7 @@ pnpm hooks:install
 
 Discord Developer Portal → Bot → Privileged Gateway Intents:
 
-- ✅ **MESSAGE CONTENT INTENT**（メッセージ内容の読み取りに必須）
+- ❌ **MESSAGE CONTENT INTENT**（不要。@mention および DM は Privileged Intent 無しで本文が配信されるため要求しない）
 - ✅ **SERVER MEMBERS INTENT**（ロール解決に必須）
 
 ### 5-3. OAuth2 Scope

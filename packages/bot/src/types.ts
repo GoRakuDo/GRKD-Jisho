@@ -57,4 +57,7 @@ export type TraceEventType =
   | "wipe.command_executed"
   | "ops_job.started"
   | "ops_job.completed"
-  | "ops_job.failed";
+  | "ops_job.failed"
+  | "gateway.disconnected"
+  | "gateway.error"
+  | "gateway.reconnected";

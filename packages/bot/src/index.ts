@@ -1,31 +1,80 @@
 import { env } from "./config/env.js";
-import { Client, GatewayIntentBits, Events, TextChannel } from "discord.js";
+import { Client, GatewayIntentBits, Events, Status, TextChannel } from "discord.js";
 import cron from "node-cron";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@grkd-jisho/db";
 import { messageCreateHandler } from "./events/messageCreate.js";
 import { messageUpdateHandler } from "./events/messageUpdate.js";
 import { interactionCreateHandler } from "./events/interactionCreate.js";
-import { recordHeartbeat } from "./services/observability.service.js";
+import { recordHeartbeat, traceEvent } from "./services/observability.service.js";
 import { wipeChannel } from "./services/channel-wipe.service.js";
 import { pollAndExecuteJobs } from "./services/ops-job.service.js";
 import { purgeOldLogs } from "./services/log-purge.service.js";
 import { aggregateHourly } from "./services/analytics.service.js";
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
+  // Note: MessageContent は要求しない。mention/DM/reply 経路は privileged intent 無しで本文が届く。
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
 });
+
+// Gateway watchdog（ゾンビ化防止）。切断継続が5分を超えたら process.exit(1) し、
+// systemd の Restart=on-failure に再起動を任せる。無限ループは RestartSec + StartLimit 側で抑止。
+const GATEWAY_DISCONNECT_EXIT_AFTER_MS = 5 * 60 * 1000;
+let gatewayDisconnectedSince: number | null = null;
+
+function getShardStatusName(): string {
+  const shard = client.ws.shards.first();
+  return shard ? (Status[shard.status] ?? String(shard.status)) : "no-shard";
+}
+
+function isGatewayDisconnected(): boolean {
+  if (client.readyAt === null) return true;
+  const shards = [...client.ws.shards.values()];
+  if (shards.length === 0) return true;
+  return shards.some((s) => s.status !== Status.Ready);
+}
 
 client.once("ready", () => {
   console.log(`Bot logged in as ${client.user?.tag}`);
   console.log("Prompt source: active prompt row in DB");
 
-  // 2分ごとに heartbeat を送信
+  // 2分ごとに heartbeat を送信（Gateway切断中は degraded + wsStatus付きで正直に記録）
   setInterval(async () => {
+    const wsStatusName = getShardStatusName();
+    if (isGatewayDisconnected()) {
+      if (gatewayDisconnectedSince === null) {
+        gatewayDisconnectedSince = Date.now();
+      }
+      const disconnectedMs = Date.now() - gatewayDisconnectedSince;
+      if (disconnectedMs > GATEWAY_DISCONNECT_EXIT_AFTER_MS) {
+        console.error(
+          `[Gateway] Prolonged disconnect, exiting for restart: disconnected for ${Math.round(disconnectedMs / 1000)}s (wsStatus=${wsStatusName}) → Check Discord Gateway status and network connection`,
+        );
+        // ここで DB 側がハングしても exit できるよう、traceEvent の flush は最大2秒で打ち切る
+        await Promise.race([
+          traceEvent(`gateway-${Date.now()}`, "gateway.disconnected", "error", {
+            wsStatus: wsStatusName,
+            disconnectedMs,
+            action: "process.exit(1)",
+          }),
+          new Promise((resolve) => setTimeout(resolve, 2_000)),
+        ]);
+        process.exit(1);
+      }
+      await recordHeartbeat("bot", client.user?.id ?? "unknown", "degraded", {
+        guildCount: client.guilds.cache.size,
+        uptime: process.uptime(),
+        wsStatus: wsStatusName,
+      });
+      return;
+    }
+    if (gatewayDisconnectedSince !== null) {
+      console.log(`[Gateway] Gateway復帰: reconnected (wsStatus=${wsStatusName})`);
+      await traceEvent(`gateway-${Date.now()}`, "gateway.reconnected", "info", {
+        wsStatus: wsStatusName,
+      });
+      gatewayDisconnectedSince = null;
+    }
     await recordHeartbeat("bot", client.user?.id ?? "unknown", "ok", {
       guildCount: client.guilds.cache.size,
       uptime: process.uptime(),
@@ -111,6 +160,80 @@ client.on(Events.MessageCreate, messageCreateHandler);
 client.on(Events.MessageUpdate, messageUpdateHandler);
 client.on(Events.InteractionCreate, interactionCreateHandler);
 
+// Gateway切断の検知: 理由・codeを§17形式でconsole.error + bot_eventsに記録。
+// Note: ShardDisconnect は回復不能コード時のみで、通常のネットワーク断は
+// ShardReconnecting → ShardResume/ShardReady の順で発火する。復帰検知は
+// ShardResume/ShardReady で即時リセットし、heartbeat側のshard statusチェック +
+// 5分exitウォッチドッグで取りこぼしを担保する。
+client.on(Events.ShardDisconnect, (closeEvent, shardId) => {
+  if (gatewayDisconnectedSince === null) {
+    gatewayDisconnectedSince = Date.now();
+  }
+  const code = closeEvent.code;
+  const hint =
+    code === 4014
+      ? "Enable required Privileged Gateway Intents in Discord Developer Portal → Bot → Privileged Gateway Intents"
+      : code === 4004
+        ? "Check .env DISCORD_TOKEN"
+        : "Check Discord Gateway status and network connection";
+  console.error(
+    `[Gateway] Shard disconnected: shard ${shardId} code ${code} → ${hint}`,
+  );
+  void traceEvent(`gateway-${Date.now()}`, "gateway.disconnected", "error", {
+    shardId,
+    code,
+    wsStatus: getShardStatusName(),
+  });
+});
+
+// 通常のネットワーク断はこちらが発火する（ShardDisconnect は回復不能コード時のみ）。
+client.on(Events.ShardReconnecting, (shardId) => {
+  if (gatewayDisconnectedSince === null) {
+    gatewayDisconnectedSince = Date.now();
+  }
+  const wsStatusName = getShardStatusName();
+  console.warn(
+    `[Gateway] Shard reconnecting: shard ${shardId} (wsStatus=${wsStatusName}) → Check Discord Gateway status and network connection`,
+  );
+  void traceEvent(`gateway-${Date.now()}`, "gateway.disconnected", "warn", {
+    shardId,
+    wsStatus: wsStatusName,
+  });
+});
+
+function handleShardRecovered(event: string, shardId: number): void {
+  const wsStatusName = getShardStatusName();
+  if (gatewayDisconnectedSince !== null) {
+    console.log(`[Gateway] Gateway復帰: ${event} shard ${shardId} (wsStatus=${wsStatusName})`);
+    void traceEvent(`gateway-${Date.now()}`, "gateway.reconnected", "info", {
+      event,
+      shardId,
+      wsStatus: wsStatusName,
+    });
+    gatewayDisconnectedSince = null;
+  }
+}
+
+client.on(Events.ShardResume, (shardId) => {
+  handleShardRecovered("resume", shardId);
+});
+
+client.on(Events.ShardReady, (shardId) => {
+  handleShardRecovered("ready", shardId);
+});
+
+client.on(Events.ShardError, (error, shardId) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(
+    `[Gateway] Shard error: shard ${shardId}: ${message} → Check Discord Gateway status and network connection`,
+  );
+  void traceEvent(`gateway-${Date.now()}`, "gateway.error", "error", {
+    shardId,
+    error: message,
+    wsStatus: getShardStatusName(),
+  });
+});
+
 client.login(env.DISCORD_TOKEN).catch((err) => {
   const message = parseLoginError(err);
   console.error(message);
@@ -121,6 +244,7 @@ function parseLoginError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
 
   // @discordjs/ws: close code 4014 — intent exists but not enabled in Developer Portal
+  // Note: MessageContent は要求対象外のため、この分岐は他 intent 用の保険として残す。
   if (msg.includes("disallowed intents")) {
     return [
       "❌ Login failed: Discord Gateway Intents が有効になっていません。",
